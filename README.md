@@ -4,8 +4,8 @@
 
 **이 저장소의 수치는 전부 가상 서비스 시나리오와 분포 규칙으로 생성한 데이터다.** 실제 서비스·회사의 데이터, 코드, 식별자는 들어 있지 않다. 설계는 업무 경험에서 온 일반적인 패턴을 새로 작성한 것이다.
 
-- 대시보드: `<Vercel URL>`
-- 프로젝트 개요: `<Vercel URL>/?page=about` · 데이터 페이지(스키마·미리보기): `<Vercel URL>/?page=data`
+- 대시보드: `https://placewave-analytics.vercel.app`
+- 프로젝트 개요: `https://placewave-analytics.vercel.app/?page=about` · 데이터 페이지(스키마·미리보기): `https://placewave-analytics.vercel.app/?page=data`
 
 ## 화면
 
