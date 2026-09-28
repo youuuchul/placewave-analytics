@@ -25,28 +25,23 @@ function hit(m: MetricDef, q: string): boolean {
 export default function MetricsPage() {
   const spec = useMetricSpec()
   const [tab, setTab] = useState('all')
-  const [axis, setAxis] = useState('all')
   const [q, setQ] = useState('')
 
   const list = useMemo(() => {
     if (!spec || spec === 'error') return []
-    return spec.metrics.filter((m) => (tab === 'all' || m.tab === tab) && (axis === 'all' || m.axis === axis) && hit(m, q.trim()))
-  }, [spec, tab, axis, q])
+    return spec.metrics.filter((m) => (tab === 'all' || m.tab === tab) && hit(m, q.trim()))
+  }, [spec, tab, q])
 
   if (spec === null) return <main className="mx-auto h-40 max-w-[1280px]" />
   if (spec === 'error')
     return <main className="mx-auto max-w-[1280px] px-4 pt-8 text-sm text-muted sm:px-6">지표 정의를 불러오지 못했습니다</main>
 
-  const tabName = new Map(spec.tabs.map((t) => [t.id, t.name]))
   const byId = new Map(spec.metrics.map((m) => [m.id, m]))
-  const axes = spec.axes ?? []
-  const axisName = new Map(axes.map((a) => [a.id, a.name]))
-  const inAxis = spec.metrics.filter((m) => axis === 'all' || m.axis === axis)
-  const count = (id: string) => inAxis.filter((m) => m.tab === id).length
-  const countAxis = (id: string) => spec.metrics.filter((m) => m.axis === id).length
+  const axisName = new Map((spec.axes ?? []).map((a) => [a.id, a.name]))
+  const groupName = new Map(spec.groups.map((g) => [g.id, g.name]))
+  const count = (id: string) => spec.metrics.filter((m) => m.tab === id).length
   const jump = (id: string) => {
     setTab('all')
-    setAxis('all')
     setQ(id)
     setTimeout(() => document.getElementById('metric-list')?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 0)
   }
@@ -97,31 +92,10 @@ export default function MetricsPage() {
 
       <section id="metric-list" className="flex scroll-mt-4 flex-col gap-3">
         <h3 className="text-[15px] font-semibold text-ink">지표</h3>
-        {axes.length > 0 && (
-          <div role="radiogroup" aria-label="수익 축" className="flex w-fit max-w-full items-center gap-0.5 overflow-x-auto rounded-lg bg-wash p-0.5">
-            {[{ id: 'all', name: '전체 축' }, ...axes].map((a) => {
-              const on = axis === a.id
-              return (
-                <button
-                  key={a.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={on}
-                  onClick={() => setAxis(a.id)}
-                  className={`h-7 whitespace-nowrap rounded-md px-2.5 text-[13px] transition-colors ${
-                    on ? 'bg-surface font-semibold text-ink shadow-[0_0_0_1px_var(--ring)]' : 'text-ink2 hover:text-ink'
-                  }`}
-                >
-                  {a.name} <span className="tnum opacity-60">{a.id === 'all' ? spec.metrics.length : countAxis(a.id)}</span>
-                </button>
-              )
-            })}
-          </div>
-        )}
         <div className="flex flex-wrap items-center gap-2">
           <div className="scrollbar-none -mx-4 flex gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
             <Chip on={tab === 'all'} onClick={() => setTab('all')}>
-              전체 <span className="tnum opacity-60">{inAxis.length}</span>
+              전체 <span className="tnum opacity-60">{spec.metrics.length}</span>
             </Chip>
             {spec.tabs.map((t) => (
               <Chip key={t.id} on={tab === t.id} onClick={() => setTab(t.id)}>
@@ -157,7 +131,7 @@ export default function MetricsPage() {
               <div className="flex min-w-0 flex-col gap-0.5">
                 <span className="font-semibold text-ink">{m.name}</span>
                 <span className="tnum text-xs text-muted">
-                  {m.id} · {tabName.get(m.tab) ?? m.tab}
+                  {m.id} · {groupName.get(m.group) ?? m.group}
                   {m.axis && axisName.has(m.axis) ? ` · ${axisName.get(m.axis)}` : ''}
                 </span>
               </div>

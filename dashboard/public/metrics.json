@@ -32,15 +32,19 @@
     },
     {
       "id": "subscription",
-      "name": "구독"
-    },
-    {
-      "id": "venue",
-      "name": "공간·파트너"
+      "name": "멤버십"
     },
     {
       "id": "acquisition",
       "name": "유입·광고"
+    },
+    {
+      "id": "venue",
+      "name": "공간"
+    },
+    {
+      "id": "partner",
+      "name": "파트너 계약"
     }
   ],
   "notes": {
@@ -179,21 +183,6 @@
   ],
   "metrics": [
     {
-      "id": "V01",
-      "name": "일 방문자",
-      "tab": "overview",
-      "group": "visit",
-      "definition": "그날 방문 세션이 1개 이상인 사람",
-      "formula": "Σ persons (같은 날 세그먼트끼리만 합산)",
-      "unit": "사람",
-      "denominator": "—",
-      "mart_columns": [
-        "daily_metrics.persons"
-      ],
-      "why": "하루 규모의 기본 단위",
-      "axis": "marketplace"
-    },
-    {
       "id": "V02",
       "name": "신규 방문자",
       "tab": "overview",
@@ -205,8 +194,7 @@
       "mart_columns": [
         "daily_metrics.new_persons"
       ],
-      "why": "새로 들어오는 사람의 흐름",
-      "axis": "marketplace"
+      "why": "새로 들어오는 사람의 흐름"
     },
     {
       "id": "V03",
@@ -220,8 +208,7 @@
       "mart_columns": [
         "weekly_activity.wau"
       ],
-      "why": "주 단위 활성 규모",
-      "axis": "marketplace"
+      "why": "주 단위 활성 규모"
     },
     {
       "id": "V04",
@@ -235,8 +222,7 @@
       "mart_columns": [
         "monthly_summary.persons"
       ],
-      "why": "월 단위 활성 규모",
-      "axis": "marketplace"
+      "why": "월 단위 활성 규모"
     },
     {
       "id": "V05",
@@ -251,8 +237,7 @@
         "weekly_activity.returning_persons",
         "weekly_activity.wau"
       ],
-      "why": "신규 유입 없이도 남는 사용자층의 두께",
-      "axis": "marketplace"
+      "why": "신규 유입 없이도 남는 사용자층의 두께"
     },
     {
       "id": "V06",
@@ -267,87 +252,7 @@
         "weekly_activity.two_plus_days",
         "weekly_activity.wau"
       ],
-      "why": "습관 형성 정도",
-      "axis": "marketplace"
-    },
-    {
-      "id": "V07",
-      "name": "방문 세션",
-      "tab": "overview",
-      "group": "visit",
-      "definition": "자동 로드가 아닌 세션",
-      "formula": "Σ sessions",
-      "unit": "세션",
-      "denominator": "—",
-      "mart_columns": [
-        "daily_metrics.sessions"
-      ],
-      "why": "방문의 양",
-      "axis": "marketplace"
-    },
-    {
-      "id": "V08",
-      "name": "활성 세션 비율",
-      "tab": "overview",
-      "group": "visit",
-      "definition": "방문 세션 중 engaged 세션의 비율",
-      "formula": "Σ engaged_sessions ÷ Σ sessions",
-      "unit": "세션",
-      "denominator": "방문 세션",
-      "mart_columns": [
-        "daily_metrics.engaged_sessions",
-        "daily_metrics.sessions"
-      ],
-      "why": "들어와서 실제로 머문 비율 — 유입 품질 신호",
-      "axis": "marketplace"
-    },
-    {
-      "id": "V09",
-      "name": "자동 로드 세션 비중",
-      "tab": "overview",
-      "group": "visit",
-      "definition": "전체 세션 중 자동 로드 세션",
-      "formula": "auto_load_sessions ÷ (sessions + auto_load_sessions)",
-      "unit": "세션",
-      "denominator": "전체 세션",
-      "mart_columns": [
-        "daily_metrics.auto_load_sessions"
-      ],
-      "why": "웹뷰·미리보기 같은 비방문 세션 규모 점검",
-      "axis": "marketplace",
-      "direction": "down"
-    },
-    {
-      "id": "V10",
-      "name": "세션당 체류",
-      "tab": "overview",
-      "group": "visit",
-      "definition": "방문 세션의 평균 체류 시간",
-      "formula": "engagement_msec ÷ 1000 ÷ sessions",
-      "unit": "초",
-      "denominator": "방문 세션",
-      "mart_columns": [
-        "daily_metrics.engagement_msec",
-        "daily_metrics.sessions"
-      ],
-      "why": "콘텐츠 몰입도",
-      "axis": "marketplace"
-    },
-    {
-      "id": "V11",
-      "name": "하루 2세션+ 비중",
-      "tab": "overview",
-      "group": "visit",
-      "definition": "그날 방문 세션 2개 이상인 사람의 비중",
-      "formula": "multi_session_persons ÷ persons",
-      "unit": "사람",
-      "denominator": "일 방문자",
-      "mart_columns": [
-        "daily_metrics.multi_session_persons",
-        "daily_metrics.persons"
-      ],
-      "why": "하루 안 재방문",
-      "axis": "marketplace"
+      "why": "습관 형성 정도"
     },
     {
       "id": "V12",
@@ -362,8 +267,7 @@
         "person_day.flags(visited)",
         "daily_metrics.persons"
       ],
-      "why": "기간 규모의 기본 지표. 일 방문자를 더한 값(사람 × 일)과 다르다",
-      "axis": "marketplace"
+      "why": "기간 규모의 기본 지표. 일 방문자를 더한 값(사람 × 일)과 다르다"
     },
     {
       "id": "V13",
@@ -377,8 +281,7 @@
       "mart_columns": [
         "hourly_metrics.sessions"
       ],
-      "why": "운영·푸시 시간대 결정",
-      "axis": "marketplace"
+      "why": "운영·푸시 시간대 결정"
     },
     {
       "id": "V14",
@@ -393,8 +296,7 @@
         "person_day.flags(visited)",
         "person_day.m"
       ],
-      "why": "로그인 상태로 돌아오는 핵심 사용자 규모",
-      "axis": "marketplace"
+      "why": "로그인 상태로 돌아오는 핵심 사용자 규모"
     },
     {
       "id": "V15",
@@ -409,8 +311,7 @@
         "person_day.flags(visited)",
         "person_day.m"
       ],
-      "why": "비회원 트래픽 의존도",
-      "axis": "marketplace"
+      "why": "비회원 트래픽 의존도"
     },
     {
       "id": "V16",
@@ -424,8 +325,7 @@
       "mart_columns": [
         "weekly_activity.new_persons"
       ],
-      "why": "주간 유입",
-      "axis": "marketplace"
+      "why": "주간 유입"
     },
     {
       "id": "V17",
@@ -439,8 +339,7 @@
       "mart_columns": [
         "weekly_activity.returning_persons"
       ],
-      "why": "주간 유지",
-      "axis": "marketplace"
+      "why": "주간 유지"
     },
     {
       "id": "E01",
@@ -455,40 +354,7 @@
         "person_day.flags(explored)",
         "daily_metrics.explorers"
       ],
-      "why": "탐색 기능이 쓰이는 정도",
-      "axis": "marketplace"
-    },
-    {
-      "id": "E02",
-      "name": "행사 상세 조회율",
-      "tab": "funnel",
-      "group": "explore",
-      "definition": "일 방문자 중 행사 상세를 본 사람",
-      "formula": "detail_viewers ÷ persons",
-      "unit": "사람",
-      "denominator": "일 방문자",
-      "mart_columns": [
-        "daily_metrics.detail_viewers",
-        "daily_metrics.persons"
-      ],
-      "why": "행사 콘텐츠의 흡인력",
-      "axis": "marketplace"
-    },
-    {
-      "id": "E03",
-      "name": "신청 화면 도달률",
-      "tab": "funnel",
-      "group": "explore",
-      "definition": "일 방문자 중 신청 화면을 본 사람",
-      "formula": "apply_viewers ÷ persons",
-      "unit": "사람",
-      "denominator": "일 방문자",
-      "mart_columns": [
-        "daily_metrics.apply_viewers",
-        "daily_metrics.persons"
-      ],
-      "why": "구매 의도 규모",
-      "axis": "marketplace"
+      "why": "탐색 기능이 쓰이는 정도"
     },
     {
       "id": "E04",
@@ -502,8 +368,7 @@
       "mart_columns": [
         "daily_event.detail_viewers"
       ],
-      "why": "행사별 관심도 순위",
-      "axis": "marketplace"
+      "why": "행사별 관심도 순위"
     },
     {
       "id": "E05",
@@ -517,8 +382,7 @@
       "mart_columns": [
         "daily_venue.detail_viewers"
       ],
-      "why": "공간별 관심도 순위",
-      "axis": "marketplace"
+      "why": "공간별 관심도 순위"
     },
     {
       "id": "E06",
@@ -532,8 +396,7 @@
       "mart_columns": [
         "weekly_path.sessions"
       ],
-      "why": "사람들이 실제로 움직이는 길",
-      "axis": "marketplace"
+      "why": "사람들이 실제로 움직이는 길"
     },
     {
       "id": "E07",
@@ -547,8 +410,7 @@
       "mart_columns": [
         "daily_event.event_id"
       ],
-      "why": "노출된 행사 폭",
-      "axis": "marketplace"
+      "why": "노출된 행사 폭"
     },
     {
       "id": "E08",
@@ -562,8 +424,7 @@
       "mart_columns": [
         "daily_venue.venue_id"
       ],
-      "why": "노출된 공간 폭",
-      "axis": "marketplace"
+      "why": "노출된 공간 폭"
     },
     {
       "id": "C01",
@@ -578,71 +439,7 @@
         "daily_metrics.signups",
         "daily_metrics.new_persons"
       ],
-      "why": "첫 방문을 회원으로 바꾸는 힘",
-      "axis": "marketplace"
-    },
-    {
-      "id": "C02",
-      "name": "방문 → 가입 전환(기간 누적)",
-      "tab": "members",
-      "group": "convert",
-      "definition": "기간 방문 고유 사람 중 기간 안 가입한 사람",
-      "formula": "고유(signed_up) ÷ 고유(visited)",
-      "unit": "사람",
-      "denominator": "방문자(기간 고유)",
-      "mart_columns": [
-        "staging.int_person_day"
-      ],
-      "why": "검사 R3 기준값",
-      "axis": "marketplace"
-    },
-    {
-      "id": "C03",
-      "name": "행사 상세 → 신청",
-      "tab": "funnel",
-      "group": "convert",
-      "definition": "행사 상세를 본 사람 중 신청한 사람",
-      "formula": "appliers ÷ detail_viewers",
-      "unit": "사람 × 일",
-      "denominator": "행사 상세를 본 사람",
-      "mart_columns": [
-        "daily_metrics.appliers",
-        "daily_metrics.detail_viewers"
-      ],
-      "why": "상세 화면의 설득력",
-      "axis": "marketplace"
-    },
-    {
-      "id": "C04",
-      "name": "신청 화면 → 신청",
-      "tab": "funnel",
-      "group": "convert",
-      "definition": "신청 화면을 본 사람 중 신청한 사람",
-      "formula": "appliers ÷ apply_viewers",
-      "unit": "사람 × 일",
-      "denominator": "신청 화면을 본 사람",
-      "mart_columns": [
-        "daily_metrics.appliers",
-        "daily_metrics.apply_viewers"
-      ],
-      "why": "신청 양식의 마찰",
-      "axis": "marketplace"
-    },
-    {
-      "id": "C05",
-      "name": "신청 → 결제 완료",
-      "tab": "events",
-      "group": "convert",
-      "definition": "유료 행사 신청 중 결제 완료",
-      "formula": "pay_count ÷ paid_tier_applies",
-      "unit": "건",
-      "denominator": "유료 행사 신청",
-      "mart_columns": [
-        "daily_event.pay_count",
-        "daily_event.paid_tier_applies"
-      ],
-      "why": "결제 단계 이탈",
-      "axis": "marketplace"
+      "why": "첫 방문을 회원으로 바꾸는 힘"
     },
     {
       "id": "C06",
@@ -658,7 +455,6 @@
         "daily_metrics.applies"
       ],
       "why": "노쇼·환불 위험",
-      "axis": "marketplace",
       "direction": "down"
     },
     {
@@ -674,8 +470,7 @@
         "daily_metrics.pay_amount",
         "person_day.flags(paid)"
       ],
-      "why": "사람당 지출 크기",
-      "axis": "marketplace"
+      "why": "사람당 지출 크기"
     },
     {
       "id": "C08",
@@ -690,8 +485,7 @@
         "funnel_daily.persons",
         "person_day.flags"
       ],
-      "why": "퍼널 탭의 뼈대",
-      "axis": "marketplace"
+      "why": "퍼널 탭의 뼈대"
     },
     {
       "id": "C09",
@@ -705,8 +499,7 @@
       "mart_columns": [
         "weekly_audience_funnel.persons"
       ],
-      "why": "누구에게 어느 단계가 막히는가",
-      "axis": "marketplace"
+      "why": "누구에게 어느 단계가 막히는가"
     },
     {
       "id": "C10",
@@ -720,8 +513,7 @@
       "mart_columns": [
         "daily_metrics.signups"
       ],
-      "why": "회원 기반 성장",
-      "axis": "marketplace"
+      "why": "회원 기반 성장"
     },
     {
       "id": "C11",
@@ -735,8 +527,7 @@
       "mart_columns": [
         "daily_metrics.applies"
       ],
-      "why": "수요의 양",
-      "axis": "marketplace"
+      "why": "수요의 양"
     },
     {
       "id": "C12",
@@ -750,8 +541,7 @@
       "mart_columns": [
         "daily_metrics.pay_count"
       ],
-      "why": "거래의 양",
-      "axis": "marketplace"
+      "why": "거래의 양"
     },
     {
       "id": "C13",
@@ -765,8 +555,7 @@
       "mart_columns": [
         "daily_metrics.pay_amount"
       ],
-      "why": "세그먼트로 쪼갤 수 있는 결제 규모. 원장과의 합계 비교는 검사 C9",
-      "axis": "marketplace"
+      "why": "세그먼트로 쪼갤 수 있는 결제 규모. 원장과의 합계 비교는 검사 C9"
     },
     {
       "id": "C14",
@@ -780,8 +569,7 @@
       "mart_columns": [
         "person_day.flags"
       ],
-      "why": "행사 화면 이후 결제까지의 이탈",
-      "axis": "marketplace"
+      "why": "행사 화면 이후 결제까지의 이탈"
     },
     {
       "id": "C15",
@@ -796,8 +584,7 @@
         "person_day.flags",
         "funnel_daily.persons"
       ],
-      "why": "퍼널 전체 효율 한 숫자",
-      "axis": "marketplace"
+      "why": "퍼널 전체 효율 한 숫자"
     },
     {
       "id": "C16",
@@ -812,7 +599,6 @@
         "person_day.flags"
       ],
       "why": "개선 우선순위",
-      "axis": "marketplace",
       "direction": "down"
     },
     {
@@ -827,8 +613,7 @@
       "mart_columns": [
         "person_day.flags"
       ],
-      "why": "배포·캠페인 영향 감지",
-      "axis": "marketplace"
+      "why": "배포·캠페인 영향 감지"
     },
     {
       "id": "C18",
@@ -842,8 +627,7 @@
       "mart_columns": [
         "person_day.flags"
       ],
-      "why": "어느 집단이 어디서 막히는가",
-      "axis": "marketplace"
+      "why": "어느 집단이 어디서 막히는가"
     },
     {
       "id": "C19",
@@ -859,8 +643,7 @@
         "daily_event.detail_viewers",
         "daily_venue.applies"
       ],
-      "why": "대상별 전환 효율",
-      "axis": "marketplace"
+      "why": "대상별 전환 효율"
     },
     {
       "id": "C20",
@@ -874,8 +657,7 @@
       "mart_columns": [
         "daily_metrics.signups"
       ],
-      "why": "회원 기반의 크기",
-      "axis": "marketplace"
+      "why": "회원 기반의 크기"
     },
     {
       "id": "C21",
@@ -893,7 +675,6 @@
         "monthly_summary.applies"
       ],
       "why": "행사·가격대별 취소 위험 비교. 흐름 보기 취소율(C06, 취소일 기준)과 분자 기준이 다르다",
-      "axis": "marketplace",
       "direction": "down"
     },
     {
@@ -909,8 +690,7 @@
         "weekly_cohort.retained",
         "weekly_cohort.cohort_size"
       ],
-      "why": "제품이 다시 부르는 힘",
-      "axis": "marketplace"
+      "why": "제품이 다시 부르는 힘"
     },
     {
       "id": "R02",
@@ -924,8 +704,7 @@
       "mart_columns": [
         "monthly_summary.w1_retention"
       ],
-      "why": "월 브리핑용 리텐션",
-      "axis": "marketplace"
+      "why": "월 브리핑용 리텐션"
     },
     {
       "id": "R03",
@@ -940,8 +719,7 @@
         "monthly_cohort.retained",
         "monthly_cohort.cohort_size"
       ],
-      "why": "장기 유지",
-      "axis": "marketplace"
+      "why": "장기 유지"
     },
     {
       "id": "M01",
@@ -1324,8 +1102,7 @@
       "mart_columns": [
         "daily_venue_registry.registered_total"
       ],
-      "why": "공급 측 목록의 크기",
-      "axis": "b2b"
+      "why": "공급 측 목록의 크기"
     },
     {
       "id": "P02",
@@ -1339,14 +1116,13 @@
       "mart_columns": [
         "daily_venue_registry.partner_total"
       ],
-      "why": "유료 계약 공급자 규모",
-      "axis": "b2b"
+      "why": "유료 계약 공급자 규모"
     },
     {
       "id": "P03",
       "name": "신규 계약",
       "tab": "venues",
-      "group": "venue",
+      "group": "partner",
       "definition": "기간 안 시작한 파트너 계약",
       "formula": "Σ new_contracts",
       "unit": "건",
@@ -1361,7 +1137,7 @@
       "id": "P04",
       "name": "계약 해지",
       "tab": "venues",
-      "group": "venue",
+      "group": "partner",
       "definition": "기간 안 끝난 파트너 계약",
       "formula": "Σ churned_contracts",
       "unit": "건",
@@ -1377,7 +1153,7 @@
       "id": "P05",
       "name": "파트너 플랜 MRR",
       "tab": "venues",
-      "group": "venue",
+      "group": "partner",
       "definition": "기간 끝일 활성 계약의 월 요금 합(베이직 49,000 · 프로 149,000). ARR = MRR × 12",
       "formula": "Σ (mrr_basic + mrr_pro) (기간 끝일)",
       "unit": "원",
@@ -1402,8 +1178,7 @@
         "daily_venue_registry.partner_total",
         "daily_venue_registry.registered_total"
       ],
-      "why": "등록 공간을 유료 플랜으로 바꾸는 비율",
-      "axis": "b2b"
+      "why": "등록 공간을 유료 플랜으로 바꾸는 비율"
     },
     {
       "id": "P07",
@@ -1417,8 +1192,7 @@
       "mart_columns": [
         "venue_registry.detail_viewers_28d"
       ],
-      "why": "공간별 수요의 크기 — 지도 점 크기",
-      "axis": "b2b"
+      "why": "공간별 수요의 크기 — 지도 점 크기"
     },
     {
       "id": "P08",
@@ -1432,8 +1206,7 @@
       "mart_columns": [
         "venue_registry.events_365d"
       ],
-      "why": "파트너 활동량",
-      "axis": "b2b"
+      "why": "파트너 활동량"
     },
     {
       "id": "P09",
@@ -1447,14 +1220,13 @@
       "mart_columns": [
         "venue_registry.ticket_amount_365d"
       ],
-      "why": "공간별 거래 기여",
-      "axis": "b2b"
+      "why": "공간별 거래 기여"
     },
     {
       "id": "P10",
       "name": "ARPA",
       "tab": "venues",
-      "group": "venue",
+      "group": "partner",
       "definition": "활성 계약 1건당 월 플랜 요금(Average revenue per account)",
       "formula": "mrr_eom ÷ contracts_eom (plan = all, 마지막 끝난 달)",
       "unit": "원",
@@ -1470,7 +1242,7 @@
       "id": "P11",
       "name": "계약 월 해지율",
       "tab": "venues",
-      "group": "venue",
+      "group": "partner",
       "definition": "월초 활성 계약 중 그 달 해지된 비율(Logo churn)",
       "formula": "Σ churned_contracts ÷ Σ contracts_bom (끝난 달)",
       "unit": "%",
@@ -1487,7 +1259,7 @@
       "id": "P12",
       "name": "매출 해지율",
       "tab": "venues",
-      "group": "venue",
+      "group": "partner",
       "definition": "월초 플랜 MRR 중 해지·다운그레이드로 잃은 비율(Revenue churn)",
       "formula": "Σ (mrr_churn + mrr_contraction) ÷ Σ mrr_bom (끝난 달)",
       "unit": "%",
@@ -1505,7 +1277,7 @@
       "id": "P13",
       "name": "GRR",
       "tab": "venues",
-      "group": "venue",
+      "group": "partner",
       "definition": "월초 플랜 MRR 중 해지·다운그레이드 후 남은 비율(Gross revenue retention)",
       "formula": "Σ (mrr_bom − mrr_churn − mrr_contraction) ÷ Σ mrr_bom (끝난 달)",
       "unit": "%",
@@ -1522,7 +1294,7 @@
       "id": "P14",
       "name": "NRR",
       "tab": "venues",
-      "group": "venue",
+      "group": "partner",
       "definition": "GRR 에 업그레이드 증가분을 더한 비율(Net revenue retention)",
       "formula": "Σ (mrr_bom − mrr_churn − mrr_contraction + mrr_expansion) ÷ Σ mrr_bom (끝난 달)",
       "unit": "%",
@@ -1539,7 +1311,7 @@
       "id": "P15",
       "name": "계약 코호트 유지율",
       "tab": "venues",
-      "group": "venue",
+      "group": "partner",
       "definition": "계약 시작 월 코호트 중 n개월 뒤 월말에 활성인 비율(건·MRR)",
       "formula": "retained ÷ cohort_size · mrr_retained ÷ mrr_retained(0개월)",
       "unit": "%",
@@ -1556,7 +1328,7 @@
       "id": "P16",
       "name": "파트너 부담률",
       "tab": "venues",
-      "group": "venue",
+      "group": "partner",
       "definition": "파트너 공간이 플랫폼에서 판 거래액 대비 플랫폼에 낸 비용(수수료 + 플랜 요금)",
       "formula": "(Σ net_amount (ticket, fee_tier ∈ basic, pro) + Σ net_amount (partner_plan)) ÷ Σ gmv_amount (fee_tier ∈ basic, pro)",
       "unit": "%",
@@ -1582,8 +1354,7 @@
       "mart_columns": [
         "daily_channel.sessions"
       ],
-      "why": "유입 구성",
-      "axis": "marketplace"
+      "why": "유입 구성"
     },
     {
       "id": "A02",
@@ -1598,8 +1369,7 @@
         "daily_channel.sessions",
         "daily_channel.channel1"
       ],
-      "why": "광고 의존도",
-      "axis": "marketplace"
+      "why": "광고 의존도"
     },
     {
       "id": "A03",
@@ -1613,8 +1383,7 @@
       "mart_columns": [
         "daily_channel.new_persons"
       ],
-      "why": "새 사람을 데려오는 채널",
-      "axis": "marketplace"
+      "why": "새 사람을 데려오는 채널"
     },
     {
       "id": "A04",
@@ -1629,8 +1398,7 @@
         "daily_ad.clicks",
         "daily_ad.impressions"
       ],
-      "why": "소재 반응",
-      "axis": "marketplace"
+      "why": "소재 반응"
     },
     {
       "id": "A05",
@@ -1645,8 +1413,7 @@
         "daily_ad.spend",
         "daily_ad.signups"
       ],
-      "why": "회원 한 명을 사는 비용(보수적)",
-      "axis": "marketplace"
+      "why": "회원 한 명을 사는 비용(보수적)"
     },
     {
       "id": "A06",
@@ -1661,8 +1428,7 @@
         "daily_ad.pay_amount",
         "daily_ad.spend"
       ],
-      "why": "광고비 회수",
-      "axis": "marketplace"
+      "why": "광고비 회수"
     },
     {
       "id": "A07",
@@ -1681,8 +1447,7 @@
         "daily_ad.signups",
         "daily_ad.pay_amount"
       ],
-      "why": "캠페인끼리 비용 효율을 같은 기간 기준으로 비교",
-      "axis": "marketplace"
+      "why": "캠페인끼리 비용 효율을 같은 기간 기준으로 비교"
     },
     {
       "id": "A08",
@@ -1696,8 +1461,7 @@
       "mart_columns": [
         "daily_ad.spend"
       ],
-      "why": "집행 규모",
-      "axis": "marketplace"
+      "why": "집행 규모"
     },
     {
       "id": "A09",
@@ -1712,8 +1476,7 @@
         "daily_ad.impressions",
         "daily_ad.clicks"
       ],
-      "why": "집행 도달",
-      "axis": "marketplace"
+      "why": "집행 도달"
     },
     {
       "id": "A10",
@@ -1727,8 +1490,7 @@
       "mart_columns": [
         "daily_ad.sessions"
       ],
-      "why": "클릭이 방문으로 이어지는 정도",
-      "axis": "marketplace"
+      "why": "클릭이 방문으로 이어지는 정도"
     },
     {
       "id": "A11",
@@ -1742,26 +1504,25 @@
       "mart_columns": [
         "daily_ad.new_persons"
       ],
-      "why": "광고가 데려온 새 사람",
-      "axis": "marketplace"
+      "why": "광고가 데려온 새 사람"
     }
   ],
   "axes": [
     {
       "id": "platform",
-      "name": "공통"
+      "name": "플랫폼 매출"
     },
     {
       "id": "marketplace",
-      "name": "마켓플레이스"
+      "name": "거래 수수료"
     },
     {
       "id": "subscription",
-      "name": "구독"
+      "name": "멤버십"
     },
     {
       "id": "b2b",
-      "name": "B2B"
+      "name": "파트너 플랜"
     }
   ]
 }
