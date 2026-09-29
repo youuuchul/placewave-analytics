@@ -248,41 +248,68 @@ function Row({ children }: { children: React.ReactNode }) {
 
 export function Funnel({ steps }: { steps: { label: string; value: number }[] }) {
   const first = steps[0]?.value ?? 0
+  const w = (v: number) => (first > 0 ? Math.min(1, v / first) : 0)
   return (
-    <div className="flex flex-col gap-2.5">
-      <div className="grid grid-cols-[88px_1fr_64px_56px] gap-3 text-[11px] text-muted sm:grid-cols-[112px_1fr_80px_64px]">
+    <div className="flex flex-col">
+      <div className="mb-1.5 grid grid-cols-[88px_1fr_72px] gap-3 text-[11px] text-muted sm:grid-cols-[112px_1fr_88px]">
         <span />
-        <span>이전 단계 대비</span>
+        <span>첫 단계 대비</span>
         <span className="text-right">명</span>
-        <span className="text-right">첫 단계 대비</span>
       </div>
       {steps.map((s, i) => {
         const prev = i === 0 ? null : steps[i - 1].value
-        const conv = prev == null ? 1 : prev > 0 ? s.value / prev : 0
+        const conv = prev == null ? null : prev > 0 ? s.value / prev : 0
+        const drop = prev == null ? 0 : Math.max(0, prev - s.value)
+        const cur = w(s.value)
+        const before = prev == null ? cur : w(prev)
+        const share = first > 0 ? s.value / first : 0
+        const tip =
+          prev == null
+            ? `${s.label} ${num(s.value)}명 · 기준`
+            : `${s.label} ${num(s.value)}명 · 첫 단계 대비 ${pct(share)} · 이전 단계 대비 ${pct(conv ?? 0)} · 이탈 ${num(drop)}명`
         return (
-          <div
-            key={s.label}
-            className="grid grid-cols-[88px_1fr_64px_56px] items-center gap-3 text-[13px] sm:grid-cols-[112px_1fr_80px_64px]"
-          >
-            <span className="truncate text-ink2">{s.label}</span>
-            <div className="relative h-6 rounded-[4px] bg-[var(--bar-wash)]">
-              <div
-                className="absolute inset-y-0 left-0 rounded-[4px] bg-[var(--s1)]"
-                style={{ width: `${Math.max(conv * 100, conv > 0 ? 0.8 : 0)}%` }}
-              />
-              <span
-                className="tnum absolute inset-y-0 flex items-center text-xs font-medium"
-                style={
-                  conv > 0.22
-                    ? { left: 8, color: '#fff' }
-                    : { left: `calc(${conv * 100}% + 6px)`, color: 'var(--ink)' }
-                }
-              >
-                {i === 0 ? '기준' : pct(conv)}
-              </span>
+          <div key={s.label}>
+            {conv != null && (
+              <div className="grid grid-cols-[88px_1fr_72px] gap-3 sm:grid-cols-[112px_1fr_88px]">
+                <span />
+                <span className="tnum flex items-center gap-1.5 py-1 text-[11px] text-muted">
+                  <span aria-hidden>↓</span>
+                  <span className="font-medium text-ink2">{pct(conv)}</span>
+                  <span>전환 · 이탈 {num(drop)}명</span>
+                </span>
+                <span />
+              </div>
+            )}
+            <div
+              title={tip}
+              className="group grid grid-cols-[88px_1fr_72px] items-center gap-3 text-[13px] sm:grid-cols-[112px_1fr_88px]"
+            >
+              <span className="truncate text-ink2">{s.label}</span>
+              <div className="relative h-7 rounded-[4px] bg-[var(--bar-wash)]">
+                {prev != null && before > cur && (
+                  <div
+                    className="absolute inset-y-0 rounded-r-[4px] opacity-60"
+                    style={{
+                      left: `${cur * 100}%`,
+                      width: `${(before - cur) * 100}%`,
+                      background:
+                        'repeating-linear-gradient(135deg, var(--axis) 0 2px, transparent 2px 6px)',
+                    }}
+                  />
+                )}
+                <div
+                  className="absolute inset-y-0 left-0 rounded-[4px] bg-[var(--s1)] transition-opacity group-hover:opacity-90"
+                  style={{ width: `${Math.max(cur * 100, cur > 0 ? 0.8 : 0)}%` }}
+                />
+                <span
+                  className="tnum absolute inset-y-0 flex items-center text-xs font-medium"
+                  style={cur > 0.18 ? { left: 8, color: '#fff' } : { left: `calc(${cur * 100}% + 6px)`, color: 'var(--ink)' }}
+                >
+                  {i === 0 ? '100%' : pct(share)}
+                </span>
+              </div>
+              <span className="tnum text-right font-medium text-ink">{num(s.value)}</span>
             </div>
-            <span className="tnum text-right text-ink">{num(s.value)}</span>
-            <span className="tnum text-right text-muted">{first > 0 ? pct(s.value / first) : '—'}</span>
           </div>
         )
       })}
