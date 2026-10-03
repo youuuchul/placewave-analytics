@@ -1,6 +1,6 @@
 """BigQuery 마트 → dashboard/public/data/ 분할 추출기.
 
-marts 데이터셋의 표 21개를 개인 GCP 래퍼(scripts/bq.sh)로 읽어 분할 파일로 쓴다.
+marts 데이터셋의 표 26개를 개인 GCP 래퍼(scripts/bq.sh)로 읽어 분할 파일로 쓴다.
 조회는 SELECT 뿐이며 표를 만들거나 바꾸지 않는다. 마트가 적재된 뒤에 실행한다.
 
     uv run dashboard/scripts/extract.py
@@ -34,7 +34,7 @@ DATASET = "marts"
 SEG = ["channel1", "device_platform", "member_seg"]
 
 # 화면이 필요할 때 따로 받는 표. 나머지 표는 index.json 에 넣는다.
-LAZY = ["hourly_metrics", "daily_channel", "daily_venue", "daily_event", "weekly_path"]
+LAZY = ["hourly_metrics", "daily_channel", "daily_venue", "daily_event", "weekly_path", "daily_search", "daily_query"]
 
 # person_day.bin 비트 배치: (필드, 워드, 시작 비트, 비트 수). 리틀엔디언 Uint32 2개 = 행당 8바이트.
 PD_BITS = [("pk", 0, 0, 20), ("d", 0, 20, 9), ("c", 0, 29, 1), ("p", 0, 30, 2), ("m", 1, 0, 1), ("f", 1, 1, 16)]
@@ -42,6 +42,99 @@ HASHED = re.compile(r"^[a-z_]+(\.meta)?\.[0-9a-f]{8}\.(json|bin|pdz)$")
 
 # 표 이름 → (열 목록, 정렬 열). 열 이름은 docs/architecture.md §2 marts 와 docs/dashboard.md 계약을 따른다.
 TABLES: dict[str, tuple[list[str], list[str]]] = {
+    "daily_search": (
+        [
+            "kst_date",
+            "query_intent",
+            "ranker_version",
+            *SEG,
+            "searches",
+            "zero_result_searches",
+            "ga_matched_searches",
+            "matched_result_searches",
+            "clicked_searches",
+            "first_click_position_sum",
+            "top3_clicks",
+            "reformulated_searches",
+            "search_sessions",
+            "search_sessions_applied",
+        ],
+        ["kst_date", "query_intent", "ranker_version"],
+    ),
+    "daily_query": (
+        [
+            "kst_date",
+            "query_norm",
+            *SEG,
+            "query_intent",
+            "searches",
+            "zero_result_searches",
+            "ga_matched_searches",
+            "clicked_searches",
+            "reformulated_searches",
+            "first_eval_date",
+            "first_failed_eval_date",
+        ],
+        ["kst_date", "query_norm"],
+    ),
+    "weekly_eval_ops": (
+        [
+            "week_start",
+            "requester",
+            "rater_group",
+            "guideline_version",
+            "labels",
+            "rework_labels",
+            "handle_seconds",
+            "gold_labels",
+            "gold_correct",
+            "final_labels",
+            "label_pairs",
+            "agree_pairs",
+            "labels_g0",
+            "labels_g1",
+            "labels_g2",
+            "labels_g3",
+            "tasks_completed",
+        ],
+        ["week_start", "requester", "rater_group", "guideline_version"],
+    ),
+    "weekly_rater": (
+        [
+            "week_start",
+            "rater_id",
+            "requester",
+            "rater_group",
+            "labels",
+            "rework_labels",
+            "handle_seconds",
+            "gold_labels",
+            "gold_correct",
+            "label_pairs",
+            "agree_pairs",
+        ],
+        ["week_start", "rater_id", "requester"],
+    ),
+    "weekly_batch": (
+        [
+            "week_start",
+            "batch_id",
+            "requester",
+            "purpose",
+            "guideline_version",
+            "priority",
+            "created_date",
+            "due_date",
+            "as_of_date",
+            "target_tasks",
+            "done_tasks",
+            "done_in_week",
+            "remaining_tasks",
+            "recent_done_14d",
+            "days_to_due",
+        ],
+        ["week_start", "batch_id"],
+    ),
     "daily_metrics": (
         [
             "kst_date",
@@ -303,6 +396,19 @@ STRING_COLS = {
     "contract_ended_at",
     "status",
     "as_of_date",
+    "query_intent",
+    "ranker_version",
+    "query_norm",
+    "first_eval_date",
+    "first_failed_eval_date",
+    "requester",
+    "rater_group",
+    "guideline_version",
+    "rater_id",
+    "batch_id",
+    "purpose",
+    "created_date",
+    "due_date",
 }
 FLOAT_COLS = {"w1_retention", "lat", "lng"}
 BOOL_COLS = {"is_partner"}

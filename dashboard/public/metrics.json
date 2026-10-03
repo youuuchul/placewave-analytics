@@ -45,6 +45,14 @@
     {
       "id": "partner",
       "name": "파트너 계약"
+    },
+    {
+      "id": "search",
+      "name": "검색"
+    },
+    {
+      "id": "eval",
+      "name": "평가 운영"
     }
   ],
   "notes": {
@@ -80,6 +88,18 @@
       "유입 분류는 세션 라스트클릭이다(`daily_channel.channel1~3`). 다른 마트의 세그먼트 `channel1` 은 사람의 첫 유입이다.",
       "광고 귀속은 광고 세션 안에서 일어난 가입·결제만 센다. 이후 다른 채널로 돌아와 전환한 경우는 포함하지 않으므로 CAC 는 보수적(높게), ROAS 는 낮게 나온다.",
       "채널 규칙(`channel1` paid/non_paid, `channel2` 유입 유형, `channel3` 소스)의 원본은 `bigquery/sql/01_map_channel.sql` 하나다."
+    ],
+    "search": [
+      "검색 지표는 서버 검색 로그(`raw.search_log`)가 기준이다. 클릭·재검색·신청 같은 행동은 GA 로그에서 기기 + 시각 근접(±3초)으로 붙인다. 행동 비율의 분모는 매칭된 요청이다(Q11).",
+      "결과 0건이 줄면 결과가 있는 검색이 늘어 클릭률(Q04)의 분모가 커진다. 랭킹 비교에는 검색당 클릭(Q12)·첫 클릭 순위(Q05)·상위 3위 비중(Q06)을 함께 본다.",
+      "의도 유형은 정규화 검색어를 장르·상권(공간 원장)·행사 유형(행사 원장) 사전에 대어 분류하고, 어디에도 없으면 공간명이다.",
+      "검색 탭의 `랭킹 실험` 보기는 같은 날 v1·v2 가 함께 있는 기간(기기 해시 50% 배정)으로 기간이 정해진다. 비율 차이의 95% 구간은 정규 근사다."
+    ],
+    "eval": [
+      "평가 운영 지표는 주(월요일 시작) 단위다. 화면은 기간 프리셋 대신 주차 선택기, 세그먼트 대신 요청 부서(검색 · 추천 슬롯)를 쓴다.",
+      "카파는 마트에 저장하지 않고 성분(쌍 수·일치 쌍 수·등급별 최종 라벨 수)을 필터 적용 후 합산해 계산한다.",
+      "과제 완료 = 서로 다른 평가자의 첫 제출 라벨 수가 배치의 `labels_per_task` 에 도달. 정답셋 과제는 평가자에게 일반 과제와 구분되지 않는다.",
+      "기준 미달 평가자 = 그 주 정답셋 라벨 10건 이상이고 정확도 80% 미만."
     ]
   },
   "tabs": [
@@ -109,6 +129,21 @@
         "C15",
         "C16",
         "E01"
+      ]
+    },
+    {
+      "id": "search",
+      "name": "검색",
+      "question": "검색이 어디서 실패하고, 랭킹 개선이 실패를 줄였는가",
+      "users": [
+        "프로덕트",
+        "검색",
+        "데이터 분석"
+      ],
+      "key_metrics": [
+        "Q03",
+        "Q05",
+        "Q06"
       ]
     },
     {
@@ -164,6 +199,20 @@
         "A02",
         "A05",
         "A06"
+      ]
+    },
+    {
+      "id": "evalops",
+      "name": "평가 운영",
+      "question": "이번 주 평가 목표를 품질 기준 안에서 채우고 있는가, 막힌 곳은 어디인가",
+      "users": [
+        "검색 운영",
+        "평가 운영"
+      ],
+      "key_metrics": [
+        "L02",
+        "L07",
+        "L09"
       ]
     },
     {
@@ -1505,6 +1554,375 @@
         "daily_ad.new_persons"
       ],
       "why": "광고가 데려온 새 사람"
+    },
+    {
+      "id": "Q01",
+      "name": "검색 이용자",
+      "tab": "search",
+      "group": "search",
+      "definition": "기간 안에 검색을 1회 이상 한 고유 사람",
+      "formula": "고유(searched)",
+      "unit": "사람",
+      "denominator": "—",
+      "mart_columns": [
+        "person_day.flags(searched)"
+      ],
+      "why": "검색 기능이 쓰이는 규모"
+    },
+    {
+      "id": "Q02",
+      "name": "검색 수",
+      "tab": "search",
+      "group": "search",
+      "definition": "서버가 받은 검색 요청 건수",
+      "formula": "Σ searches",
+      "unit": "건",
+      "denominator": "—",
+      "mart_columns": [
+        "daily_search.searches"
+      ],
+      "why": "검색 품질 지표의 분모"
+    },
+    {
+      "id": "Q03",
+      "name": "결과 0건 비율",
+      "tab": "search",
+      "group": "search",
+      "definition": "결과가 하나도 없었던 검색의 비중",
+      "formula": "Σ zero_result_searches ÷ Σ searches",
+      "unit": "건",
+      "denominator": "검색 수",
+      "mart_columns": [
+        "daily_search.zero_result_searches",
+        "daily_search.searches"
+      ],
+      "why": "검색이 아무것도 못 보여준 실패",
+      "direction": "down"
+    },
+    {
+      "id": "Q04",
+      "name": "결과 클릭률",
+      "tab": "search",
+      "group": "search",
+      "definition": "GA 와 매칭된 검색 중 결과가 있었던 검색에서 결과를 눌러 공간 상세로 간 비중",
+      "formula": "Σ clicked_searches ÷ Σ matched_result_searches",
+      "unit": "건",
+      "denominator": "결과 있는 매칭 검색",
+      "mart_columns": [
+        "daily_search.clicked_searches",
+        "daily_search.matched_result_searches"
+      ],
+      "why": "결과가 쓸모 있었는가"
+    },
+    {
+      "id": "Q05",
+      "name": "평균 첫 클릭 순위",
+      "tab": "search",
+      "group": "search",
+      "definition": "클릭된 검색에서 처음 누른 결과의 노출 순위 평균(1이 맨 위)",
+      "formula": "Σ first_click_position_sum ÷ Σ clicked_searches",
+      "unit": "순위",
+      "denominator": "클릭된 검색",
+      "mart_columns": [
+        "daily_search.first_click_position_sum",
+        "daily_search.clicked_searches"
+      ],
+      "why": "원하는 결과가 위에 있는가",
+      "direction": "down"
+    },
+    {
+      "id": "Q06",
+      "name": "상위 3위 클릭 비중",
+      "tab": "search",
+      "group": "search",
+      "definition": "클릭된 검색 중 첫 클릭이 1~3위였던 비중",
+      "formula": "Σ top3_clicks ÷ Σ clicked_searches",
+      "unit": "건",
+      "denominator": "클릭된 검색",
+      "mart_columns": [
+        "daily_search.top3_clicks",
+        "daily_search.clicked_searches"
+      ],
+      "why": "랭킹 품질을 클릭으로 본 값"
+    },
+    {
+      "id": "Q07",
+      "name": "재검색률",
+      "tab": "search",
+      "group": "search",
+      "definition": "GA 와 매칭된 검색 중 결과를 누르지 않고 바로 다시 검색한 비중",
+      "formula": "Σ reformulated_searches ÷ Σ ga_matched_searches",
+      "unit": "건",
+      "denominator": "매칭 검색",
+      "mart_columns": [
+        "daily_search.reformulated_searches",
+        "daily_search.ga_matched_searches"
+      ],
+      "why": "원하는 것을 못 찾아 고쳐 친 정도",
+      "direction": "down"
+    },
+    {
+      "id": "Q08",
+      "name": "검색 세션 신청 전환",
+      "tab": "search",
+      "group": "search",
+      "definition": "검색이 있었던 방문 세션 중 같은 세션에서 행사 신청까지 간 비중. 세션은 첫 매칭 검색 행에 귀속",
+      "formula": "Σ search_sessions_applied ÷ Σ search_sessions",
+      "unit": "세션",
+      "denominator": "검색 세션",
+      "mart_columns": [
+        "daily_search.search_sessions_applied",
+        "daily_search.search_sessions"
+      ],
+      "why": "검색이 거래로 이어지는 정도"
+    },
+    {
+      "id": "Q09",
+      "name": "실패 검색어",
+      "tab": "search",
+      "group": "search",
+      "definition": "기간 안 검색 20건 이상이고 결과 0건 비율이 30% 이상인 검색어",
+      "formula": "검색어별 Σ zero_result_searches ÷ Σ searches ≥ 0.3, Σ searches ≥ 20",
+      "unit": "검색어",
+      "denominator": "—",
+      "mart_columns": [
+        "daily_query.searches",
+        "daily_query.zero_result_searches"
+      ],
+      "why": "평가 대상 검색어를 고르는 기준",
+      "direction": "down"
+    },
+    {
+      "id": "Q10",
+      "name": "실패 검색어 평가 편입률",
+      "tab": "search",
+      "group": "search",
+      "definition": "실패 검색어 중 기간 끝 7일 안까지 평가 배치에 편입된 비중",
+      "formula": "first_eval_date ≤ 기간 끝 + 7일 인 실패 검색어 ÷ 실패 검색어",
+      "unit": "검색어",
+      "denominator": "실패 검색어",
+      "mart_columns": [
+        "daily_query.first_eval_date"
+      ],
+      "why": "실패가 개선 작업으로 넘어갔는가"
+    },
+    {
+      "id": "Q11",
+      "name": "로그 매칭률",
+      "tab": "search",
+      "group": "search",
+      "definition": "서버 검색 요청 중 GA 검색 이벤트와 매칭된 비중(기기 + 시각 ±3초)",
+      "formula": "Σ ga_matched_searches ÷ Σ searches",
+      "unit": "건",
+      "denominator": "검색 수",
+      "mart_columns": [
+        "daily_search.ga_matched_searches",
+        "daily_search.searches"
+      ],
+      "why": "두 원천을 붙인 지표를 믿을 수 있는가"
+    },
+    {
+      "id": "Q12",
+      "name": "검색당 클릭",
+      "tab": "search",
+      "group": "search",
+      "definition": "GA 와 매칭된 검색 중 결과를 눌러 공간 상세로 간 비중(결과 0건 검색 포함)",
+      "formula": "Σ clicked_searches ÷ Σ ga_matched_searches",
+      "unit": "건",
+      "denominator": "매칭 검색",
+      "mart_columns": [
+        "daily_search.clicked_searches",
+        "daily_search.ga_matched_searches"
+      ],
+      "why": "결과 0건이 줄어 분모가 바뀌는 클릭률과 달리 검색 1건이 클릭으로 이어지는 정도"
+    },
+    {
+      "id": "L01",
+      "name": "라벨 수",
+      "tab": "evalops",
+      "group": "eval",
+      "definition": "그 주 제출된 라벨 건수(재작업 포함)",
+      "formula": "Σ labels",
+      "unit": "건",
+      "denominator": "—",
+      "mart_columns": [
+        "weekly_eval_ops.labels"
+      ],
+      "why": "평가 처리량의 기본 단위"
+    },
+    {
+      "id": "L02",
+      "name": "목표 대비 진척률",
+      "tab": "evalops",
+      "group": "eval",
+      "definition": "그 주 진행 중 배치의 완료 과제(서로 다른 평가자 라벨 수 충족)를 목표 과제로 나눈 값, 주말 시점 누적",
+      "formula": "Σ done_tasks ÷ Σ target_tasks",
+      "unit": "과제",
+      "denominator": "목표 과제",
+      "mart_columns": [
+        "weekly_batch.done_tasks",
+        "weekly_batch.target_tasks"
+      ],
+      "why": "약속한 양을 채우고 있는가"
+    },
+    {
+      "id": "L03",
+      "name": "마감 위험 배치",
+      "tab": "evalops",
+      "group": "eval",
+      "definition": "진행 배치를 배정 순서(우선순위 → 생성일)로 세웠을 때 앞 배치까지의 남은 과제 누적을 팀 처리량으로 나눈 예상 소요 일수가 마감까지 남은 일수보다 긴 배치, 또는 마감이 지난 배치",
+      "formula": "Σ(앞 배치 포함) remaining_tasks ÷ (최근 2주 Σ tasks_completed ÷ 14) > days_to_due, 또는 days_to_due < 0",
+      "unit": "배치",
+      "denominator": "—",
+      "mart_columns": [
+        "weekly_batch.remaining_tasks",
+        "weekly_batch.days_to_due",
+        "weekly_batch.priority",
+        "weekly_batch.created_date",
+        "weekly_eval_ops.tasks_completed"
+      ],
+      "why": "우선순위 조정·인력 재배치 신호",
+      "direction": "down"
+    },
+    {
+      "id": "L04",
+      "name": "활동 평가자",
+      "tab": "evalops",
+      "group": "eval",
+      "definition": "그 주 라벨을 1건 이상 제출한 평가자",
+      "formula": "고유 rater_id",
+      "unit": "명",
+      "denominator": "—",
+      "mart_columns": [
+        "weekly_rater.rater_id"
+      ],
+      "why": "투입 인력 규모"
+    },
+    {
+      "id": "L05",
+      "name": "평가자당 라벨 수",
+      "tab": "evalops",
+      "group": "eval",
+      "definition": "라벨 수를 활동 평가자로 나눈 값",
+      "formula": "Σ labels ÷ 활동 평가자",
+      "unit": "건",
+      "denominator": "활동 평가자",
+      "mart_columns": [
+        "weekly_eval_ops.labels",
+        "weekly_rater.rater_id"
+      ],
+      "why": "인당 생산성"
+    },
+    {
+      "id": "L06",
+      "name": "건당 처리 시간",
+      "tab": "evalops",
+      "group": "eval",
+      "definition": "라벨 1건 제출에 걸린 평균 시간",
+      "formula": "Σ handle_seconds ÷ Σ labels",
+      "unit": "초",
+      "denominator": "라벨 수",
+      "mart_columns": [
+        "weekly_eval_ops.handle_seconds",
+        "weekly_eval_ops.labels"
+      ],
+      "why": "지침·과제 난이도 변화가 생산성에 주는 영향"
+    },
+    {
+      "id": "L07",
+      "name": "정답셋 정확도",
+      "tab": "evalops",
+      "group": "eval",
+      "definition": "정답셋 과제에 단 첫 제출 라벨(검수 반려 전) 중 정답 등급과 같은 비중",
+      "formula": "Σ gold_correct ÷ Σ gold_labels",
+      "unit": "건",
+      "denominator": "정답셋 라벨",
+      "mart_columns": [
+        "weekly_eval_ops.gold_correct",
+        "weekly_eval_ops.gold_labels"
+      ],
+      "why": "라벨 품질의 절대 기준"
+    },
+    {
+      "id": "L08",
+      "name": "평가자 간 일치율",
+      "tab": "evalops",
+      "group": "eval",
+      "definition": "같은 과제의 최종 라벨 쌍 중 등급이 같은 쌍의 비중. 쌍은 늦게 낸 라벨에 귀속",
+      "formula": "Σ agree_pairs ÷ Σ label_pairs",
+      "unit": "쌍",
+      "denominator": "라벨 쌍",
+      "mart_columns": [
+        "weekly_eval_ops.agree_pairs",
+        "weekly_eval_ops.label_pairs"
+      ],
+      "why": "지침이 같은 판단을 만들고 있는가"
+    },
+    {
+      "id": "L09",
+      "name": "일치도 카파",
+      "tab": "evalops",
+      "group": "eval",
+      "definition": "우연 일치를 뺀 일치도. 관측 일치율 Po 와 등급 분포로 본 기대 일치율 Pe 로 계산",
+      "formula": "(Po − Pe) ÷ (1 − Pe), Po = Σ agree_pairs ÷ Σ label_pairs, Pe = Σₖ (Σ labels_gₖ ÷ Σ final_labels)²",
+      "unit": "—",
+      "denominator": "—",
+      "mart_columns": [
+        "weekly_eval_ops.agree_pairs",
+        "weekly_eval_ops.label_pairs",
+        "weekly_eval_ops.labels_g0",
+        "weekly_eval_ops.labels_g1",
+        "weekly_eval_ops.labels_g2",
+        "weekly_eval_ops.labels_g3",
+        "weekly_eval_ops.final_labels"
+      ],
+      "why": "등급 쏠림에 흔들리지 않는 일치도"
+    },
+    {
+      "id": "L10",
+      "name": "재작업률",
+      "tab": "evalops",
+      "group": "eval",
+      "definition": "검수에서 반려되어 다시 제출된 라벨의 비중",
+      "formula": "Σ rework_labels ÷ Σ labels",
+      "unit": "건",
+      "denominator": "라벨 수",
+      "mart_columns": [
+        "weekly_eval_ops.rework_labels",
+        "weekly_eval_ops.labels"
+      ],
+      "why": "검수 부담과 지침 모호성",
+      "direction": "down"
+    },
+    {
+      "id": "L11",
+      "name": "기준 미달 평가자",
+      "tab": "evalops",
+      "group": "eval",
+      "definition": "그 주 정답셋 라벨 10건 이상 중 정확도 80% 미만인 평가자",
+      "formula": "정확도 < 0.8 ∧ gold_labels ≥ 10 인 rater_id 수",
+      "unit": "명",
+      "denominator": "—",
+      "mart_columns": [
+        "weekly_rater.gold_correct",
+        "weekly_rater.gold_labels"
+      ],
+      "why": "재교육·배정 조정 대상",
+      "direction": "down"
+    },
+    {
+      "id": "L12",
+      "name": "완료 과제",
+      "tab": "evalops",
+      "group": "eval",
+      "definition": "그 주 라벨 수가 과제당 필요 라벨 수에 도달한 과제",
+      "formula": "Σ tasks_completed",
+      "unit": "과제",
+      "denominator": "—",
+      "mart_columns": [
+        "weekly_eval_ops.tasks_completed"
+      ],
+      "why": "주간 처리량을 과제 단위로 본 값"
     }
   ],
   "axes": [

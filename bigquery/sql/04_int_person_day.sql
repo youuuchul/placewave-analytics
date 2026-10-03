@@ -3,7 +3,7 @@
 -- 키: (person_id, kst_date)
 -- 파티션·클러스터: kst_date / channel1, device_platform, member_seg
 -- 원천: staging.int_session·dim_subscription (그날 활성 구독), raw.db_members (가입일)
--- 소비: marts.daily_metrics·funnel_daily·weekly_cohort·monthly_cohort·weekly_activity·monthly_summary,
+-- 소비: staging.int_search, marts.daily_metrics·funnel_daily·weekly_cohort·monthly_cohort·weekly_activity·monthly_summary,
 --       marts.daily_channel·hourly_metrics·weekly_audience_funnel·weekly_path·person_day, ops.reconciliation
 -- 검사: R3
 --

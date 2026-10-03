@@ -3,7 +3,7 @@
 -- 키: (client_id, session_id, event_at, event_name)
 -- 파티션·클러스터: kst_date / event_name, client_id
 -- 원천: raw.ga4_events
--- 소비: staging.int_session, marts.daily_event·daily_venue·weekly_path·venue_registry, ops.reconciliation
+-- 소비: staging.int_session·int_search, marts.daily_event·daily_venue·weekly_path·venue_registry, ops.reconciliation
 -- 검사: C1a·C1b·C2·I3
 --
 -- 처리: 식별자 이름 정리(user_pseudo_id→client_id, user_id→member_id, ga_session_id→session_id),

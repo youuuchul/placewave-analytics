@@ -16,7 +16,7 @@
 | ![주간 탭 — WAU·재방문 비중, 주간 방문자, 코호트 리텐션 히트맵](docs/img/weekly_cohort.png) | ![프로젝트 개요 — 가상 프로덕트, 핵심 퍼널 5화면, 데이터 흐름](docs/img/about.png) |
 | ![데이터 페이지 — 층별 표 41개, 스키마·컬럼 설명, 마트 미리보기](docs/img/data.png) | ![공간 탭 — 등록·파트너 공간, 서울 상권 분포 지도, 파트너 공간 표](docs/img/venues.png) |
 
-탭 7개(개요 / 퍼널 / 행사·결제 / 회원 / 공간 / 유입·광고 / 주간·월간)와 프로젝트 개요·지표 가이드·데이터 페이지. 필터(기간·채널·플랫폼·회원)는 마트에 그 축이 있는 카드에만 붙이고, 상태는 전부 URL에 남는다. 탭별 구성과 산식은 [docs/dashboard.md](docs/dashboard.md).
+탭 9개(개요 / 퍼널 / 검색 / 행사·결제 / 회원 / 공간 / 유입·광고 / 평가 운영 / 주간·월간)와 프로젝트 개요·지표 가이드·데이터 페이지. 필터(기간·채널·플랫폼·회원)는 마트에 그 축이 있는 카드에만 붙이고, 상태는 전부 URL에 남는다. 탭별 구성과 산식은 [docs/dashboard.md](docs/dashboard.md).
 
 ## 비즈니스 모델
 
@@ -25,6 +25,8 @@
 ## 시나리오 2.0
 
 런칭 1년차(2025-09-22~2026-09-20) 서울 공간·이벤트 플랫폼. 1.0(탐색 → 신청 → 결제)에 **공간 등록·파트너 계약(B2B)**, **소비자 구독**, **실제 서울 상권 좌표** 축을 더했다. 상권 이름·구·중심 좌표는 공개 지리 정보이고, 상호·행사·회원·매출은 전부 가상 분포로 생성한다. 설계 근거는 [docs/scenario_v2.md](docs/scenario_v2.md).
+
+**시나리오 3.0** 은 같은 세계에 검색 품질과 관련성 평가 운영을 더한다. 기존 행동 로그·원장은 그대로 두고, 그 로그를 읽어 만든 부속 원천(검색 서버 로그, 평가 도구 스냅샷)을 붙여 검색 실패 → 평가 데이터셋 → 랭킹 v2 50% 노출 → 검색 지표 변화의 고리를 만든다. 설계는 [docs/scenario_v3_search_eval.md](docs/scenario_v3_search_eval.md).
 
 | 항목 | 값 |
 |---|---|
@@ -84,6 +86,7 @@ BigQuery 없이 화면만 보려면 1~3 대신 `uv run dashboard/scripts/make_sa
 | 문서 | 내용 |
 |---|---|
 | [docs/scenario_v2.md](docs/scenario_v2.md) | 시나리오 2.0 설계 — 공간 등록·파트너 계약·구독·B2B, 서울 상권 |
+| [docs/scenario_v3_search_eval.md](docs/scenario_v3_search_eval.md) | 시나리오 3.0 설계 — 검색 서버 로그·관련성 평가 운영·랭킹 실험 |
 | [docs/architecture.md](docs/architecture.md) | 원천·층·표·그레인·신원 규칙 |
 | [docs/metrics.md](docs/metrics.md) | 지표 정의 — 단위·분자·분모·제외 규칙, 마트 열 기준 |
 | [docs/dashboard.md](docs/dashboard.md) | 탭·필터 원칙, 화면 산식, `data.json` 데이터 계약, 개요·데이터 페이지 |

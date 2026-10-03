@@ -1,0 +1,32 @@
+[
+  {
+    "name": "batch_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "배치 ID"
+  },
+  {
+    "name": "query_norm",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "정규화 검색어 (소문자·앞뒤 공백 제거)"
+  },
+  {
+    "name": "source",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "편입 출처 failed (직전 7일 실패 검색어) / head (상위 검색량) / random / promoted (추천 슬롯 노출)"
+  },
+  {
+    "name": "sampled_at",
+    "type": "DATE",
+    "mode": "REQUIRED",
+    "description": "추출일 (KST, 배치 생성일)"
+  },
+  {
+    "name": "snapshot_date",
+    "type": "DATE",
+    "mode": "REQUIRED",
+    "description": "스냅샷 기준일 (생성 종료일, KST)"
+  }
+]

@@ -1,0 +1,55 @@
+-- 표: marts.daily_search — 검색 품질 일 마트
+-- 1행: 일(KST) × query_intent × ranker_version × channel1 × device_platform × member_seg
+-- 키: 이 여섯 열
+-- 파티션·클러스터: kst_date / query_intent, ranker_version
+-- 원천: staging.int_search
+-- 소비: 검색 탭 스코어보드·추이·의도 유형·랭킹 버전 분해. ops.reconciliation
+-- 검사: C16
+--
+-- 비율은 저장하지 않는다. 0건 비율은 전체 요청, 클릭률·재검색률은 GA 매칭 요청이 분모다(매칭 안 된 요청은 행동을 모른다).
+-- 세션 열은 세션의 첫 매칭 검색 행에 귀속된 값이라 어느 축으로 더해도 세션이 두 번 세지지 않는다.
+
+CREATE OR REPLACE TABLE marts.daily_search (
+  kst_date DATE OPTIONS(description='날짜 (KST, 세션 시작일). 일 파티션'),
+  query_intent STRING OPTIONS(description='의도 유형 genre / region / event_type / venue_name'),
+  ranker_version STRING OPTIONS(description='랭킹 버전 v1 / v2'),
+  channel1 STRING OPTIONS(description='세그먼트: 첫 유입 paid / non_paid'),
+  device_platform STRING OPTIONS(description='세그먼트: 첫 방문 기기 플랫폼 ios / android / web'),
+  member_seg STRING OPTIONS(description='세그먼트: 그날 0시 기준 member / guest'),
+  searches INT64 OPTIONS(description='서버 검색 요청 수'),
+  zero_result_searches INT64 OPTIONS(description='결과 0건 요청 수'),
+  ga_matched_searches INT64 OPTIONS(description='GA 와 매칭된 요청 수'),
+  matched_result_searches INT64 OPTIONS(description='GA 매칭 요청 중 결과가 있었던 수 (클릭률 분모)'),
+  clicked_searches INT64 OPTIONS(description='결과 클릭 요청 수'),
+  first_click_position_sum INT64 OPTIONS(description='첫 클릭 순위 합 (평균 순위 분자)'),
+  top3_clicks INT64 OPTIONS(description='첫 클릭이 1~3위인 요청 수'),
+  reformulated_searches INT64 OPTIONS(description='결과를 누르지 않고 바로 다시 검색한 요청 수'),
+  promoted_searches INT64 OPTIONS(description='상단 추천 슬롯이 노출된 요청 수'),
+  search_sessions INT64 OPTIONS(description='검색이 있었던 방문 세션 수 (세션 첫 매칭 검색에 귀속)'),
+  search_sessions_applied INT64 OPTIONS(description='그중 같은 세션에서 행사 신청한 세션 수')
+)
+PARTITION BY kst_date
+CLUSTER BY query_intent, ranker_version
+OPTIONS(description='검색 품질 일 마트. 1행 = 일 × 의도 유형 × 랭킹 버전 × channel1 × device_platform × member_seg. 원천 staging.int_search')
+AS
+SELECT
+  kst_date,
+  query_intent,
+  ranker_version,
+  channel1,
+  device_platform,
+  member_seg,
+  COUNT(*) AS searches,
+  COUNTIF(is_zero_result) AS zero_result_searches,
+  COUNTIF(ga_matched) AS ga_matched_searches,
+  COUNTIF(ga_matched AND NOT is_zero_result) AS matched_result_searches,
+  COUNTIF(is_clicked) AS clicked_searches,
+  COALESCE(SUM(IF(is_clicked, first_click_position, 0)), 0) AS first_click_position_sum,
+  COUNTIF(is_clicked AND first_click_position <= 3) AS top3_clicks,
+  COUNTIF(is_reformulated) AS reformulated_searches,
+  COUNTIF(has_promoted) AS promoted_searches,
+  COUNTIF(is_session_first) AS search_sessions,
+  COUNTIF(session_applied) AS search_sessions_applied
+FROM staging.int_search
+WHERE kst_date BETWEEN DATE '2000-01-01' AND DATE '2099-12-31'
+GROUP BY 1, 2, 3, 4, 5, 6;

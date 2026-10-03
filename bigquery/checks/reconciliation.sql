@@ -5,7 +5,9 @@
 -- 원천: raw.db_payments·db_applications·db_subscriptions·db_venues,
 --       staging.events_clean·int_session·int_person_day·fct_order·ad_spend·dim_contract,
 --       marts.daily_metrics·weekly_cohort·daily_channel·weekly_activity·weekly_audience_funnel·weekly_path·person_day,
---       marts.daily_revenue·daily_subscription·daily_venue_registry·daily_event·venue_registry·monthly_contract
+--       marts.daily_revenue·daily_subscription·daily_venue_registry·daily_event·venue_registry·monthly_contract,
+--       raw.search_log·eval_queries·eval_labels·eval_tasks·eval_batches, staging.int_search·int_label,
+--       marts.daily_search·weekly_eval_ops·weekly_batch
 -- 소비: load_all.sh 8단계. passed = FALSE 가 하나라도 있으면 파이프라인이 exit 1
 --
 -- 표 정의는 sql/00_ops_tables.sql.
@@ -391,6 +393,72 @@ cross_day AS (
   JOIN staging.int_session AS s USING (client_id, session_id)
   WHERE e.kst_date BETWEEN DATE '2000-01-01' AND DATE '2099-12-31' AND e.event_name = 'apply_event'
 ),
+-- C16 검색 요청: 서버 로그 행 = 중간 표 행 = 일 마트 합. 날짜별 마트 vs 중간 표 불일치 일수 포함
+c16 AS (
+  SELECT
+    (SELECT COUNT(*) FROM raw.search_log WHERE requested_at IS NOT NULL) AS raw_n,
+    SUM(COALESCE(m.v, 0)) AS mart_v,
+    SUM(COALESCE(i.v, 0)) AS stg_v,
+    COUNTIF(COALESCE(m.v, -1) != COALESCE(i.v, -1)) AS bad_days
+  FROM (
+    SELECT kst_date, SUM(searches) AS v FROM marts.daily_search
+    WHERE kst_date BETWEEN DATE '2000-01-01' AND DATE '2099-12-31' GROUP BY 1
+  ) AS m
+  FULL OUTER JOIN (
+    SELECT kst_date, COUNT(*) AS v FROM staging.int_search
+    WHERE kst_date BETWEEN DATE '2000-01-01' AND DATE '2099-12-31' GROUP BY 1
+  ) AS i USING (kst_date)
+),
+-- C17·R12·I5·I6 검색 판정 (중간 표)
+srch AS (
+  SELECT
+    COUNT(*) AS n,
+    COUNTIF(ga_matched) AS matched,
+    COUNTIF(is_clicked AND (is_zero_result OR first_click_position NOT BETWEEN 1 AND 10 OR NOT ga_matched)) AS bad_click,
+    COUNTIF(channel1 IS NULL OR device_platform IS NULL OR member_seg IS NULL) AS no_seg,
+    COUNTIF(is_session_first) AS first_rows,
+    COUNT(DISTINCT IF(ga_matched, FORMAT('%s|%d', client_id, session_id), NULL)) AS matched_sessions
+  FROM staging.int_search
+  WHERE kst_date BETWEEN DATE '2000-01-01' AND DATE '2099-12-31'
+),
+-- C18·C19 라벨 수·정답셋 성분: 주간 마트 합 vs 원천 재집계
+lab AS (
+  SELECT
+    (SELECT COUNT(*) FROM raw.eval_labels) AS raw_labels,
+    (SELECT SUM(labels) FROM marts.weekly_eval_ops) AS mart_labels,
+    (SELECT COUNTIF(t.is_gold AND NOT l.is_rework) FROM raw.eval_labels AS l JOIN raw.eval_tasks AS t USING (task_id)) AS raw_gold,
+    (SELECT COUNTIF(t.is_gold AND NOT l.is_rework AND l.grade = t.gold_grade)
+       FROM raw.eval_labels AS l JOIN raw.eval_tasks AS t USING (task_id)) AS raw_gold_ok,
+    (SELECT SUM(gold_labels) FROM marts.weekly_eval_ops) AS mart_gold,
+    (SELECT SUM(gold_correct) FROM marts.weekly_eval_ops) AS mart_gold_ok
+),
+-- I7 과제당 첫 제출 평가자 수 > labels_per_task, 배치 완료 > 목표
+over_label AS (
+  SELECT
+    (SELECT COUNT(*) FROM (
+       SELECT l.task_id, ANY_VALUE(b.labels_per_task) AS lpt, COUNT(DISTINCT l.rater_id) AS n
+       FROM staging.int_label AS l JOIN raw.eval_batches AS b USING (batch_id)
+       WHERE l.kst_date BETWEEN DATE '2000-01-01' AND DATE '2099-12-31' AND NOT l.is_rework
+       GROUP BY 1
+     ) WHERE n > lpt)
+    + (SELECT COUNTIF(done_tasks > target_tasks) FROM marts.weekly_batch) AS violations
+),
+-- C20 실패 출처 편입 검색어: 추출일 직전 7일(서버 로그, 요청 KST 날짜) 검색 20건 이상 · 0건 비율 30% 이상이어야 한다
+failed_src AS (
+  SELECT COUNTIF(COALESCE(w.n, 0) < 20 OR SAFE_DIVIDE(w.z, w.n) < 0.3) AS bad, COUNT(*) AS n
+  FROM raw.eval_queries AS q
+  LEFT JOIN (
+    SELECT
+      q2.batch_id, q2.query_norm, COUNT(*) AS n, COUNTIF(s.results_count = 0) AS z
+    FROM raw.eval_queries AS q2
+    JOIN raw.search_log AS s
+      ON LOWER(TRIM(s.query_raw)) = q2.query_norm
+     AND DATE(s.requested_at, 'Asia/Seoul') BETWEEN DATE_SUB(q2.sampled_at, INTERVAL 7 DAY) AND DATE_SUB(q2.sampled_at, INTERVAL 1 DAY)
+    WHERE q2.source = 'failed'
+    GROUP BY 1, 2
+  ) AS w USING (batch_id, query_norm)
+  WHERE q.source = 'failed'
+),
 checks AS (
   SELECT 'C1a' AS check_id, 'reconcile' AS category, '결제 건수: 로그 vs 원장' AS check_name,
          'events_clean purchase' AS left_label, CAST(l.purchases AS FLOAT64) AS left_value,
@@ -551,6 +619,48 @@ checks AS (
          '다른 날 신청', cross_n, '전체 신청', all_n,
          SAFE_DIVIDE(cross_n, all_n), 0, 0.02, NULL
   FROM cross_day
+  UNION ALL
+  SELECT 'C16', 'reconcile', '검색 요청: 서버 로그 vs 중간 표 vs 일 마트 (+ 날짜별 불일치 일수)',
+         'raw.search_log 행', raw_n, 'daily_search searches 합', mart_v,
+         ABS(raw_n - mart_v) + ABS(stg_v - mart_v) + bad_days, 0, 0, NULL
+  FROM c16
+  UNION ALL
+  SELECT 'C17', 'reconcile', '세션 대표 행: 대표 검색 행 수 vs 검색이 있었던 매칭 세션 수',
+         'is_session_first 행', first_rows, '매칭 세션 고유 수', matched_sessions,
+         ABS(first_rows - matched_sessions), 0, 0, NULL
+  FROM srch
+  UNION ALL
+  SELECT 'R12', 'range', 'GA 매칭률 (서버 요청 중 GA search 와 근접 매칭)',
+         'GA 매칭 요청', matched, '서버 요청', n,
+         SAFE_DIVIDE(matched, n), 0.98, 1, NULL
+  FROM srch
+  UNION ALL
+  SELECT 'I5', 'integrity', '클릭 판정: 0건·매칭 없음·순위 1~10 밖인데 클릭', '위반 요청', bad_click, NULL, NULL,
+         bad_click, 0, 0, NULL
+  FROM srch
+  UNION ALL
+  SELECT 'I6', 'integrity', '검색 요청 세그먼트 누락', '세그먼트 NULL 요청', no_seg, NULL, NULL,
+         no_seg, 0, 0, NULL
+  FROM srch
+  UNION ALL
+  SELECT 'C18', 'reconcile', '라벨 수: 원천 vs 평가 운영 주간 마트',
+         'raw.eval_labels 행', raw_labels, 'weekly_eval_ops labels 합', mart_labels,
+         ABS(raw_labels - mart_labels), 0, 0, NULL
+  FROM lab
+  UNION ALL
+  SELECT 'C19', 'reconcile', '정답셋 성분: 원천 재집계 vs 주간 마트 (첫 제출 라벨 수 + 정답 수)',
+         '원천 정답셋 첫 제출 / 정답', raw_gold + raw_gold_ok, 'weekly_eval_ops gold_labels + gold_correct', mart_gold + mart_gold_ok,
+         ABS(raw_gold - mart_gold) + ABS(raw_gold_ok - mart_gold_ok), 0, 0, NULL
+  FROM lab
+  UNION ALL
+  SELECT 'I7', 'integrity', '과제당 평가자 초과·배치 완료 > 목표', '위반 건', violations, NULL, NULL,
+         violations, 0, 0, NULL
+  FROM over_label
+  UNION ALL
+  SELECT 'C20', 'reconcile', '실패 출처 편입 검색어가 직전 7일 실패 조건(20건 이상·0건 30% 이상)을 만족',
+         '조건 미달 편입', bad, '실패 출처 편입', n,
+         bad, 0, 0, NULL
+  FROM failed_src
 )
 SELECT
   @run_id,

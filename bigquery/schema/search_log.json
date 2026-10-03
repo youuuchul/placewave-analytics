@@ -1,0 +1,82 @@
+[
+  {
+    "name": "request_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "검색 요청 ID"
+  },
+  {
+    "name": "requested_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "서버 수신 시각 (UTC). GA search 이벤트보다 수백 ms 늦다"
+  },
+  {
+    "name": "user_pseudo_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "기기 식별자 (GA user_pseudo_id 와 같은 체계)"
+  },
+  {
+    "name": "query_raw",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "입력 검색어 (GA search_term 과 같음)"
+  },
+  {
+    "name": "ranker_version",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "랭킹 버전 v1 / v2. 2026-07-13~07-26 은 기기 해시 50% 노출"
+  },
+  {
+    "name": "results_count",
+    "type": "INTEGER",
+    "mode": "REQUIRED",
+    "description": "일치 결과 수. 0 = 결과 없음"
+  },
+  {
+    "name": "results",
+    "type": "RECORD",
+    "mode": "REPEATED",
+    "description": "노출 상위 10 (순위순)",
+    "fields": [
+      {
+        "name": "position",
+        "type": "INTEGER",
+        "mode": "REQUIRED",
+        "description": "노출 순위 (1 = 맨 위)"
+      },
+      {
+        "name": "item_type",
+        "type": "STRING",
+        "mode": "REQUIRED",
+        "description": "venue / event"
+      },
+      {
+        "name": "item_id",
+        "type": "INTEGER",
+        "mode": "REQUIRED",
+        "description": "공간 ID 또는 행사 ID"
+      }
+    ]
+  },
+  {
+    "name": "promoted_event_id",
+    "type": "INTEGER",
+    "mode": "NULLABLE",
+    "description": "상단 추천 슬롯 행사 ID (2026-05-04 도입, 없으면 NULL)"
+  },
+  {
+    "name": "latency_ms",
+    "type": "INTEGER",
+    "mode": "REQUIRED",
+    "description": "응답 시간 (ms)"
+  },
+  {
+    "name": "snapshot_date",
+    "type": "DATE",
+    "mode": "REQUIRED",
+    "description": "스냅샷 기준일 (생성 종료일, KST)"
+  }
+]

@@ -1,9 +1,11 @@
 import { useMemo } from 'react'
-import { segFilter } from '../lib/agg'
+import { groupSum, segFilter } from '../lib/agg'
 import { addDays, addMonths, md, ym } from '../lib/date'
 import { num, pct, ratio, won } from '../lib/format'
 import { channel2Label, S } from '../lib/labels'
+import { ready, useTable } from '../lib/source'
 import type { Data, WeeklyActivity } from '../lib/types'
+import { kappa, riskIds, teamPace } from './EvalOps'
 import { Heatmap, TimeChart } from '../components/charts'
 import { DataTable, type Col } from '../components/DataTable'
 import { Card, type Delta, Legend, Tile, TileRow } from '../components/ui'
@@ -29,6 +31,81 @@ export function defaultMonth(data: Data): string {
 function rel(cur: number | null, prev: number | null, goodUp: boolean | null = true, points = false): Delta {
   if (cur == null || prev == null) return { value: null, goodUp, points }
   return { value: points ? cur - prev : prev ? cur / prev - 1 : null, goodUp, points }
+}
+
+const sign = (v: number, digits = 1) => `${v > 0 ? '+' : v < 0 ? '−' : '±'}${Math.abs(v).toFixed(digits)}`
+const chg = (cur: number | null, prev: number | null) =>
+  cur == null || prev == null || !prev ? '' : ` (전주 대비 ${sign((cur / prev - 1) * 100)}%)`
+const chgPt = (cur: number | null, prev: number | null) =>
+  cur == null || prev == null ? '' : ` (${sign((cur - prev) * 100)}%p)`
+
+/** 주간 브리핑: 방문 · 검색 · 평가 운영 핵심 변화를 규칙으로 한 줄씩. 평가 운영은 세그먼트 축이 없어 세그먼트를 걸면 뺀다. */
+function Briefing({ data, s, wk, wau, prevWau, ret, prevRet }: {
+  data: Data
+  s: TabProps['s']
+  wk: string
+  wau: number
+  prevWau: number
+  ret: number | null
+  prevRet: number | null
+}) {
+  const seg = segFilter(s)
+  const ds = ready(useTable(data, 'daily_search')) ?? []
+  const prevWk = addDays(wk, -7)
+  const sw = groupSum(
+    ds.filter((r) => seg(r) && r.kst_date >= prevWk && r.kst_date <= addDays(wk, 6)),
+    (r) => (r.kst_date >= wk ? 'cur' : 'prev'),
+    ['searches', 'zero_result_searches', 'clicked_searches', 'matched_result_searches'],
+  )
+  const zr = (k: string) => {
+    const z = sw.get(k)
+    return z ? ratio(z.zero_result_searches, z.searches) : null
+  }
+  const ct = (k: string) => {
+    const z = sw.get(k)
+    return z ? ratio(z.clicked_searches, z.matched_result_searches) : null
+  }
+  const segOn = s.ch !== 'all' || s.pf !== 'all' || s.ms !== 'all'
+  const ops = groupSum(
+    (data.weekly_eval_ops ?? []).filter((r) => r.week_start === wk || r.week_start === prevWk),
+    (r) => r.week_start,
+    ['labels', 'gold_labels', 'gold_correct', 'final_labels', 'label_pairs', 'agree_pairs', 'labels_g0', 'labels_g1', 'labels_g2', 'labels_g3', 'rework_labels', 'handle_seconds', 'tasks_completed'],
+  )
+  const oc = ops.get(wk)
+  const op = ops.get(prevWk)
+  const risk = riskIds(
+    (data.weekly_batch ?? []).filter((b) => b.week_start === wk),
+    teamPace(data, wk),
+  ).size
+
+  const lines: { k: string; v: string }[] = [
+    { k: '방문', v: `WAU ${num(wau)}명${chg(wau, prevWau)}, 재방문 비중 ${pct(ret)}${chgPt(ret, prevRet)}` },
+  ]
+  if (sw.get('cur'))
+    lines.push({
+      k: '검색',
+      v: `결과 0건 비율 ${pct(zr('cur'))}${chgPt(zr('cur'), zr('prev'))}, 결과 클릭률 ${pct(ct('cur'))}${chgPt(ct('cur'), ct('prev'))}`,
+    })
+  if (oc && !segOn)
+    lines.push({
+      k: '평가 운영',
+      v: `라벨 ${num(oc.labels)}건${chg(oc.labels, op?.labels ?? null)}, 정답셋 정확도 ${pct(ratio(oc.gold_correct, oc.gold_labels))}${chgPt(
+        ratio(oc.gold_correct, oc.gold_labels),
+        op ? ratio(op.gold_correct, op.gold_labels) : null,
+      )}, 카파 ${kappa(oc)?.toFixed(2) ?? '—'}, 마감 위험 배치 ${num(risk)}개`,
+    })
+  return (
+    <Card title="주간 브리핑" meta={`${md(wk)} ~ ${md(addDays(wk, 6))}`}>
+      <ul className="flex flex-col gap-1.5 text-[13px]">
+        {lines.map((l) => (
+          <li key={l.k} className="grid grid-cols-[72px_1fr] gap-3">
+            <span className="text-muted">{l.k}</span>
+            <span className="tnum text-ink">{l.v}</span>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  )
 }
 
 type WA = Pick<WeeklyActivity, 'wau' | 'new_persons' | 'returning_persons' | 'two_plus_days'>
@@ -152,6 +229,16 @@ function Weekly({ data, s }: TabProps) {
           delta={rel(w1(w1Cohort), w1(w1Prev), true, true)}
         />
       </TileRow>
+
+      <Briefing
+        data={data}
+        s={s}
+        wk={wk}
+        wau={cur.wau}
+        prevWau={prev.wau}
+        ret={ratio(cur.returning_persons, cur.wau)}
+        prevRet={ratio(prev.returning_persons, prev.wau)}
+      />
 
       <Card title="주간 방문자" meta="최근 12주 · 사람" right={<Legend items={series} />}>
         <TimeChart

@@ -1,0 +1,62 @@
+[
+  {
+    "name": "batch_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "배치 ID"
+  },
+  {
+    "name": "requester",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "요청 부서 search (검색) / promotion (상단 추천 슬롯)"
+  },
+  {
+    "name": "purpose",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "train (학습) / eval (정기 평가) / adhoc (긴급)"
+  },
+  {
+    "name": "guideline_version",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "평가 지침 버전 v1 / v2 (2026-06-01 개정)"
+  },
+  {
+    "name": "target_tasks",
+    "type": "INTEGER",
+    "mode": "REQUIRED",
+    "description": "목표 과제 수"
+  },
+  {
+    "name": "labels_per_task",
+    "type": "INTEGER",
+    "mode": "REQUIRED",
+    "description": "과제당 필요 라벨 수 (서로 다른 평가자)"
+  },
+  {
+    "name": "created_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "생성 시각 (UTC)"
+  },
+  {
+    "name": "due_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "마감 시각 (UTC)"
+  },
+  {
+    "name": "priority",
+    "type": "INTEGER",
+    "mode": "REQUIRED",
+    "description": "배정 우선순위 (1 = 긴급, 2 = 정기). 같은 순위는 먼저 만든 배치부터"
+  },
+  {
+    "name": "snapshot_date",
+    "type": "DATE",
+    "mode": "REQUIRED",
+    "description": "스냅샷 기준일 (생성 종료일, KST)"
+  }
+]

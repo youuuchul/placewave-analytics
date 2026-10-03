@@ -5,7 +5,10 @@ import {
   CartesianGrid,
   ComposedChart,
   Line,
+  ReferenceLine,
   ResponsiveContainer,
+  Scatter,
+  ScatterChart,
   Tooltip,
   XAxis,
   YAxis,
@@ -63,6 +66,8 @@ export function TimeChart({
   valueFormat = num,
   tipTitle,
   decimals = false,
+  marks = [],
+  yDomain,
 }: {
   data: Row[]
   series: Series[]
@@ -74,6 +79,8 @@ export function TimeChart({
   valueFormat?: (v: number) => string
   tipTitle?: (v: string | number) => string
   decimals?: boolean
+  marks?: { x: string; label: string }[]
+  yDomain?: [number, number]
 }) {
   const fx = xFormat ?? ((v: string | number) => (typeof v === 'string' ? md(v) : String(v)))
   const ft = tipTitle ?? ((v: string | number) => (typeof v === 'string' ? v : String(v)))
@@ -99,6 +106,7 @@ export function TimeChart({
             axisLine={false}
             width={44}
             allowDecimals={decimals}
+            domain={yDomain ?? [0, 'auto']}
           />
           <Tooltip
             cursor={bars ? { fill: 'var(--wash)' } : { stroke: 'var(--axis)', strokeWidth: 1 }}
@@ -116,6 +124,15 @@ export function TimeChart({
               return <TipBox title={ft(label as string)} rows={[...rows].reverse()} total={total} />
             }}
           />
+          {marks.map((m) => (
+            <ReferenceLine
+              key={m.x}
+              x={m.x}
+              stroke="var(--axis)"
+              strokeDasharray="3 3"
+              label={{ value: m.label, position: 'insideTopLeft', fill: 'var(--muted)', fontSize: 11 }}
+            />
+          ))}
           {series.map((s, i) => {
             if (kind === 'line')
               return (
@@ -345,3 +362,98 @@ export function BarList({
     </div>
   )
 }
+
+export interface Point {
+  id: string
+  x: number
+  y: number
+  color: string
+  label: string
+  detail: string
+}
+
+/** 평가자 산점도처럼 점 수십 개를 두 지표 축에 놓는다. 기준선(yRef)은 점선. */
+export function ScatterPlot({
+  points,
+  xLabel,
+  yLabel,
+  xFormat = num,
+  yFormat = (v: number) => pct(v, 0),
+  yRef,
+  height = 280,
+}: {
+  points: Point[]
+  xLabel: string
+  yLabel: string
+  xFormat?: (v: number) => string
+  yFormat?: (v: number) => string
+  yRef?: number
+  height?: number
+}) {
+  const ys = points.map((p) => p.y)
+  const lo = Math.max(0, Math.floor((Math.min(...ys, yRef ?? 1) - 0.05) * 20) / 20)
+  return (
+    <div style={{ height }} className="-ml-2">
+      <ResponsiveContainer width="100%" height="100%">
+        <ScatterChart margin={{ top: 8, right: 12, bottom: 18, left: 0 }}>
+          <CartesianGrid stroke="var(--line)" strokeWidth={1} />
+          <XAxis
+            type="number"
+            dataKey="x"
+            name={xLabel}
+            tickFormatter={xFormat}
+            tick={{ fill: 'var(--muted)', fontSize: 11 }}
+            tickLine={false}
+            axisLine={{ stroke: 'var(--axis)' }}
+            label={{ value: xLabel, position: 'insideBottom', offset: -10, fill: 'var(--muted)', fontSize: 11 }}
+            domain={['auto', 'auto']}
+          />
+          <YAxis
+            type="number"
+            dataKey="y"
+            name={yLabel}
+            tickFormatter={yFormat}
+            tick={{ fill: 'var(--muted)', fontSize: 11 }}
+            tickLine={false}
+            axisLine={false}
+            width={44}
+            domain={[lo, 1]}
+          />
+          {yRef != null && <ReferenceLine y={yRef} stroke="var(--bad)" strokeDasharray="3 3" />}
+          <Tooltip
+            cursor={{ stroke: 'var(--axis)', strokeWidth: 1 }}
+            content={({ active, payload }) => {
+              if (!active || !payload?.length) return null
+              const p = payload[0].payload as Point
+              return (
+                <TipBox
+                  title={p.label}
+                  rows={[
+                    { label: xLabel, color: p.color, value: xFormat(p.x) },
+                    { label: yLabel, color: p.color, value: yFormat(p.y) },
+                    { label: '라벨', color: p.color, value: p.detail },
+                  ]}
+                />
+              )
+            }}
+          />
+          <Scatter
+            data={points}
+            isAnimationActive={false}
+            shape={(props: { cx?: number; cy?: number; payload?: Point }) => (
+              <circle
+                cx={props.cx}
+                cy={props.cy}
+                r={6}
+                fill={props.payload?.color}
+                stroke="var(--surface)"
+                strokeWidth={2}
+              />
+            )}
+          />
+        </ScatterChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+

@@ -92,3 +92,8 @@ export const FEE_TIERS: { key: 'none' | 'basic' | 'pro'; label: string; rate: nu
 ]
 
 export const PLAN_LABEL: Record<string, string> = { basic: '베이직', pro: '프로' }
+
+export const QUERY_INTENT: Record<string, string> = { genre: '장르', region: '상권', event_type: '행사 유형', venue_name: '공간명' }
+export const REQUESTER: Record<string, string> = { search: '검색', promotion: '추천 슬롯' }
+export const PURPOSE: Record<string, string> = { train: '학습', eval: '정기 평가', adhoc: '긴급' }
+export const RATER_GROUP: Record<string, string> = { internal: '내부', vendor: '외부' }

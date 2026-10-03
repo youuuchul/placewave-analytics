@@ -1,0 +1,62 @@
+[
+  {
+    "name": "task_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "과제 ID"
+  },
+  {
+    "name": "batch_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "배치 ID"
+  },
+  {
+    "name": "query_norm",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "정규화 검색어"
+  },
+  {
+    "name": "item_type",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "venue / event"
+  },
+  {
+    "name": "item_id",
+    "type": "INTEGER",
+    "mode": "REQUIRED",
+    "description": "공간 ID 또는 행사 ID"
+  },
+  {
+    "name": "shown_position",
+    "type": "INTEGER",
+    "mode": "NULLABLE",
+    "description": "추출 기간 최고 노출 순위. 0 = 상단 추천 슬롯, NULL = 노출되지 않은 확장 후보"
+  },
+  {
+    "name": "ranker_version",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "최고 노출 순위를 낸 랭킹 버전. 확장 후보·추천 슬롯은 NULL"
+  },
+  {
+    "name": "is_gold",
+    "type": "BOOLEAN",
+    "mode": "REQUIRED",
+    "description": "정답셋 과제 (평가자에게는 일반 과제와 같은 형태)"
+  },
+  {
+    "name": "gold_grade",
+    "type": "INTEGER",
+    "mode": "NULLABLE",
+    "description": "정답 등급 0~3. 정답셋 과제만"
+  },
+  {
+    "name": "snapshot_date",
+    "type": "DATE",
+    "mode": "REQUIRED",
+    "description": "스냅샷 기준일 (생성 종료일, KST)"
+  }
+]

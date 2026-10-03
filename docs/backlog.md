@@ -114,3 +114,15 @@
 - 월간 브리핑 자동 문장(월간 요약 표의 수치를 3줄 요약으로 — 규칙 기반, LLM 없이)
 - 코호트 히트맵 월 단위 전환·세그먼트 비교 보기
 - 파이프라인 예약 실행 예시(예약 쿼리 SQL 결합본 생성기)와 실패 알림 설계 문서
+
+## 10. 검색 품질 · 관련성 평가 운영 (결정 2026-10-02, S0~S3 완료 10-03)
+
+시나리오 3.0. 검색 실패 → 관련성 평가 프로그램 → 랭킹 v2 → 검색 지표 회복의 고리를 기존 세계 안에 추가한다. 상세 설계는 `docs/scenario_v3_search_eval.md`(S0에서 작성).
+
+- [x] **S0 정의** — 시나리오 문서, 검색·평가 지표를 `metrics.json` 원본에 등재(단위·분자·분모·마트 열)
+- [x] **S1 생성기** — `generator/search_eval.py`(기존 raw 읽기 전용): 검색 서버 로그 `search_log`(결과 수·상위 10·랭킹 v1/v2, GA `search` 와 기기·시각 근접 조인), 평가 원천 `eval_raters`·`eval_batches`·`eval_queries`·`eval_tasks`·`eval_labels`, 검증 규칙
+- [x] **S2 BigQuery** — 신규 원천만 적재(기존 raw·staging·marts 재생성 없음), `staging.int_search`·`int_label`, 마트 `daily_search`·`weekly_query`·`daily_eval_ops`·`weekly_rater`·`eval_batch_status`·`weekly_agreement`, 검사(검색 수·라벨 수·gold 정확도·배치 완료·평가 대상 편입 경로), `load_all.sh`·카탈로그
+- [x] **S3 화면** — `검색` 탭(퍼널 다음), `평가 운영` 탭(주간·월간 앞, 세그먼트 줄을 요청 부서·평가자 그룹·지침 버전으로 대체), 주간 탭 주간 브리핑(규칙 기반), 지표 가이드, 대시보드 대조 기록, 헤드리스 캡처
+- [ ] **S4 문서·배포** — README 「무엇을 보여주는가」·소개 페이지·`docs/dashboard.md`·README 캡처 갱신, 브랜치 → Vercel 프리뷰 확인 → main (README 탭 수·시나리오 3.0 줄은 10-03 반영)
+
+기본값: 기존 raw·마트 불변(부속 원천 추가 방식 — 클릭률·전환은 랭킹 버전과 무관하게 고정), 랭킹 50% 노출 비교 포함, 평가 4점 척도.

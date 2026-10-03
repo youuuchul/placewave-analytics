@@ -20,14 +20,14 @@
 -- 키: venue_id
 -- 파티션·클러스터: 없음 / 없음
 -- 원천: data/raw/db_venues.csv (생성기 출력). 상권·구·좌표·등록일·상태 포함
--- 소비: staging.dim_event·dim_venue, ops.reconciliation
+-- 소비: staging.dim_event·dim_venue·int_search, ops.reconciliation
 
 -- 표: raw.db_events — 서비스 RDB 행사 스냅샷 (합성)
 -- 1행: 행사 1건
 -- 키: event_id
 -- 파티션·클러스터: 없음 / 없음
 -- 원천: data/raw/db_events.csv (생성기 출력). 정원·가격대·가격·개최 시점 파트너 여부 포함
--- 소비: staging.dim_event·dim_venue·fct_order
+-- 소비: staging.dim_event·dim_venue·fct_order·int_search
 
 -- 표: raw.db_applications — 서비스 RDB 신청 원장 스냅샷 (합성)
 -- 1행: 신청 1건
@@ -70,3 +70,45 @@
 -- 파티션·클러스터: date / 없음
 -- 원천: data/raw/ads_spend.csv (생성기 출력). date 는 KST
 -- 소비: staging.ad_spend
+
+-- 표: raw.search_log — 검색 서버 로그 (합성)
+-- 1행: 검색 요청 1건
+-- 키: request_id
+-- 파티션·클러스터: requested_at / 없음
+-- 원천: data/raw/search_log.ndjson.gz (generator/search_eval.py 출력, 기존 GA 로그를 읽어 만든 부속 원천). GA 와 공유 키 없음
+-- 소비: staging.int_search, ops.reconciliation
+
+-- 표: raw.eval_raters — 평가 도구 평가자 스냅샷 (합성)
+-- 1행: 평가자 1명
+-- 키: rater_id
+-- 파티션·클러스터: 없음 / 없음
+-- 원천: data/raw/eval_raters.csv (generator/search_eval.py 출력)
+-- 소비: staging.int_label
+
+-- 표: raw.eval_batches — 평가 도구 배치 스냅샷 (합성)
+-- 1행: 배치 1건
+-- 키: batch_id
+-- 파티션·클러스터: 없음 / 없음
+-- 원천: data/raw/eval_batches.csv (generator/search_eval.py 출력). 요청 부서·목적·지침 버전·목표·마감·우선순위
+-- 소비: staging.int_label, marts.weekly_batch, ops.reconciliation
+
+-- 표: raw.eval_queries — 평가 배치에 편입된 검색어 (합성)
+-- 1행: 배치 × 검색어
+-- 키: (batch_id, query_norm)
+-- 파티션·클러스터: 없음 / 없음
+-- 원천: data/raw/eval_queries.csv (generator/search_eval.py 출력). 출처 failed / head / random / promoted
+-- 소비: marts.daily_query, ops.reconciliation
+
+-- 표: raw.eval_tasks — 평가 도구 과제 스냅샷 (합성)
+-- 1행: 검색어 × 후보 과제 1건
+-- 키: task_id
+-- 파티션·클러스터: 없음 / 없음
+-- 원천: data/raw/eval_tasks.csv (generator/search_eval.py 출력). 정답셋 과제는 정답 등급 포함
+-- 소비: staging.int_label, ops.reconciliation
+
+-- 표: raw.eval_labels — 평가 도구 라벨 스냅샷 (합성)
+-- 1행: 라벨 1건
+-- 키: label_id
+-- 파티션·클러스터: 없음 / 없음
+-- 원천: data/raw/eval_labels.csv (generator/search_eval.py 출력). 재작업 라벨 포함
+-- 소비: staging.int_label, ops.reconciliation

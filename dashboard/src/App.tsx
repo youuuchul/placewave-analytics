@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react'
-import { campaignSpans, resolveRange } from './lib/agg'
+import { campaignSpans, resolveRange, spanRange } from './lib/agg'
 import { md } from './lib/date'
 import { type State, type TabId, toHref, useUrlState } from './lib/state'
 import type { Data } from './lib/types'
@@ -8,6 +8,8 @@ import { MonthLine, PeriodLine, SegmentControls, SegmentLine, WeekLine } from '.
 import { Segmented, Select } from './components/ui'
 import Overview from './tabs/Overview'
 import FunnelTab from './tabs/FunnelTab'
+import Search, { rankerSpan } from './tabs/Search'
+import EvalOps, { evalWeeks } from './tabs/EvalOps'
 import About from './About'
 import DataPage from './DataPage'
 import MetricsPage from './MetricsPage'
@@ -17,7 +19,7 @@ import Events from './tabs/Events'
 import Members from './tabs/Members'
 import Acquisition from './tabs/Acquisition'
 import Periodic, { completeWeeks, defaultMonth, summaryMonths } from './tabs/Periodic'
-import { PRICE_TIER } from './lib/labels'
+import { PRICE_TIER, REQUESTER } from './lib/labels'
 import type { TabProps } from './tabs/common'
 
 interface TabDef {
@@ -30,6 +32,15 @@ interface TabDef {
 const TABS: TabDef[] = [
   { id: 'overview', label: '개요', el: Overview },
   { id: 'funnel', label: '퍼널', el: FunnelTab },
+  {
+    id: 'search',
+    label: '검색',
+    el: Search,
+    views: [
+      { value: 'quality', label: '품질' },
+      { value: 'ranker', label: '랭킹 실험' },
+    ],
+  },
   {
     id: 'events',
     label: '행사·결제',
@@ -60,6 +71,7 @@ const TABS: TabDef[] = [
       { value: 'campaign', label: '캠페인' },
     ],
   },
+  { id: 'evalops', label: '평가 운영', el: EvalOps },
   {
     id: 'periodic',
     label: '주간·월간',
@@ -133,16 +145,26 @@ export default function App() {
   const legacy = (s.tab as string) === 'explore' ? (s.view === 'venue' ? 'events' : 'funnel') : s.tab
   const tab = TABS.find((t) => t.id === legacy) ?? TABS[0]
   const view = tab.views ? (tab.views.some((v) => v.value === s.view) ? s.view : tab.views[0].value) : ''
-  const p = s.p === '' || (s.p === 'target' && view !== 'campaign') ? (view === 'campaign' ? 'target' : '28') : s.p
+  const isTarget = (t: TabId, v: string) => v === 'campaign' || (t === 'search' && v === 'ranker')
+  const target = isTarget(tab.id, view)
+  const p = s.p === '' || (s.p === 'target' && !target) ? (target ? 'target' : '28') : s.p
   const st: State = { ...s, tab: tab.id, view, p }
-  const range = useMemo(() => (data ? resolveRange(st, data) : null), [data, st.p, st.d, st.from, st.to, st.camp])
+  const searchRows = ready(useTable(data, 'daily_search', tab.id === 'search'))
+  const span = useMemo(() => (searchRows ? rankerSpan(searchRows) : null), [searchRows])
+  const range = useMemo(() => {
+    if (!data) return null
+    if (tab.id === 'search' && view === 'ranker' && p === 'target' && span) return spanRange(span.from, span.to)
+    return resolveRange(st, data)
+  }, [data, st.p, st.d, st.from, st.to, st.camp, tab.id, view, span])
   const venues = ready(useTable(data, 'daily_venue', tab.id === 'events' && view === 'venue')) ?? []
   const events = ready(useTable(data, 'daily_event', tab.id === 'events' && view === 'event')) ?? []
 
   const go = (patch: Partial<State>) => {
     const next = { ...st, ...patch }
-    if (next.view === 'campaign' && st.view !== 'campaign') patch = { ...patch, p: '' }
-    else if (next.view !== 'campaign' && st.p === 'target') patch = { ...patch, p: '' }
+    const was = isTarget(st.tab, st.view)
+    const now = isTarget(next.tab, next.view)
+    if (now && !was) patch = { ...patch, p: '' }
+    else if (!now && st.p === 'target') patch = { ...patch, p: '' }
     set(patch)
   }
 
@@ -185,7 +207,24 @@ export default function App() {
   let periodLine
   let segLine
   const views = tab.views
-  if (tab.id === 'periodic') {
+  if (tab.id === 'evalops') {
+    const weeks = evalWeeks(data)
+    const wk = weeks.includes(st.wk) ? st.wk : weeks[weeks.length - 1]
+    periodLine = <WeekLine weeks={weeks} value={wk} onChange={(w) => set({ wk: w })} />
+    segLine = (
+      <SegmentLine>
+        <Segmented
+          label="요청 부서"
+          value={st.rq}
+          onChange={(rq) => set({ rq })}
+          options={[
+            { value: 'all', label: '전체' },
+            ...Object.entries(REQUESTER).map(([value, label]) => ({ value: value as 'search' | 'promotion', label })),
+          ]}
+        />
+      </SegmentLine>
+    )
+  } else if (tab.id === 'periodic') {
     if (view === 'month') {
       const months = summaryMonths(data)
       const mo = months.includes(st.mo) ? st.mo : defaultMonth(data)
@@ -222,7 +261,13 @@ export default function App() {
         range={range}
         min={min}
         max={max}
-        extra={view === 'campaign' ? { value: 'target', label: '캠페인 기간' } : undefined}
+        extra={
+          view === 'campaign'
+            ? { value: 'target', label: '캠페인 기간' }
+            : tab.id === 'search' && view === 'ranker'
+              ? { value: 'target', label: '실험 기간' }
+              : undefined
+        }
       />
     )
     let controls: ReactNode = <SegmentControls s={st} set={set} />

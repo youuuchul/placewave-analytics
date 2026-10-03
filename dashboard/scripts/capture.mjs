@@ -3,14 +3,16 @@
 //   npm run capture -- --all                    + 보기 전환·1일·다크·폰 폭·데이터 페이지
 //   NP_CATALOG=/tmp/catalog.json npm run capture -- --all   catalog.json 을 이 파일로 대체해 찍는다
 //   NP_DATA=/tmp/np_v2/data npm run capture -- --all        dist/data/ 요청을 이 폴더 파일로 대체해 찍는다(샘플 데이터)
+//   NP_PORT=4190 NP_ONLY='search|eval|periodic' npm run capture -- --all   포트 지정 · 이름이 정규식에 맞는 화면만
 import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { chromium } from 'playwright'
 
-const PORT = 4173
+const PORT = Number(process.env.NP_PORT ?? 4173)
 const BASE = `http://localhost:${PORT}/`
 const OUT = new URL('../captures/', import.meta.url).pathname
 const all = process.argv.includes('--all')
+const only = process.env.NP_ONLY ? new RegExp(process.env.NP_ONLY) : null
 const catalogFile = process.env.NP_CATALOG
 if (catalogFile && !existsSync(catalogFile)) throw new Error(`NP_CATALOG 파일 없음: ${catalogFile}`)
 const dataDir = process.env.NP_DATA
@@ -19,9 +21,11 @@ if (dataDir && !existsSync(`${dataDir}/index.json`)) throw new Error(`NP_DATA �
 const tabs = [
   ['01_overview', 'tab=overview'],
   ['02_funnel', 'tab=funnel'],
+  ['90_search', 'tab=search'],
   ['03_events', 'tab=events'],
   ['04_members', 'tab=members'],
   ['05_acquisition', 'tab=acquisition'],
+  ['91_evalops', 'tab=evalops'],
   ['06_periodic', 'tab=periodic'],
   ['61_venues', 'tab=venues'],
 ]
@@ -49,6 +53,14 @@ const extras = [
   ['86_overview_28_member', 'tab=overview&ms=member'],
   ['79_venues_1year', 'tab=venues&p=365'],
   ['80_members_subscription_1year', 'tab=members&view=subscription&p=365'],
+  ['92_search_1year', 'tab=search&p=365'],
+  ['93_search_ranker', 'tab=search&view=ranker'],
+  ['94_search_90_ios_member', 'tab=search&p=90&pf=ios&ms=member'],
+  ['95_search_1day', 'tab=search&p=1'],
+  ['96_evalops_0615_promotion', 'tab=evalops&wk=2026-06-15&rq=promotion'],
+  ['97_evalops_0706', 'tab=evalops&wk=2026-07-06'],
+  ['98_evalops_0907', 'tab=evalops&wk=2026-09-07'],
+  ['99_periodic_paid', 'tab=periodic&ch=paid'],
 ]
 
 const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], { stdio: 'ignore' })
@@ -67,6 +79,7 @@ try {
   await wait()
   const browser = await chromium.launch()
   const shoot = async (name, q, opts = {}) => {
+    if (only && !only.test(name)) return
     const ctx = await browser.newContext({
       viewport: opts.viewport ?? { width: 1440, height: 900 },
       deviceScaleFactor: opts.scale ?? 1,
@@ -186,6 +199,11 @@ try {
     await shoot('76_members_subscription_dark', 'tab=members&view=subscription&p=365', { scheme: 'dark' })
     await shoot('78_venues_region_open', 'tab=venues', { expand: 'select >> nth=0', clip: true })
     await shoot('81_metrics_top', 'page=metrics', { wait: 'main section', clip: true })
+    await shoot('100_search_dark', 'tab=search', { scheme: 'dark' })
+    await shoot('101_search_phone', 'tab=search', { viewport: { width: 390, height: 844 }, scale: 2 })
+    await shoot('102_evalops_dark', 'tab=evalops', { scheme: 'dark' })
+    await shoot('103_evalops_phone', 'tab=evalops', { viewport: { width: 390, height: 844 }, scale: 2 })
+    await shoot('104_evalops_scatter_hover', 'tab=evalops&wk=2026-07-06', { section: '처리 속도 × 정확도', hover: [0.85, 0.6] })
     await shoot('77_header_phone_metrics', 'page=metrics', { viewport: { width: 390, height: 300 }, scale: 2, wait: 'header', clip: true })
   }
   await browser.close()

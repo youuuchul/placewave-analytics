@@ -262,6 +262,87 @@ export interface WeeklyPath extends Seg {
   sessions: number
 }
 
+export interface DailySearch extends Seg {
+  kst_date: string
+  query_intent: string
+  ranker_version: string
+  searches: number
+  zero_result_searches: number
+  ga_matched_searches: number
+  matched_result_searches: number
+  clicked_searches: number
+  first_click_position_sum: number
+  top3_clicks: number
+  reformulated_searches: number
+  search_sessions: number
+  search_sessions_applied: number
+}
+
+export interface DailyQuery extends Seg {
+  kst_date: string
+  query_norm: string
+  query_intent: string
+  searches: number
+  zero_result_searches: number
+  ga_matched_searches: number
+  clicked_searches: number
+  reformulated_searches: number
+  first_eval_date: string | null
+  first_failed_eval_date: string | null
+}
+
+export interface WeeklyEvalOps {
+  week_start: string
+  requester: string
+  rater_group: string
+  guideline_version: string
+  labels: number
+  rework_labels: number
+  handle_seconds: number
+  gold_labels: number
+  gold_correct: number
+  final_labels: number
+  label_pairs: number
+  agree_pairs: number
+  labels_g0: number
+  labels_g1: number
+  labels_g2: number
+  labels_g3: number
+  tasks_completed: number
+}
+
+export interface WeeklyRater {
+  week_start: string
+  rater_id: string
+  requester: string
+  rater_group: string
+  labels: number
+  rework_labels: number
+  handle_seconds: number
+  gold_labels: number
+  gold_correct: number
+  label_pairs: number
+  agree_pairs: number
+}
+
+export interface WeeklyBatch {
+  week_start: string
+  batch_id: string
+  requester: string
+  purpose: string
+  guideline_version: string
+  priority: number
+  created_date: string
+  due_date: string
+  as_of_date: string
+  target_tasks: number
+  done_tasks: number
+  done_in_week: number
+  remaining_tasks: number
+  recent_done_14d: number
+  days_to_due: number
+}
+
 export interface Meta {
   to_date: string
   from_date: string
@@ -288,6 +369,9 @@ export interface Data {
   monthly_contract?: MonthlyContract[]
   contract_cohort?: ContractCohort[]
   subscription_cohort?: SubscriptionCohort[]
+  weekly_eval_ops?: WeeklyEvalOps[]
+  weekly_rater?: WeeklyRater[]
+  weekly_batch?: WeeklyBatch[]
 }
 
 export interface LazyTables {
@@ -296,6 +380,8 @@ export interface LazyTables {
   daily_venue: DailyVenue[]
   daily_event: DailyEvent[]
   weekly_path: WeeklyPath[]
+  daily_search: DailySearch[]
+  daily_query: DailyQuery[]
   person_day: PersonDay
 }
 

@@ -3,7 +3,7 @@
 -- 키: (client_id, session_id)
 -- 파티션·클러스터: session_date / person_id
 -- 원천: staging.events_clean, staging.map_channel
--- 소비: staging.int_person_day·dim_member,
+-- 소비: staging.int_person_day·dim_member·int_search,
 --       marts.hourly_metrics·daily_channel·daily_ad·daily_event·daily_venue·monthly_summary·weekly_audience_funnel·weekly_path·venue_registry,
 --       ops.reconciliation
 -- 검사: I1·I2·R7·R8

@@ -58,6 +58,11 @@ export function resolveRange(s: State, data: Data): Range {
   return { from, to, days, oneDay: days === 1, prevFrom: addDays(from, -days), prevTo: addDays(from, -1) }
 }
 
+export function spanRange(from: string, to: string): Range {
+  const days = diffDays(from, to) + 1
+  return { from, to, days, oneDay: days === 1, prevFrom: addDays(from, -days), prevTo: addDays(from, -1) }
+}
+
 export function segFilter(s: State) {
   return (r: Seg) =>
     (s.ch === 'all' || r.channel1 === s.ch) &&

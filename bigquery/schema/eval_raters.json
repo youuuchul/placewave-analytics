@@ -1,0 +1,38 @@
+[
+  {
+    "name": "rater_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "평가자 ID"
+  },
+  {
+    "name": "rater_group",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "internal (내부 운영) / vendor (외부 평가 파트너)"
+  },
+  {
+    "name": "joined_at",
+    "type": "DATE",
+    "mode": "REQUIRED",
+    "description": "투입일 (KST)"
+  },
+  {
+    "name": "left_at",
+    "type": "DATE",
+    "mode": "NULLABLE",
+    "description": "종료일 (KST, 이날부터 미투입). NULL = 진행"
+  },
+  {
+    "name": "weekly_target",
+    "type": "INTEGER",
+    "mode": "REQUIRED",
+    "description": "주간 목표 라벨 수"
+  },
+  {
+    "name": "snapshot_date",
+    "type": "DATE",
+    "mode": "REQUIRED",
+    "description": "스냅샷 기준일 (생성 종료일, KST)"
+  }
+]
