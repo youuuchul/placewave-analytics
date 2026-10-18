@@ -145,7 +145,7 @@
 | 평균 첫 클릭 순위 · 상위 3위 클릭 비중 | Σ first_click_position_sum ÷ Σ clicked_searches · Σ top3_clicks ÷ Σ clicked_searches | 위 · 건 |
 | 재검색률 · 검색 세션 신청 전환 | Σ reformulated_searches ÷ Σ ga_matched_searches · Σ search_sessions_applied ÷ Σ search_sessions | 건 · 세션 |
 | 실패 검색어 | `daily_query` 검색어별 기간 합으로 검색 20건 이상이고 결과 0건 비율 30% 이상 | 검색어 |
-| 평가 편입일 | `daily_query.first_eval_date`. 기간 끝 + 7일보다 뒤에 편입된 검색어는 비운다 | 날짜 |
+| 평가 편입일 | `daily_query.failed_eval_dates`(실패 출처로 편입된 날 목록) 중 기간 시작 ~ 기간 끝 + 7일 안의 첫 날. 없으면 비운다 — 실패가 반복된 검색어는 그 기간의 편입을 보고, 예전 편입을 끌어오지 않는다 | 날짜 |
 | 실험 기간 | v1·v2가 같은 날 각각 그날 검색의 10% 이상인 날의 처음 ~ 끝(07-13 ~ 07-26). 다음 날을 v2 전체 적용일로 표시 | 일 |
 | 랭킹 실험 차이 · 95% 구간 | 비율 = p2 − p1 ± 1.96·√(p1(1−p1)/n1 + p2(1−p2)/n2). 평균 첫 클릭 순위 = m2 − m1 ± 1.96·√(s1²/n1 + s2²/n2), s² = (Σx² − n·m²) ÷ (n − 1), Σx² = `first_click_position_sq_sum`. 구간이 0을 포함하면 `차이 없음`, 아니면 지표 방향에 따라 `개선`·`악화`. 결과 클릭률이 `악화`이면서 검색당 클릭이 `차이 없음`이고 0건 비율이 `개선`이면 판정 옆에 `분모 효과`(툴팁에 이유) | — |
 | 목표 대비 진척률 | 그 주 배치(요청 부서 필터) Σ done_tasks ÷ Σ target_tasks, 주말 시점 누적 | 과제 |
@@ -201,7 +201,7 @@
 | `subscription_cohort` | `cohort_month, month_offset(0..9), cohort_size, retained` — 구독 시작 월 코호트(구독 건), n개월 = 시작일 + n개월에 활성. 0개월 `retained = cohort_size`, 전원 관측된 칸만 행이 있다 |
 | `venue_registry` | `venue_id, name, region, district, lat, lng, genre, venue_type, capacity_band, registered_at, is_partner(bool), plan, contract_started_at, contract_ended_at, events_365d, ticket_amount_365d, detail_viewers_28d, status, as_of_date` — 기준일 고정(기간·세그먼트 필터 없음), 날짜 열은 `YYYY-MM-DD` |
 | `daily_search` | `kst_date, query_intent(genre/region/event_type/venue_name), ranker_version(v1/v2), channel1, device_platform, member_seg, searches, zero_result_searches, ga_matched_searches, matched_result_searches, clicked_searches, first_click_position_sum, first_click_position_sq_sum, top3_clicks, reformulated_searches, search_sessions, search_sessions_applied` |
-| `daily_query` | `kst_date, query_norm, channel1, device_platform, member_seg, query_intent, searches, zero_result_searches, ga_matched_searches, clicked_searches, reformulated_searches, first_eval_date, first_failed_eval_date` — 편입일 두 열은 검색어 속성(모든 행에 같은 값) |
+| `daily_query` | `kst_date, query_norm, channel1, device_platform, member_seg, query_intent, searches, zero_result_searches, ga_matched_searches, clicked_searches, reformulated_searches, failed_eval_dates` — 검색어 속성(모든 행에 같은 값, `YYYY-MM-DD` 쉼표 구분 오름차순). 마트의 `first_eval_date`·`first_failed_eval_date` 는 추출하지 않는다 |
 | `weekly_eval_ops` | `week_start, requester(search/promotion), rater_group(internal/vendor), guideline_version(v1/v2), labels, rework_labels, handle_seconds, gold_labels, gold_correct, final_labels, label_pairs, agree_pairs, labels_g0..labels_g3, tasks_completed` |
 | `weekly_rater` | `week_start, rater_id, requester, rater_group, labels, rework_labels, handle_seconds, gold_labels, gold_correct, label_pairs, agree_pairs` |
 | `weekly_batch` | `week_start, batch_id, requester, purpose(train/eval/adhoc), guideline_version, priority, created_date, due_date, as_of_date, target_tasks, done_tasks, done_in_week, remaining_tasks, recent_done_14d, days_to_due` — 주말 시점 누적 |
