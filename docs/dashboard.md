@@ -4,10 +4,10 @@
 
 ## 1. 원칙
 
-1. **필터는 마트에 축이 있을 때만 붙인다.** 필터가 걸린 것처럼 보이는데 값이 안 변하는 카드는 만들지 않는다. 축이 없는 대상(공간·행사·캠페인)은 탭 안 **보기 전환**으로 분리하고, 그 보기에서는 세그먼트 줄을 대상 축 컨트롤(지역·장르 / 유형·가격대 / 캠페인)로 바꾼다.
-2. **줄은 없애지 않고 바꾼다.** 필터 바는 기간 줄과 세그먼트 줄 두 줄, 높이 고정. 주간·월간 탭은 기간 줄이 주차·월 선택기로, 월간 보기는 세그먼트 줄이 범위(6/12개월) 선택으로 바뀐다.
+1. **필터는 마트에 축이 있을 때만 붙인다.** 필터가 걸린 것처럼 보이는데 값이 안 변하는 카드는 만들지 않는다. 축이 없는 대상(공간·행사·캠페인)은 탭 안 **보기 전환**으로 분리하고, 그 보기에서는 세그먼트 줄을 대상 축 컨트롤(지역·장르 / 유형·가격대 / 캠페인)로 바꾼다. 보기 전환은 메인 탭 바로 아래 서브 탭 줄에 두고, 필터 영역(기간 줄·세그먼트 줄)에는 필터만 둔다.
+2. **같은 보기 안에서는 줄을 없애지 않고 바꾼다.** 필터 바는 기간 줄과 세그먼트 줄 두 줄이고, 필터 값을 바꿔도 높이가 그대로다. 주간·월간 탭은 기간 줄이 주차·월 선택기로, 월간 보기는 세그먼트 줄이 범위(6/12개월) 선택으로, 평가 운영 탭은 세그먼트 줄이 요청 부서 선택으로 바뀐다. 보기(서브 탭)를 바꾸면 그 보기의 필터 줄로 바뀌고, 걸 수 있는 필터가 없는 보기(매출 구성·구독)는 세그먼트 줄을 두지 않는다.
 3. **탭 구조는 스코어보드 → 메인 추이 → (대상 탭만) 표.** 설명 문장은 화면에 쓰지 않고 라벨·단위·창·분모 한 줄로 푼다(`방문자 944명 중`, `W1 리텐션 · 9/7 코호트`).
-4. **비율은 화면에서 계산한다.** 마트는 분자·분모 열만 두고, 화면은 필터 적용 후 분자·분모를 각각 합산한 뒤 나눈다. 비율의 증감은 %p, 건수·금액의 증감은 %.
+4. **비율은 화면에서 계산한다.** 마트는 분자·분모 열만 두고, 화면은 필터 적용 후 분자·분모를 각각 합산한 뒤 나눈다. 비율의 증감은 %p, 건수·금액의 증감은 %. 작은 개수(평가자·배치)와 비율이 아닌 지수(카파)는 차이 값(`▲ 2명`, `▼ 0.01`, 같으면 `±0명`).
 5. **단위를 섞지 않는다.** 일별 마트의 사람 수를 기간으로 합하면 사람이 아니라 사람 × 일이다. 사람 지표는 `person_day` 로 기간 고유를 세고(§3), 주간·월간 탭의 WAU·월 방문자·리텐션은 주간·월간 마트에서 읽는다.
 6. **기간 길이에 따라 입자가 바뀐다.** 1일 = 시간별 차트, 120일 이하 = 일별, 그 이상 = 주별(월요일 시작). 개요 탭 추이 카드는 별도 규칙(§3b).
 7. **대상을 고르면 기간이 따라간다.** 캠페인 보기의 기본 기간은 `캠페인 기간`(선택한 캠페인의 관측 범위, 전체 선택 시 모든 캠페인 범위). 선택기 옵션에 관측 기간을 병기한다.
@@ -19,6 +19,8 @@
 |---|---|---|---|---|---|---|
 | 개요 | — | 채널·플랫폼·회원 | 기준일 현황(누적 회원·등록 공간·파트너 공간, 필터 미적용) + `핵심 지표` 한 줄 6칸(방문자·신규 방문자·가입·결제·플랫폼 매출·활성 구독자. 뒤 둘은 세그먼트 필터 시 숨기고 4칸) | `추이` 소제목 아래 카드 5개, 스코어보드 순서와 1:1: 방문자 → 신규 방문자·가입 → 결제(보조선 신청) → 플랫폼 매출·구성(§3c 매출 구성 카드) → 활성 구독자(보조선 신규 구독) (§3b). 뒤 둘은 세그먼트 필터 시 숨김 | — | daily_metrics, hourly_metrics, person_day, daily_venue, daily_revenue, daily_subscription, daily_venue_registry |
 | 퍼널 | — | 채널·플랫폼·회원 | 전체 전환율(랜딩→결제)·최대 이탈 단계·가장 크게 변한 단계·탐색 도달률 | 단계 전환율 추이(상세→신청 화면, 신청 화면→결제. 28일 이상 주별, 미만 일별, 1일은 단계 막대) + 세그먼트별 퍼널 히트맵 표 | 드릴다운 ① 오디언스별 퍼널(오디언스 칩 → 도달률 표 + 주별 전환율. 기간·세그먼트 안 랜딩 0인 오디언스는 칩 비활성, 예: 회원 필터의 `신규`) ② 경로 탐색 생키 · 보조 요일×시간대 (1일: 시간별 세션) | person_day, funnel_daily, daily_metrics, hourly_metrics, weekly_audience_funnel, weekly_path |
+| 검색 | 품질 | 채널·플랫폼·회원 | 검색 이용자·결과 0건 비율·결과 클릭률·평균 첫 클릭 순위·재검색률·검색 세션 신청 전환 | 결과 0건 비율·결과 클릭률 추이(랭킹 v2 50% 노출일·전체 적용일 표시) | 의도 유형별 · 검색어(검색 20건 이상, 실패 검색어 강조, 평가 편입일. 공간명 검색어는 앞 단어가 같은 가상 상호를 `○○ 외 N곳` 으로 병기 — 검색어는 사용자가 친 상호 첫 단어라 한 곳으로 바꾸지 않는다) | daily_search, daily_query, person_day, venue_registry |
+| 검색 | 랭킹 실험 | 채널·플랫폼·회원 · 기간 기본 `실험 기간` | — | 결과 0건 비율 · 평균 첫 클릭 순위 일별(v1/v2) | v1 · v2 비교(맨 위): 지표별 v1·v2·차이(95% 구간)·판정 | daily_search |
 | 행사·결제 | 흐름 | 채널·플랫폼·회원 | 신청·결제·결제 금액·결제자당 금액·취소율 | 신청·결제 추이 + 결제 퍼널(행사 상세 → 신청 화면 → 결제) | — | daily_metrics, hourly_metrics, person_day |
 | 행사·결제 | 행사별 | 유형·가격대 | 조회된 행사·신청·결제 금액·신청분 취소율 | 결제 금액 추이 | 행사별 성과 | daily_event |
 | 행사·결제 | 공간별 | 지역·장르 | 조회된 공간·신청·결제 | 공간 상세 조회 추이 | 공간 순위 | daily_venue |
@@ -28,10 +30,11 @@
 | 공간 | — | 상권 선택(세그먼트 줄 대체) | `공간` 행(등록 공간·파트너 공간·파트너 전환율·신규 계약·계약 해지·파트너 플랜 MRR) + `파트너 계약 · 월 기준` 행(계약 월 해지율·ARPA·GRR·NRR·파트너 부담률, 상권 선택 시 숨김) | 등록 공간 / 파트너 공간 / 신규 계약·해지 세 차트(31일 이하 일별, 그 이상 주별) → 플랜별 구성(월말 계약·MRR 토글, 최근 12개월) + 계약 코호트 유지율 히트맵(계약·MRR 토글) (둘 다 상권 선택 시 숨김) → 서울 분포 지도(영업 중 공간, 카드 안 무드·파트너 여부 선택) | 상권별(기준일 스냅샷, 등록 수는 폐업 포함 — 등록 공간 타일과 같은 기준) · 파트너 공간(상위 50, 정렬) | daily_venue_registry, venue_registry, monthly_contract, contract_cohort, daily_revenue |
 | 유입·광고 | 채널 | 채널·플랫폼·회원 | 세션·광고 세션 비중·신규 방문자·가입·결제 금액 | 유입 유형별 세션 누적 (1일: 막대 목록) | 채널별 성과(유입 유형 · 소스 = `channel2` · `channel3`) | daily_channel |
 | 유입·광고 | 캠페인 | 캠페인 선택 | 집행(지출·노출·클릭, CTR) → 유입(세션·신규 방문자) → 행동(가입 + CAC·신청·결제 금액 + ROAS) | 지출 / 광고 세션 (두 차트, 이중 축 없음) | 캠페인 비교(행 클릭 = 선택) | daily_ad |
-| 주간·월간 | 주간 | 채널·플랫폼·회원 · 기간 줄 → 주차 | WAU·신규·재방문·재방문 비중·주 2일+ 방문·W1(직전 주 코호트) | 주간 방문자 12주(신규/재방문) + 코호트 히트맵 W1~W12(12개 코호트 + 가중 평균) | — | weekly_activity, weekly_cohort |
+| 평가 운영 | — | 요청 부서(세그먼트 줄 대체) · 기간 줄 → 주차 | `진척`(목표 대비 진척률·완료 과제·마감 위험 배치) / `생산성`(라벨 수·활동 평가자·평가자당 라벨 수·건당 처리 시간) / `품질`(정답셋 정확도·평가자 간 일치율·일치도 카파·재작업률·기준 미달 평가자) | 품질 추이(정확도·일치율·카파, 지침 v2 표시) + 라벨 수(내부/외부 누적), 최근 12주 | 배치 진척(완료·마감 지남·위험·진행) · 처리 속도 × 정확도 산점도 + 평가자 · 지침 버전 비교(그 주까지 누적) | weekly_eval_ops, weekly_rater, weekly_batch |
+| 주간·월간 | 주간 | 채널·플랫폼·회원 · 기간 줄 → 주차 | WAU·신규·재방문·재방문 비중·주 2일+ 방문·W1(직전 주 코호트) | 주간 방문자 12주(신규/재방문) + 코호트 히트맵 W1~W12(12개 코호트 + 가중 평균) | 주간 브리핑(방문·검색·평가 운영 변화를 규칙 문장으로. 세그먼트를 걸면 평가 운영 줄은 뺀다) | weekly_activity, weekly_cohort, daily_search, weekly_eval_ops, weekly_batch |
 | 주간·월간 | 월간 | 범위 6/12개월 · 기간 줄 → 월 | 방문자·신규·가입·결제 금액·신청분 취소율·W1 (전월 대비) | 월간 방문자(신규/재방문) + 월 코호트 M1~M6 | 월간 브리핑 | monthly_summary, monthly_cohort |
 
-스코어보드마다 위에 소제목 한 줄 `<구획 이름> · <비교 기준>` 을 둔다(개요 `핵심 지표`, 퍼널 `전환`, 흐름 `신청·결제`, 매출 구성 `거래·매출`, 회원 `회원`, 구독 `구독`, 공간 `공간`·`파트너 계약 · 월 기준 <달 범위>`(비교 기준 `직전 N개월 대비`), 채널 `유입`, 주간 `주간 · 전주 대비`, 월간 `월간 · 전월 대비`). 비교 기준은 `직전 N일 대비`(1일은 `전일 대비`), 직전 기간이 데이터 범위 밖이면 `전기 없음`. 증감이 없는 스코어보드(행사별·공간별·캠페인)는 소제목을 두지 않는다. 공간 탭 상권 선택지는 `전체` → 기준일 등록 공간 수 내림차순 → `기타`.
+스코어보드마다 위에 소제목 한 줄 `<구획 이름> · <비교 기준>` 을 둔다(개요 `핵심 지표`, 퍼널 `전환`, 흐름 `신청·결제`, 매출 구성 `거래·매출`, 회원 `회원`, 구독 `구독`, 공간 `공간`·`파트너 계약 · 월 기준 <달 범위>`(비교 기준 `직전 N개월 대비`), 채널 `유입`, 검색 `검색`, 평가 운영 `진척 · <주> · 전주 대비`·`생산성`·`품질`, 주간 `주간 · 전주 대비`, 월간 `월간 · 전월 대비`). 비교 기준은 `직전 N일 대비`(1일은 `전일 대비`), 직전 기간이 데이터 범위 밖이면 `전기 없음`. 증감이 없는 스코어보드(행사별·공간별·캠페인)는 소제목을 두지 않는다. 공간 탭 상권 선택지는 `전체` → 기준일 등록 공간 수 내림차순 → `기타`.
 
 탭 순서는 도메인 탭 → 성격이 다른 주간·월간 탭(끝). 공간 탭은 회원 옆. 공간·행사의 `genre` 값은 화면에서 `무드` 로 부른다. 공간 탭의 무드·파트너 여부 선택은 필터 줄이 아니라 지도 카드 머리에 둔다 — `daily_venue_registry` 의 축이 상권 하나라 스코어보드·추이가 그 선택을 받을 수 없기 때문이다(URL `sr`·`sg`·`sp`). 퍼널 탭은 표 열에 드릴다운 카드를 적었다. 옛 링크 `tab=explore` 는 퍼널 탭으로, `tab=explore&view=venue` 는 행사·결제 공간별로 연결된다.
 
@@ -44,7 +47,7 @@
 | 기준일 현황 (개요 탭) | 누적 회원 = `meta.to_date` 까지 Σ signups(전체, 필터 미적용) · 공간 = `daily_venue` 고유 venue_id | 명 · 곳 |
 | 활성 세션 비율 | Σ engaged_sessions ÷ Σ sessions | 세션 |
 | 탐색 도달률 (퍼널 탭) | 고유(visited ∧ explored) ÷ 고유(visited) | 명 |
-| 단계 막대 (퍼널 탭 1일) | 누적 단계별 고유 사람, 막대 = 이전 단계 대비, 오른쪽 열 = 첫 단계 대비 | 명 |
+| 단계 막대 (퍼널 탭 1일) | 누적 단계별 고유 사람, 막대 = 첫 단계 대비(이탈 구간 빗금), 단계 사이 = 이전 단계 대비 전환율·이탈 인원 | 명 |
 | 결제 퍼널 (행사·결제) | 누적 조건 고유 사람: event_detail → event_detail ∧ apply_view → event_detail ∧ apply_view ∧ paid(같은 날 비트 AND). 뒤 단계가 앞 단계에 포함된다. 결제자당 금액의 결제자는 누적 조건 없이 고유(paid). `person_day` 가 없으면 daily_metrics 열 합(비누적)으로 폴백 | 명 |
 | 결제자당 금액 | Σ pay_amount ÷ 고유(paid) | 원 |
 | 취소율 (흐름 보기) | `daily_metrics` Σ cancels ÷ Σ applies. 분자는 취소일 기준 로그라 기간 이전 신청분의 취소도 들어간다 | 건 |
@@ -131,18 +134,41 @@
 
 코호트 히트맵은 선택한 주(월)까지 완결된 칸만 칠한다. 색은 한 색상의 명도 단계(값이 클수록 진함), 칸 안 숫자는 %.
 
+### 3d. 검색·평가 운영 산식
+
+| 지표 | 산식 | 단위 |
+|---|---|---|
+| 검색 이용자 | `person_day` `searched` 비트 기간 고유 사람 | 명 |
+| 결과 0건 비율 | Σ zero_result_searches ÷ Σ searches (서버 요청 전체가 분모) | 건 |
+| 결과 클릭률 | Σ clicked_searches ÷ Σ matched_result_searches (GA 매칭 요청 중 결과가 있던 것) | 건 |
+| 검색당 클릭 | Σ clicked_searches ÷ Σ ga_matched_searches (0건 포함). 0건이 줄면 결과 클릭률의 분모가 늘어 클릭률만 내려갈 수 있다 | 건 |
+| 평균 첫 클릭 순위 · 상위 3위 클릭 비중 | Σ first_click_position_sum ÷ Σ clicked_searches · Σ top3_clicks ÷ Σ clicked_searches | 위 · 건 |
+| 재검색률 · 검색 세션 신청 전환 | Σ reformulated_searches ÷ Σ ga_matched_searches · Σ search_sessions_applied ÷ Σ search_sessions | 건 · 세션 |
+| 실패 검색어 | `daily_query` 검색어별 기간 합으로 검색 20건 이상이고 결과 0건 비율 30% 이상 | 검색어 |
+| 평가 편입일 | `daily_query.first_eval_date`. 기간 끝 + 7일보다 뒤에 편입된 검색어는 비운다 | 날짜 |
+| 실험 기간 | v1·v2가 같은 날 각각 그날 검색의 10% 이상인 날의 처음 ~ 끝(07-13 ~ 07-26). 다음 날을 v2 전체 적용일로 표시 | 일 |
+| 랭킹 실험 차이 · 95% 구간 | 비율 = p2 − p1 ± 1.96·√(p1(1−p1)/n1 + p2(1−p2)/n2). 평균 첫 클릭 순위 = m2 − m1 ± 1.96·√(s1²/n1 + s2²/n2), s² = (Σx² − n·m²) ÷ (n − 1), Σx² = `first_click_position_sq_sum`. 구간이 0을 포함하면 `차이 없음`, 아니면 지표 방향에 따라 `개선`·`악화`. 결과 클릭률이 `악화`이면서 검색당 클릭이 `차이 없음`이고 0건 비율이 `개선`이면 판정 옆에 `분모 효과`(툴팁에 이유) | — |
+| 목표 대비 진척률 | 그 주 배치(요청 부서 필터) Σ done_tasks ÷ Σ target_tasks, 주말 시점 누적 | 과제 |
+| 마감 위험 배치 | 그 주 진행 배치를 우선순위 → 생성일 순으로 세워 앞 배치까지 남은 과제 누적 ÷ 팀 처리량(그 주와 전주 완료 과제 ÷ 14)이 마감까지 남은 일수보다 크면 위험, 마감이 지났으면 위험. 줄과 처리량은 부서 필터 전 전체로 본다(평가자는 같은 대기열을 처리) | 개 |
+| 정답셋 정확도 · 일치율 · 재작업률 | Σ gold_correct ÷ Σ gold_labels · Σ agree_pairs ÷ Σ label_pairs · Σ rework_labels ÷ Σ labels | 건 · 쌍 |
+| 일치도 카파 | (Po − Pe) ÷ (1 − Pe), Po = 일치율, Pe = Σ(등급별 최종 라벨 ÷ 최종 라벨)² | — |
+| 기준 미달 평가자 | 그 주 정답셋 라벨 10건 이상이고 정확도 80% 미만인 평가자 수 | 명 |
+| 증감 (평가 운영) | 전주 대비. 비율은 %p, 라벨·과제는 %, 평가자·배치 수와 카파는 차이 값. 전주 데이터가 없으면 `전기 없음` | — |
+
 ## 4. 데이터 계약 (`dashboard/public/data/`)
 
 **파일 분할과 로딩.** 첫 화면에 필요한 표만 `index.json` 에 담고, 큰 표는 화면이 필요할 때 받는다.
 
 | 파일 | 내용 | 받는 시점 |
 |---|---|---|
-| `index.json` (고정 이름) | `meta` + `files` + `daily_metrics, daily_ad, funnel_daily, weekly_cohort, monthly_cohort, weekly_activity, monthly_summary, weekly_audience_funnel, daily_revenue, daily_subscription, daily_venue_registry, venue_registry, monthly_contract, contract_cohort, subscription_cohort` | 첫 요청 |
+| `index.json` (고정 이름) | `meta` + `files` + `daily_metrics, daily_ad, funnel_daily, weekly_cohort, monthly_cohort, weekly_activity, monthly_summary, weekly_audience_funnel, daily_revenue, daily_subscription, daily_venue_registry, venue_registry, monthly_contract, contract_cohort, subscription_cohort, weekly_eval_ops, weekly_rater, weekly_batch` | 첫 요청 |
 | `hourly_metrics.<해시>.json` | 행 배열 | 1일 보기(개요·행사·회원), 퍼널 탭 시간대 히트맵 |
 | `daily_channel.<해시>.json` | 행 배열 | 유입·광고 탭 채널 보기 |
 | `daily_venue.<해시>.json` | 행 배열 | 개요 상단 공간 수, 행사·결제 탭 공간별 보기 |
 | `daily_event.<해시>.json` | 행 배열 | 행사·결제 탭 행사별 보기(유형 선택 옵션도 이 표에서, 도착 전엔 `전체`만) |
 | `weekly_path.<해시>.json` | 행 배열 | 퍼널 탭 경로 탐색 |
+| `daily_search.<해시>.json` | 행 배열 | 검색 탭, 주간 브리핑 |
+| `daily_query.<해시>.json` | 행 배열 | 검색 탭 검색어 표 |
 | `person_day.<해시>.pdz`(gzip) 또는 `person_day.<해시>.bin` + `person_day.meta.<해시>.json` | 사람×일 행동 비트(아래) | 사람 단위 지표가 있는 탭(개요·퍼널·행사 흐름·회원) |
 
 - `files` = `{표 이름: 파일 이름}`(`person_day` 는 `.bin`, `person_day_gz` 는 같은 바이너리의 gzip -9 `.pdz`, `person_day_meta` 는 메타 JSON). 로더는 `DecompressionStream('gzip')` 이 있으면 `.pdz` 를 받아 풀고, 없으면 `.bin` 을 받는다. 받은 본문이 gzip 머리(`1f 8b`)로 시작하지 않으면(서버가 `Content-Encoding` 으로 이미 풀어 보냈으면) 그대로 쓴다. 확장자를 `.gz` 로 두지 않는 이유: 정적 서버 일부(vite preview 의 sirv 등)가 `.gz` 를 `Content-Encoding: gzip` 으로 내보내 브라우저가 먼저 풀어 버린다. 이름의 8자리는 내용 SHA-256 앞자리라 내용이 바뀌면 이름이 바뀐다(캐시 무효화). `files` 에 없는 표는 추출되지 않은 것으로 본다.
@@ -174,6 +200,11 @@
 | `contract_cohort` | `cohort_month, month_offset(0..12), cohort_size, retained, mrr_retained` — 계약 시작 월 코호트, n개월 = 시작일 + n개월에 활성. 0개월 `retained = cohort_size`, `mrr_retained` 는 그날 요금 합(업그레이드로 0개월 값을 넘을 수 있다). 코호트 전원이 관측된 칸만 행이 있다 |
 | `subscription_cohort` | `cohort_month, month_offset(0..9), cohort_size, retained` — 구독 시작 월 코호트(구독 건), n개월 = 시작일 + n개월에 활성. 0개월 `retained = cohort_size`, 전원 관측된 칸만 행이 있다 |
 | `venue_registry` | `venue_id, name, region, district, lat, lng, genre, venue_type, capacity_band, registered_at, is_partner(bool), plan, contract_started_at, contract_ended_at, events_365d, ticket_amount_365d, detail_viewers_28d, status, as_of_date` — 기준일 고정(기간·세그먼트 필터 없음), 날짜 열은 `YYYY-MM-DD` |
+| `daily_search` | `kst_date, query_intent(genre/region/event_type/venue_name), ranker_version(v1/v2), channel1, device_platform, member_seg, searches, zero_result_searches, ga_matched_searches, matched_result_searches, clicked_searches, first_click_position_sum, first_click_position_sq_sum, top3_clicks, reformulated_searches, search_sessions, search_sessions_applied` |
+| `daily_query` | `kst_date, query_norm, channel1, device_platform, member_seg, query_intent, searches, zero_result_searches, ga_matched_searches, clicked_searches, reformulated_searches, first_eval_date, first_failed_eval_date` — 편입일 두 열은 검색어 속성(모든 행에 같은 값) |
+| `weekly_eval_ops` | `week_start, requester(search/promotion), rater_group(internal/vendor), guideline_version(v1/v2), labels, rework_labels, handle_seconds, gold_labels, gold_correct, final_labels, label_pairs, agree_pairs, labels_g0..labels_g3, tasks_completed` |
+| `weekly_rater` | `week_start, rater_id, requester, rater_group, labels, rework_labels, handle_seconds, gold_labels, gold_correct, label_pairs, agree_pairs` |
+| `weekly_batch` | `week_start, batch_id, requester, purpose(train/eval/adhoc), guideline_version, priority, created_date, due_date, as_of_date, target_tasks, done_tasks, done_in_week, remaining_tasks, recent_done_14d, days_to_due` — 주말 시점 누적 |
 | `person_day` | 바이너리 `person_day.<해시>.bin`(전송용 gzip 사본 `.pdz`): 행당 8바이트, 리틀엔디언 Uint32 2개. word0 = `pk`(비트 0–19) \| `d`(20–28) \| `c`(29) \| `p`(30–31), word1 = `m`(0) \| `f`(1–16), 나머지 비트 0. 행은 날짜·사람 키 순. 메타 `person_day.meta.<해시>.json` = `{base_date, codes, rows, row_bytes, layout}`. 날짜 = `base_date` + `d`일, `pk` 는 익명 사람 키(적재마다 재부여), `c`·`p`·`m` 은 `codes` 인덱스 — `codes = {c: [non_paid, paid], p: [android, ios, web], m: [guest, member]}`(적재 데이터의 고유값 정렬, 값이 늘면 인덱스가 바뀐다). `f` 는 비트 플래그(`src/lib/persons.ts` 의 `F`, 비트 정의는 `bigquery/sql/marts/person_day.sql` 머리 주석). 플래그가 없는 날은 행이 없다. 폭을 넘는 값이 나오면 `extract.py` 가 중단한다(`PD_BITS` 를 늘리고 `persons.ts` 를 같이 고친다). `meta.tables.person_day` 는 행 수 |
 
 **사람 단위 수의 세그먼트 귀속.** `person_day` 로 세는 고유 사람 수(`persons.ts` `uniquePersons`)는 사람마다 기간 안에서 해당 행동이 있었던 마지막 날의 세그먼트 값 하나로 귀속한다. 세그먼트 필터와 분해(회원/비회원·채널·플랫폼)가 모두 이 값을 쓰므로 값별 수의 합이 전체와 같다. 기간 중 가입한 사람은 회원으로 센다. 채널1·플랫폼은 사람 속성이라 날마다 같다. 전기는 전기 안의 마지막 날로 따로 귀속하고, 추이 차트의 주·월 버킷은 기간 전체의 마지막 날 기준으로 귀속한다(버킷별로 다시 귀속하지 않는다). 날마다의 값으로 세려면 마지막 인자에 `'day'` 를 넘기는데, 이 경우 한 사람이 양쪽에 모두 세어질 수 있다. 일 마트 `persons` 열의 합은 행 단위라 이 규칙과 다르다.
