@@ -95,7 +95,11 @@ export default function Header({
                 set={set}
                 page={it.page}
                 className={`flex h-8 items-center whitespace-nowrap rounded-lg px-2 text-[13px] sm:px-2.5 ${
-                  on ? 'bg-wash font-semibold text-ink' : 'text-ink2 hover:text-ink'
+                  on
+                    ? 'bg-wash font-semibold text-ink'
+                    : it.page === 'about'
+                      ? 'font-medium text-accent hover:bg-wash'
+                      : 'text-ink2 hover:text-ink'
                 }`}
               >
                 <span className="sm:hidden">{it.short}</span>
