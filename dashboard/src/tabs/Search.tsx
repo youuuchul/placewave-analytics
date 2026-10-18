@@ -127,7 +127,7 @@ function Quality({ data, s, range, rows }: TabProps & { rows: DailySearch[] }) {
       .map((z) => ({
         ...z,
         failed: z.zero / z.searches >= FAILED_ZERO,
-        evalDate: z.q.first_eval_date && z.q.first_eval_date <= evalBy ? z.q.first_eval_date : null,
+        evalDate: z.q.failed_eval_dates?.split(',').find((d) => d >= range.from && d <= evalBy) ?? null,
       }))
   }, [qRows, range.from, range.to, s.ch, s.pf, s.ms])
   const failed = queries.filter((q) => q.failed)

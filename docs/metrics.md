@@ -223,7 +223,7 @@
 | Q07 | 재검색률 | 검색 | — | 건 | GA 와 매칭된 검색 중 결과를 누르지 않고 바로 다시 검색한 비중 | Σ reformulated_searches ÷ Σ ga_matched_searches | 매칭 검색 | `daily_search.reformulated_searches`, `daily_search.ga_matched_searches` | 원하는 것을 못 찾아 고쳐 친 정도 |
 | Q08 | 검색 세션 신청 전환 | 검색 | — | 세션 | 검색이 있었던 방문 세션 중 같은 세션에서 행사 신청까지 간 비중. 세션은 첫 매칭 검색 행에 귀속 | Σ search_sessions_applied ÷ Σ search_sessions | 검색 세션 | `daily_search.search_sessions_applied`, `daily_search.search_sessions` | 검색이 거래로 이어지는 정도 |
 | Q09 | 실패 검색어 | 검색 | — | 검색어 | 기간 안 검색 20건 이상이고 결과 0건 비율이 30% 이상인 검색어 | 검색어별 Σ zero_result_searches ÷ Σ searches ≥ 0.3, Σ searches ≥ 20 | — | `daily_query.searches`, `daily_query.zero_result_searches` | 평가 대상 검색어를 고르는 기준 |
-| Q10 | 실패 검색어 평가 편입률 | 검색 | — | 검색어 | 실패 검색어 중 기간 끝 7일 안까지 평가 배치에 편입된 비중 | first_eval_date ≤ 기간 끝 + 7일 인 실패 검색어 ÷ 실패 검색어 | 실패 검색어 | `daily_query.first_eval_date` | 실패가 개선 작업으로 넘어갔는가 |
+| Q10 | 실패 검색어 평가 편입률 | 검색 | — | 검색어 | 실패 검색어 중 기간 시작부터 기간 끝 7일 안까지 실패 검색어 출처로 평가 배치에 편입된 비중. 실패가 반복된 검색어는 그 기간의 편입만 센다 | failed_eval_dates 중 기간 시작 ≤ 편입일 ≤ 기간 끝 + 7일 이 있는 실패 검색어 ÷ 실패 검색어 | 실패 검색어 | `daily_query.failed_eval_dates` | 실패가 개선 작업으로 넘어갔는가 |
 | Q11 | 로그 매칭률 | 검색 | — | 건 | 서버 검색 요청 중 GA 검색 이벤트와 매칭된 비중(기기 + 시각 ±3초) | Σ ga_matched_searches ÷ Σ searches | 검색 수 | `daily_search.ga_matched_searches`, `daily_search.searches` | 두 원천을 붙인 지표를 믿을 수 있는가 |
 | Q12 | 검색당 클릭 | 검색 | — | 건 | GA 와 매칭된 검색 중 결과를 눌러 공간 상세로 간 비중(결과 0건 검색 포함) | Σ clicked_searches ÷ Σ ga_matched_searches | 매칭 검색 | `daily_search.clicked_searches`, `daily_search.ga_matched_searches` | 결과 0건이 줄어 분모가 바뀌는 클릭률과 달리 검색 1건이 클릭으로 이어지는 정도 |
 

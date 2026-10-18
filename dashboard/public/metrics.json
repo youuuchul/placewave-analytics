@@ -1697,12 +1697,12 @@
       "name": "실패 검색어 평가 편입률",
       "tab": "search",
       "group": "search",
-      "definition": "실패 검색어 중 기간 끝 7일 안까지 평가 배치에 편입된 비중",
-      "formula": "first_eval_date ≤ 기간 끝 + 7일 인 실패 검색어 ÷ 실패 검색어",
+      "definition": "실패 검색어 중 기간 시작부터 기간 끝 7일 안까지 실패 검색어 출처로 평가 배치에 편입된 비중. 실패가 반복된 검색어는 그 기간의 편입만 센다",
+      "formula": "failed_eval_dates 중 기간 시작 ≤ 편입일 ≤ 기간 끝 + 7일 이 있는 실패 검색어 ÷ 실패 검색어",
       "unit": "검색어",
       "denominator": "실패 검색어",
       "mart_columns": [
-        "daily_query.first_eval_date"
+        "daily_query.failed_eval_dates"
       ],
       "why": "실패가 개선 작업으로 넘어갔는가"
     },
