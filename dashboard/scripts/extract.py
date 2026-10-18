@@ -54,6 +54,7 @@ TABLES: dict[str, tuple[list[str], list[str]]] = {
             "matched_result_searches",
             "clicked_searches",
             "first_click_position_sum",
+            "first_click_position_sq_sum",
             "top3_clicks",
             "reformulated_searches",
             "search_sessions",

@@ -272,6 +272,7 @@ export interface DailySearch extends Seg {
   matched_result_searches: number
   clicked_searches: number
   first_click_position_sum: number
+  first_click_position_sq_sum: number
   top3_clicks: number
   reformulated_searches: number
   search_sessions: number

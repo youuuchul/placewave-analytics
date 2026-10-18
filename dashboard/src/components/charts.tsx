@@ -368,6 +368,8 @@ export interface Point {
   x: number
   y: number
   color: string
+  /** 기준 미달 등 강조할 점의 테두리 색 */
+  ring?: string
   label: string
   detail: string
 }
@@ -444,10 +446,10 @@ export function ScatterPlot({
               <circle
                 cx={props.cx}
                 cy={props.cy}
-                r={6}
+                r={props.payload?.ring ? 7 : 6}
                 fill={props.payload?.color}
-                stroke="var(--surface)"
-                strokeWidth={2}
+                stroke={props.payload?.ring ?? 'var(--surface)'}
+                strokeWidth={props.payload?.ring ? 3 : 2}
               />
             )}
           />

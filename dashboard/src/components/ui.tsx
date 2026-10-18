@@ -75,6 +75,8 @@ export interface Delta {
   value: number | null
   goodUp?: boolean | null
   points?: boolean
+  /** 비율이 아닌 지표(개수·지수)는 차이 값으로 쓴다: 단위와 소수 자릿수 */
+  abs?: { unit: string; digits: number }
 }
 
 export function Tile({
@@ -145,14 +147,16 @@ export function Pending({ wait, h = 240, w = 'w-full', inline = false }: { wait:
 function DeltaText({ d }: { d: Delta }) {
   if (d.value == null || !Number.isFinite(d.value)) return <span>—</span>
   const up = d.value > 0
-  const flat = Math.abs(d.value) < 0.0005
-  const mag = (Math.abs(d.value) * 100).toFixed(1) + (d.points ? '%p' : '%')
+  const flat = Math.abs(d.value) < (d.abs ? 0.5 * 10 ** -d.abs.digits : 0.0005)
+  const mag = d.abs
+    ? Math.abs(d.value).toFixed(d.abs.digits) + d.abs.unit
+    : (Math.abs(d.value) * 100).toFixed(1) + (d.points ? '%p' : '%')
   const good = flat || d.goodUp === null ? null : up === (d.goodUp ?? true)
   const color = good == null ? 'var(--muted)' : good ? 'var(--good)' : 'var(--bad)'
   return (
     <span className="tnum whitespace-nowrap">
       <span style={{ color }} className="font-medium">
-        {flat ? '' : up ? '▲ ' : '▼ '}
+        {flat ? (d.abs ? '±' : '') : up ? '▲ ' : '▼ '}
         {mag}
       </span>
     </span>
@@ -217,13 +221,15 @@ export function Card({
   )
 }
 
-export function Legend({ items }: { items: { label: string; color: string; kind?: 'line' | 'box' }[] }) {
+export function Legend({ items }: { items: { label: string; color: string; kind?: 'line' | 'box' | 'ring' }[] }) {
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink2">
       {items.map((i) => (
         <span key={i.label} className="inline-flex items-center gap-1.5">
           {i.kind === 'line' ? (
             <span className="inline-block h-0.5 w-3 rounded-full" style={{ background: i.color }} />
+          ) : i.kind === 'ring' ? (
+            <span className="inline-block h-2.5 w-2.5 rounded-full border-2" style={{ borderColor: i.color }} />
           ) : (
             <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: i.color }} />
           )}

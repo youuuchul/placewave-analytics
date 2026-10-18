@@ -86,6 +86,11 @@ function rel(cur: number | null, prev: number | null, points = false, goodUp: bo
   return { value: points ? cur - prev : prev ? cur / prev - 1 : null, goodUp, points }
 }
 
+/** 개수·지수 지표의 전주 대비 차이 값(`▲ 2명`, `▼ 0.01`). */
+function diff(cur: number | null, prev: number | null, unit: string, digits = 0): Delta {
+  return { value: cur == null || prev == null ? null : cur - prev, abs: { unit, digits } }
+}
+
 interface RaterRow {
   rater_id: string
   rater_group: string
@@ -154,7 +159,8 @@ export default function EvalOps({ data, s }: TabProps) {
     )
   const doneCur = bCur.reduce((a, b) => a + b.done_tasks, 0)
   const targetCur = bCur.reduce((a, b) => a + b.target_tasks, 0)
-  const vs = byWeek.has(prevWk) ? '전주 대비' : '전기 없음'
+  const hasPrev = byWeek.has(prevWk)
+  const vs = hasPrev ? '전주 대비' : '전기 없음'
 
   const trendWeeks = weeks.filter((w) => w <= wk).slice(-12)
   const groupWeek = useMemo(
@@ -246,7 +252,8 @@ export default function EvalOps({ data, s }: TabProps) {
       id: r.rater_id,
       x: perHour(r),
       y: r.gold_correct / r.gold_labels,
-      color: low(r) ? 'var(--bad)' : r.rater_group === 'internal' ? S(2) : S(1),
+      color: r.rater_group === 'internal' ? S(2) : S(1),
+      ring: low(r) ? 'var(--bad)' : undefined,
       label: `${r.rater_id} · ${RATER_GROUP[r.rater_group]}`,
       detail: `${num(r.labels)}건`,
     }))
@@ -278,15 +285,15 @@ export default function EvalOps({ data, s }: TabProps) {
           value={num(bCur.filter(atRisk).length)}
           unit="개"
           sub={`진행 배치 ${num(bCur.filter((b) => b.remaining_tasks > 0).length)}개 중`}
-          delta={rel(bCur.filter(atRisk).length, bPrev.filter(atRisk).length)}
+          delta={diff(bCur.filter(atRisk).length, hasPrev ? bPrev.filter(atRisk).length : null, '개')}
         />
       </TileRow>
       <TileRow title="생산성" cols="lg:grid-cols-4">
         <Tile metricId="L01" label="라벨 수" value={num(cur.labels)} unit="건" delta={rel(cur.labels, prev.labels)} />
-        <Tile metricId="L04" label="활동 평가자" value={num(nRaters)} unit="명" delta={rel(nRaters, nPrev)} />
+        <Tile metricId="L04" label="활동 평가자" value={num(nRaters)} unit="명" delta={diff(nRaters, hasPrev ? nPrev : null, '명')} />
         <Tile
           metricId="L05"
-          label="평가자당 라벨"
+          label="평가자당 라벨 수"
           value={num(ratio(cur.labels, nRaters))}
           unit="건"
           delta={rel(ratio(cur.labels, nRaters), ratio(prev.labels, nPrev))}
@@ -296,7 +303,7 @@ export default function EvalOps({ data, s }: TabProps) {
       <TileRow title="품질" cols="lg:grid-cols-5">
         <Tile metricId="L07" label="정답셋 정확도" value={pct(acc(cur))} sub={`정답셋 ${num(cur.gold_labels)}건`} delta={rel(acc(cur), acc(prev), true)} />
         <Tile metricId="L08" label="평가자 간 일치율" value={pct(agree(cur))} delta={rel(agree(cur), agree(prev), true)} />
-        <Tile metricId="L09" label="일치도 카파" value={dec(kappa(cur), 2)} delta={rel(kappa(cur), kappa(prev), true)} />
+        <Tile metricId="L09" label="일치도 카파" value={dec(kappa(cur), 2)} delta={diff(kappa(cur), kappa(prev), '', 2)} />
         <Tile metricId="L10" label="재작업률" value={pct(rework(cur))} delta={rel(rework(cur), rework(prev), true)} />
         <Tile
           metricId="L11"
@@ -304,7 +311,7 @@ export default function EvalOps({ data, s }: TabProps) {
           value={num(rCur.filter(low).length)}
           unit="명"
           sub={`정확도 ${pct(LOW_ACC, 0)} 미만`}
-          delta={rel(rCur.filter(low).length, rPrev.filter(low).length)}
+          delta={diff(rCur.filter(low).length, hasPrev ? rPrev.filter(low).length : null, '명')}
         />
       </TileRow>
 
@@ -380,7 +387,7 @@ export default function EvalOps({ data, s }: TabProps) {
               items={[
                 { label: '내부', color: S(2) },
                 { label: '외부', color: S(1) },
-                { label: '기준 미달', color: 'var(--bad)' },
+                { label: '기준 미달', color: 'var(--bad)', kind: 'ring' },
               ]}
             />
           }

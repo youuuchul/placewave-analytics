@@ -18,6 +18,7 @@ const KEYS = [
   'matched_result_searches',
   'clicked_searches',
   'first_click_position_sum',
+  'first_click_position_sq_sum',
   'top3_clicks',
   'reformulated_searches',
   'search_sessions',
@@ -92,6 +93,20 @@ function Quality({ data, s, range, rows }: TabProps & { rows: DailySearch[] }) {
     { key: 'reform', label: '재검색률', value: (r) => reform(r), render: (r) => pct(reform(r)), num: true },
   ]
 
+  const venueHint = useMemo(() => {
+    const m = new Map<string, { name: string; views: number; n: number }>()
+    for (const v of data.venue_registry ?? []) {
+      const k = v.name.split(' ')[0].toLowerCase()
+      const z = m.get(k)
+      if (!z) m.set(k, { name: v.name, views: v.detail_viewers_28d, n: 1 })
+      else {
+        z.n += 1
+        if (v.detail_viewers_28d > z.views) Object.assign(z, { name: v.name, views: v.detail_viewers_28d })
+      }
+    }
+    return m
+  }, [data])
+
   const qRows = ready(qL)
   const queries = useMemo(() => {
     if (!qRows) return []
@@ -119,7 +134,21 @@ function Quality({ data, s, range, rows }: TabProps & { rows: DailySearch[] }) {
   const failedIn = failed.filter((q) => q.evalDate)
   type QRow = (typeof queries)[number]
   const qCols: Col<QRow>[] = [
-    { key: 'q', label: '검색어', value: (r) => r.q.query_norm, width: '28%' },
+    {
+      key: 'q',
+      label: '검색어',
+      value: (r) => r.q.query_norm,
+      render: (r) => {
+        const v = r.q.query_intent === 'venue_name' ? venueHint.get(r.q.query_norm) : undefined
+        return (
+          <span className="flex flex-col">
+            <span>{r.q.query_norm}</span>
+            {v && <span className="text-[11px] text-muted">{v.n > 1 ? `${v.name} 외 ${v.n - 1}곳` : v.name}</span>}
+          </span>
+        )
+      },
+      width: '28%',
+    },
     { key: 'intent', label: '의도', value: (r) => QUERY_INTENT[r.q.query_intent] ?? r.q.query_intent },
     { key: 'searches', label: '검색 수', value: (r) => r.searches, render: (r) => num(r.searches), num: true },
     {
@@ -135,7 +164,7 @@ function Quality({ data, s, range, rows }: TabProps & { rows: DailySearch[] }) {
     },
     { key: 'ctr', label: '클릭률', value: (r) => ratio(r.clicked, r.matched), render: (r) => pct(ratio(r.clicked, r.matched)), num: true },
     { key: 'reform', label: '재검색률', value: (r) => ratio(r.reform, r.matched), render: (r) => pct(ratio(r.reform, r.matched)), num: true },
-    { key: 'eval', label: '평가 편입', value: (r) => r.evalDate, render: (r) => (r.evalDate ? md(r.evalDate) : '—'), num: true },
+    { key: 'eval', label: '평가 편입일', value: (r) => r.evalDate, render: (r) => (r.evalDate ? md(r.evalDate) : '—'), num: true },
   ]
 
   return (
@@ -238,6 +267,18 @@ function diffCi(x1: number, n1: number, x2: number, n2: number): { d: number; lo
   return { d, lo: d - 1.96 * se, hi: d + 1.96 * se }
 }
 
+/** 두 평균의 차이와 95% 구간(웰치, 정규 근사). 합·제곱합·표본 수로 계산한다. */
+function meanDiffCi(s1: number, q1: number, n1: number, s2: number, q2: number, n2: number): { d: number; lo: number; hi: number } | null {
+  if (n1 < 2 || n2 < 2) return null
+  const m1 = s1 / n1
+  const m2 = s2 / n2
+  const se = Math.sqrt((q1 - n1 * m1 * m1) / (n1 - 1) / n1 + (q2 - n2 * m2 * m2) / (n2 - 1) / n2)
+  const d = m2 - m1
+  return { d, lo: d - 1.96 * se, hi: d + 1.96 * se }
+}
+
+const DENOM_TIP = '결과 0건이 줄어 분모(결과 있는 검색)가 늘었다. 검색당 클릭은 차이 없음'
+
 function Ranker({ s, range, rows }: TabProps & { rows: DailySearch[] }) {
   const seg = segFilter(s)
   const segRows = useMemo(() => rows.filter(seg), [rows, s.ch, s.pf, s.ms])
@@ -254,6 +295,7 @@ function Ranker({ s, range, rows }: TabProps & { rows: DailySearch[] }) {
     b: number | null
     fmt: (v: number | null) => string
     ci: ReturnType<typeof diffCi>
+    ciFmt?: (v: number) => string
     down?: boolean
   }[] = [
     { id: 'Q02', label: '검색 수', a: v1.searches, b: v2.searches, fmt: num, ci: null },
@@ -272,7 +314,15 @@ function Ranker({ s, range, rows }: TabProps & { rows: DailySearch[] }) {
       a: avgPos(v1),
       b: avgPos(v2),
       fmt: (v) => dec(v, 2),
-      ci: null,
+      ci: meanDiffCi(
+        v1.first_click_position_sum,
+        v1.first_click_position_sq_sum,
+        v1.clicked_searches,
+        v2.first_click_position_sum,
+        v2.first_click_position_sq_sum,
+        v2.clicked_searches,
+      ),
+      ciFmt: (v) => `${v > 0 ? '+' : ''}${v.toFixed(2)}`,
       down: true,
     },
     {
@@ -323,6 +373,9 @@ function Ranker({ s, range, rows }: TabProps & { rows: DailySearch[] }) {
     const better = down ? ci.hi < 0 : ci.lo > 0
     return { text: better ? '개선' : '악화', color: better ? 'var(--good)' : 'var(--bad)' }
   }
+  const verdicts = new Map(lines.map((l) => [l.id, l.ci ? verdict(l.ci, l.down) : null]))
+  const denomEffect =
+    verdicts.get('Q04')?.text === '악화' && verdicts.get('Q12')?.text === '차이 없음' && verdicts.get('Q03')?.text === '개선'
 
   const daily = (key: (t: Sums) => number | null) =>
     [...new Set(inWin.map((r) => r.kst_date))].sort().map((d) => {
@@ -348,6 +401,13 @@ function Ranker({ s, range, rows }: TabProps & { rows: DailySearch[] }) {
       <Card title="랭킹 v1 · v2 비교" meta={`기기 해시 50% 배정 · ${md(range.from)}~${md(range.to)}`}>
         <div className="-mx-4 overflow-x-auto px-4 sm:-mx-5 sm:px-5">
           <table className="w-full min-w-[620px] border-collapse text-[13px]">
+            <colgroup>
+              <col />
+              <col className="w-[13%]" />
+              <col className="w-[13%]" />
+              <col className="w-[30%]" />
+              <col className="w-[18%]" />
+            </colgroup>
             <thead>
               <tr className="border-b border-axis text-muted">
                 <th className="py-2 text-left font-medium">지표</th>
@@ -359,17 +419,20 @@ function Ranker({ s, range, rows }: TabProps & { rows: DailySearch[] }) {
             </thead>
             <tbody>
               {lines.map((l) => {
-                const v = l.ci ? verdict(l.ci, l.down) : null
+                const v = verdicts.get(l.id)
+                const f = l.ciFmt ?? pp
+                const note = l.id === 'Q04' && denomEffect
                 return (
                   <tr key={l.id} className="border-b border-line">
                     <td className="py-2 text-ink2">{l.label}</td>
                     <td className="tnum py-2 pr-3 text-right text-ink">{l.fmt(l.a)}</td>
                     <td className="tnum py-2 pr-3 text-right text-ink">{l.fmt(l.b)}</td>
                     <td className="tnum py-2 pr-3 text-right text-ink2">
-                      {l.ci ? `${pp(l.ci.d)} (${pp(l.ci.lo)} ~ ${pp(l.ci.hi)})` : l.a != null && l.b != null && l.id !== 'Q02' ? dec(l.b - l.a, 2) : '—'}
+                      {l.ci ? `${f(l.ci.d)} (${f(l.ci.lo)} ~ ${f(l.ci.hi)})` : '—'}
                     </td>
-                    <td className="py-2 text-right font-medium" style={{ color: v?.color }}>
+                    <td className="py-2 text-right font-medium" style={{ color: v?.color }} title={note ? DENOM_TIP : undefined}>
                       {v?.text ?? '—'}
+                      {note && <span className="font-normal text-muted"> · 분모 효과</span>}
                     </td>
                   </tr>
                 )
