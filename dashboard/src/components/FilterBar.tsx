@@ -21,10 +21,6 @@ function Line({ children }: { children: ReactNode }) {
   )
 }
 
-function Divider() {
-  return <span className="h-5 w-px shrink-0 bg-line" />
-}
-
 function Stepper({ onPrev, onNext, prevOk, nextOk, children }: {
   onPrev: () => void
   onNext: () => void
@@ -190,28 +186,8 @@ export function MonthLine({
   )
 }
 
-export function SegmentLine({
-  views,
-  view,
-  onView,
-  children,
-}: {
-  views?: { value: string; label: string }[]
-  view?: string
-  onView?: (v: string) => void
-  children: ReactNode
-}) {
-  return (
-    <Line>
-      {views && view && onView && (
-        <>
-          <Segmented options={views} value={view} onChange={onView} />
-          {children && <Divider />}
-        </>
-      )}
-      {children}
-    </Line>
-  )
+export function SegmentLine({ children }: { children: ReactNode }) {
+  return <Line>{children}</Line>
 }
 
 export function SegmentControls({ s, set }: { s: State; set: (p: Partial<State>) => void }) {

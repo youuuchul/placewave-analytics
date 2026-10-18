@@ -230,7 +230,7 @@ export default function App() {
       const mo = months.includes(st.mo) ? st.mo : defaultMonth(data)
       periodLine = <MonthLine months={months} value={mo} onChange={(m) => set({ mo: m })} partialTo={max} />
       segLine = (
-        <SegmentLine views={views} view={view} onView={(v) => go({ view: v })}>
+        <SegmentLine>
           <Segmented
             label="범위"
             value={st.mr}
@@ -247,7 +247,7 @@ export default function App() {
       const wk = weeks.includes(st.wk) ? st.wk : weeks[weeks.length - 1]
       periodLine = <WeekLine weeks={weeks} value={wk} onChange={(w) => set({ wk: w })} />
       segLine = (
-        <SegmentLine views={views} view={view} onView={(v) => go({ view: v })}>
+        <SegmentLine>
           <SegmentControls s={st} set={set} />
         </SegmentLine>
       )
@@ -339,11 +339,7 @@ export default function App() {
           ]}
         />
       )
-    segLine = (
-      <SegmentLine views={views} view={view} onView={(v) => go({ view: v })}>
-        {controls}
-      </SegmentLine>
-    )
+    segLine = controls && <SegmentLine>{controls}</SegmentLine>
   }
 
   return (
@@ -369,10 +365,38 @@ export default function App() {
             )
           })}
         </nav>
+        {views && (
+          <nav
+            aria-label="보기"
+            className="scrollbar-none mx-auto flex max-w-[1280px] gap-1 overflow-x-auto border-b border-line px-4 sm:px-6"
+          >
+            {views.map((v) => {
+              const on = v.value === view
+              return (
+                <button
+                  key={v.value}
+                  type="button"
+                  aria-current={on ? 'page' : undefined}
+                  onClick={() => go({ view: v.value })}
+                  className={`relative h-10 shrink-0 whitespace-nowrap px-3 text-[13px] transition-colors ${
+                    on ? 'font-semibold text-ink' : 'text-muted hover:text-ink'
+                  }`}
+                >
+                  {v.label}
+                  {on && <span className="absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-[var(--ink)]" />}
+                </button>
+              )
+            })}
+          </nav>
+        )}
         <div className="mx-auto max-w-[1280px] border-b border-line">
           {periodLine}
-          <div className="mx-4 h-px bg-line sm:mx-6" />
-          {segLine}
+          {segLine && (
+            <>
+              <div className="mx-4 h-px bg-line sm:mx-6" />
+              {segLine}
+            </>
+          )}
         </div>
       </div>
 
