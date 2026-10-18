@@ -3,7 +3,7 @@
 -- 키: 이 네 열
 -- 파티션·클러스터: week_start / channel1, device_platform, member_seg
 -- 원천: staging.int_person_day, staging.dim_member (가입일)
--- 소비: 주간 탭 — WAU·신규·재방문·주 2일+ 방문. 기간 필터 대신 주차 선택기로 본다. ops.reconciliation (C6·C7 기준값)
+-- 소비: 주간·월간 탭 주간 보기 — WAU·신규·재방문·주 2일+ 방문. 기간 필터 대신 주차 선택기로 본다. ops.reconciliation (C6·C7 기준값)
 --
 -- member_seg = 주 시작일 0시 기준 회원 여부 member / guest (그 주 가입자는 guest). 주 안에서 사람마다 고정.
 

@@ -77,14 +77,14 @@ python3 bigquery/build_catalog.py        # 이 문서 재생성 (주석·본문�
 | **daily_ad**<br>광고 성과 마트 | 일(KST) × 캠페인 | (kst_date, campaign_id) | kst_date / campaign_id | staging.ad_spend (집행), staging.int_session (광고 세션 = 세션 라스트클릭 channel1 paid, campaign 일치) | 유입·광고 탭 캠페인 보기 — 집행(지출·노출·클릭) → 유입(세션·방문자·활성 방문자) → 행동(가입·신청·결제). CTR·CAC·ROAS 는 화면에서 나눈다 |  | [daily_ad.sql](sql/marts/daily_ad.sql) |
 | **daily_channel**<br>세션 채널 마트 | 일(KST) × 세션 채널 3단계 × device_platform × member_seg | 이 여섯 열 | kst_date / channel2, device_platform, member_seg | staging.int_session (세션 라스트클릭 채널), staging.int_person_day (기기·회원 세그먼트) | 유입·광고 탭 채널 보기. 광고 세션 비중 = channel1 = 'paid' 의 sessions / 전체 sessions. ops.reconciliation | C5 | [daily_channel.sql](sql/marts/daily_channel.sql) |
 | **daily_event**<br>행사별 일 마트 (리스트 집계) | 일(KST) × 행사 | (kst_date, event_id) | kst_date / event_id | staging.events_clean·int_session (조회 흐름, 세션 시작일·사람 단위), staging.fct_order (원장, 신청일 기준), staging.dim_event (속성) | 행사 리스트, 행사 결제 퍼널 (상세 조회 → 신청 화면 → 신청 → 결제), ops.reconciliation. 세그먼트 축 없음 |  | [daily_event.sql](sql/marts/daily_event.sql) |
-| **daily_metrics**<br>일 지표 마트 | 일(KST) × channel1 × device_platform × member_seg | 이 네 열 | kst_date / channel1, device_platform, member_seg | staging.int_person_day | 개요·탐색·행사·결제 흐름·회원 탭 스코어보드와 추이. 세그먼트 조합의 합 = 전체. ops.reconciliation | C3·R4 | [daily_metrics.sql](sql/marts/daily_metrics.sql) |
+| **daily_metrics**<br>일 지표 마트 | 일(KST) × channel1 × device_platform × member_seg | 이 네 열 | kst_date / channel1, device_platform, member_seg | staging.int_person_day | 개요·퍼널·행사·결제(흐름 보기)·회원(회원·구독 보기) 탭 스코어보드와 추이. 세그먼트 조합의 합 = 전체. ops.reconciliation | C3·R4 | [daily_metrics.sql](sql/marts/daily_metrics.sql) |
 | **daily_query**<br>검색어별 일 집계 | 일(KST) × query_norm × channel1 × device_platform × member_seg | 이 다섯 열 | kst_date / query_norm | staging.int_search, raw.eval_queries | 검색 탭 실패 검색어 표 |  | [daily_query.sql](sql/marts/daily_query.sql) |
 | **daily_revenue**<br>플랫폼 매출 종류별 일 마트 | 일(KST) × 매출 종류 × 수수료 등급(티켓만) | (kst_date, kind, fee_tier) | kst_date / kind | staging.fct_order (티켓·구독 결제, 결제일 기준), staging.int_contract_day (파트너 플랜 활성일·요금) | 개요 플랫폼 매출 타일·매출 구성 추이, 행사·결제 탭 매출 구성, 공간 탭 파트너 부담률. marts.monthly_summary, ops.reconciliation | C9·C14·R10·R11 | [daily_revenue.sql](sql/marts/daily_revenue.sql) |
-| **daily_search**<br>검색 품질 일 마트 | 일(KST) × query_intent × ranker_version × channel1 × device_platform × member_seg | 이 여섯 열 | kst_date / query_intent, ranker_version | staging.int_search | 검색 탭 스코어보드·추이·의도 유형·랭킹 버전 분해. ops.reconciliation | C16 | [daily_search.sql](sql/marts/daily_search.sql) |
+| **daily_search**<br>검색 품질 일 마트 | 일(KST) × query_intent × ranker_version × channel1 × device_platform × member_seg | 이 여섯 열 | kst_date / query_intent, ranker_version | staging.int_search | 검색 탭 스코어보드·추이·의도 유형·랭킹 버전 분해, 주간·월간 탭 주간 브리핑. ops.reconciliation | C16 | [daily_search.sql](sql/marts/daily_search.sql) |
 | **daily_subscription**<br>구독 일 마트 | 일(KST) | kst_date | kst_date / 없음 | staging.dim_subscription (구독 원장), staging.fct_order (구독자의 티켓 결제, 결제일 기준) | 회원 탭 구독 보기 스코어보드·추이·구독자 결제 비교, 개요 기준일 구독자. marts.monthly_summary, ops.reconciliation | C10 | [daily_subscription.sql](sql/marts/daily_subscription.sql) |
 | **daily_venue**<br>공간별 일 마트 (리스트 집계) | 일(KST) × 공간 | (kst_date, venue_id) | kst_date / venue_id | staging.events_clean·int_session (공간 상세·리뷰 조회, 세션 시작일·사람 단위), staging.fct_order (그 공간 행사의 신청, 신청일 기준), staging.dim_venue | 공간 상위 N 표. 단위가 공간이므로 사람 세그먼트 축이 없다 |  | [daily_venue.sql](sql/marts/daily_venue.sql) |
 | **daily_venue_registry**<br>상권별 공간 등록·파트너 계약 일 마트 | 일(KST) × 상권 | (kst_date, region) | kst_date / region | staging.dim_venue (등록일·상권), staging.dim_contract (계약 시작·종료), staging.int_contract_day (활성일 요금제·요금) | 공간 탭 스코어보드·등록/파트너 누적 추이·상권별 표. marts.monthly_summary, ops.reconciliation | C11·C15 | [daily_venue_registry.sql](sql/marts/daily_venue_registry.sql) |
-| **funnel_daily**<br>일 방문 퍼널 마트 | 일(KST) × 단계 × channel1 × device_platform × member_seg | 이 다섯 열 | kst_date / step_order, channel1, device_platform, member_seg | staging.int_person_day | 탐색 탭 방문 퍼널 5단계. 막대 = 이전 단계 대비 |  | [funnel_daily.sql](sql/marts/funnel_daily.sql) |
+| **funnel_daily**<br>일 방문 퍼널 마트 | 일(KST) × 단계 × channel1 × device_platform × member_seg | 이 다섯 열 | kst_date / step_order, channel1, device_platform, member_seg | staging.int_person_day | 퍼널 탭 방문 퍼널 5단계(사람 단위 person_day 가 없을 때 폴백). 막대 = 첫 단계 대비 |  | [funnel_daily.sql](sql/marts/funnel_daily.sql) |
 | **hourly_metrics**<br>시간대 마트 | 일(KST) × 시(KST, 세션 시작 시) × channel1 × device_platform × member_seg | 이 다섯 열 | kst_date / channel1, device_platform, member_seg | staging.int_session (세션), staging.int_person_day (세그먼트: 사람 × 일) | 요일 × 시간대 세션 히트맵, 1일 선택 시 시간별 차트. 세그먼트 필터를 받아야 해서 축을 둔다 |  | [hourly_metrics.sql](sql/marts/hourly_metrics.sql) |
 | **monthly_cohort**<br>월간 리텐션 코호트 | 코호트 월 × 경과 월 × member_seg | 이 세 열 | DATE_TRUNC(cohort_month, MONTH) / month_offset, member_seg | staging.int_person_day, staging.dim_member | 월 리텐션 표. 리텐션 = retained / cohort_size (화면에서 나눈다) |  | [monthly_cohort.sql](sql/marts/monthly_cohort.sql) |
 | **monthly_contract**<br>파트너 계약 월 흐름 (계약 수·플랜 MRR 다리) | 월(KST) × 요금제(basic / pro / all) | (month, plan) | DATE_TRUNC(month, MONTH) / plan | staging.dim_contract (계약 시작·종료), staging.int_contract_day (날짜별 요금제·요금), staging.dim_contract_change (요금제 변경) | 공간 탭 ARPA·계약 월 해지율·매출 해지율·GRR·NRR, ops.reconciliation | C15 | [monthly_contract.sql](sql/marts/monthly_contract.sql) |
@@ -92,11 +92,11 @@ python3 bigquery/build_catalog.py        # 이 문서 재생성 (주석·본문�
 | **person_day**<br>사람 × 일 행동 플래그 마트 (기간 고유 사람 수 계산용) | 사람 × 일(KST). 행동 플래그(비트 1~16384)가 하나도 없는 날(자동 로드만 있는 날)은 뺀다. 상태 비트 32768 만 있는 날도 뺀다 | (person_key, kst_date) | kst_date / person_key | staging.int_person_day | 대시보드 사람 지표 타일·분해·전기 대비(기간 고유 사람 수). ops.reconciliation | C8 | [person_day.sql](sql/marts/person_day.sql) |
 | **subscription_cohort**<br>멤버십 구독 시작 월 코호트 유지 | 코호트 월(구독 시작 월) × 경과 월(0~9) | (cohort_month, month_offset) | DATE_TRUNC(cohort_month, MONTH) / 없음 | staging.dim_subscription (시작·종료일·스냅샷 기준일) | 회원 탭 구독 보기 코호트 히트맵 |  | [subscription_cohort.sql](sql/marts/subscription_cohort.sql) |
 | **venue_registry**<br>공간 목록 (기준일 스냅샷, 리스트 집계) | 공간 1곳 | venue_id | 없음 / region | staging.dim_venue (속성·파트너 여부·요금제·계약일), staging.dim_event (개최 행사), staging.fct_order (티켓 매출), staging.events_clean·int_session (공간 상세 조회 사람) | 공간 탭 서울 분포 지도(좌표·28일 조회·파트너 여부)·상권별 표·파트너 공간 표, ops.reconciliation. 기간 필터를 받지 않는 기준일 고정 표 |  | [venue_registry.sql](sql/marts/venue_registry.sql) |
-| **weekly_activity**<br>주간 활동 마트 | 주(월요일 시작) × channel1 × device_platform × member_seg | 이 네 열 | week_start / channel1, device_platform, member_seg | staging.int_person_day, staging.dim_member (가입일) | 주간 탭 — WAU·신규·재방문·주 2일+ 방문. 기간 필터 대신 주차 선택기로 본다. ops.reconciliation (C6·C7 기준값) |  | [weekly_activity.sql](sql/marts/weekly_activity.sql) |
+| **weekly_activity**<br>주간 활동 마트 | 주(월요일 시작) × channel1 × device_platform × member_seg | 이 네 열 | week_start / channel1, device_platform, member_seg | staging.int_person_day, staging.dim_member (가입일) | 주간·월간 탭 주간 보기 — WAU·신규·재방문·주 2일+ 방문. 기간 필터 대신 주차 선택기로 본다. ops.reconciliation (C6·C7 기준값) |  | [weekly_activity.sql](sql/marts/weekly_activity.sql) |
 | **weekly_audience_funnel**<br>오디언스별 주간 퍼널 마트 | 주(월요일 시작) × 오디언스 × 단계 × channel1 × device_platform × member_seg | 이 여섯 열 | week_start / audience_id, step_order, channel1, device_platform | staging.int_person_day, staging.int_session (광고 유입 판정), staging.dim_member (가입일) | 퍼널 탭 드릴다운 '오디언스별 퍼널' — 오디언스 × 단계 도달률 표, 선택 오디언스의 주별 전환율 추이. ops.reconciliation | C6 | [weekly_audience_funnel.sql](sql/marts/weekly_audience_funnel.sql) |
-| **weekly_batch**<br>배치 진척 주간 스냅샷 | 주(월요일 시작) × batch_id. 배치 생성 주부터 완료 주(또는 마지막 관측 주)까지 | (week_start, batch_id) | week_start / requester | staging.int_label, raw.eval_batches | 평가 운영 탭 목표 대비 진척·마감 위험 배치·배치 표. ops.reconciliation | I7 | [weekly_batch.sql](sql/marts/weekly_batch.sql) |
-| **weekly_cohort**<br>주간 리텐션 코호트 | 코호트 주 × 경과 주 × channel1 × device_platform × member_seg | 이 다섯 열 | cohort_week / week_offset, channel1, device_platform, member_seg | staging.int_person_day (방문·첫 방문), staging.dim_member (가입일) | 회원 탭 리텐션 곡선, 주간 탭 코호트 히트맵 W1~W12. 리텐션 = retained / cohort_size (화면에서 나눈다). marts.monthly_summary (W1), ops.reconciliation | C4·R1·R2 | [weekly_cohort.sql](sql/marts/weekly_cohort.sql) |
-| **weekly_eval_ops**<br>평가 운영 주간 마트 | 주(월요일 시작) × requester × rater_group × guideline_version | 이 네 열 | week_start / requester | staging.int_label | 평가 운영 탭 스코어보드·추이·지침 버전 비교. ops.reconciliation | C18·C19 | [weekly_eval_ops.sql](sql/marts/weekly_eval_ops.sql) |
+| **weekly_batch**<br>배치 진척 주간 스냅샷 | 주(월요일 시작) × batch_id. 배치 생성 주부터 완료 주(또는 마지막 관측 주)까지 | (week_start, batch_id) | week_start / requester | staging.int_label, raw.eval_batches | 평가 운영 탭 목표 대비 진척·마감 위험 배치·배치 표, 주간·월간 탭 주간 브리핑. ops.reconciliation | I7 | [weekly_batch.sql](sql/marts/weekly_batch.sql) |
+| **weekly_cohort**<br>주간 리텐션 코호트 | 코호트 주 × 경과 주 × channel1 × device_platform × member_seg | 이 다섯 열 | cohort_week / week_offset, channel1, device_platform, member_seg | staging.int_person_day (방문·첫 방문), staging.dim_member (가입일) | 회원 탭 리텐션 곡선, 주간·월간 탭 주간 보기 코호트 히트맵 W1~W12. 리텐션 = retained / cohort_size (화면에서 나눈다). marts.monthly_summary (W1), ops.reconciliation | C4·R1·R2 | [weekly_cohort.sql](sql/marts/weekly_cohort.sql) |
+| **weekly_eval_ops**<br>평가 운영 주간 마트 | 주(월요일 시작) × requester × rater_group × guideline_version | 이 네 열 | week_start / requester | staging.int_label | 평가 운영 탭 스코어보드·추이·지침 버전 비교, 주간·월간 탭 주간 브리핑. ops.reconciliation | C18·C19 | [weekly_eval_ops.sql](sql/marts/weekly_eval_ops.sql) |
 | **weekly_path**<br>주간 화면 경로 마트 (생키 다이어그램용) | 주(월요일 시작) × channel1 × device_platform × member_seg × 단계 × from 화면 × to 화면 | 이 일곱 열 | week_start / step, channel1, device_platform, member_seg | staging.events_clean (screen_view 순서), staging.int_session (세션 날짜·자동 로드·사람), staging.int_person_day (세그먼트), staging.dim_member (가입일) | 퍼널 탭 드릴다운 '경로 탐색' — 단계별 노드(화면)·링크(전이) 생키. ops.reconciliation | C7 | [weekly_path.sql](sql/marts/weekly_path.sql) |
 | **weekly_rater**<br>평가자별 주간 집계 | 주(월요일 시작) × rater_id × requester | 이 세 열 | week_start / rater_id | staging.int_label | 평가 운영 탭 활동 평가자·평가자 표·처리량 × 정확도 산점도·기준 미달 평가자 |  | [weekly_rater.sql](sql/marts/weekly_rater.sql) |
 
@@ -105,7 +105,7 @@ python3 bigquery/build_catalog.py        # 이 문서 재생성 (주석·본문�
 | 표 | 1행 | 키 | 파티션 / 클러스터 | 원천 | 소비 | 검사 | 파일 |
 |---|---|---|---|---|---|---|---|
 | **build_log**<br>파이프라인 실행 기록 (없을 때만 만든다. 기록은 누적된다) | 실행 1회 × 단계(SQL 파일 1개) | (run_id, step, step_name) | DATE(started_at) / 없음 | load_all.sh 가 단계마다 1행 추가 | 파이프라인 상태 확인, bigquery/README.md 마지막 실행 요약 |  | [00_ops_tables.sql](sql/00_ops_tables.sql) |
-| **freshness**<br>표별 신선도 (전체 교체) | 표 1개 | (dataset_name, table_name) | 없음 / 없음 | 각 데이터셋 __TABLES__ (행 수·변경 시각), INFORMATION_SCHEMA.PARTITIONS (마지막 파티션) | 대시보드 데이터 탭 기준일, 파이프라인 상태 확인 |  | [09_freshness.sql](sql/09_freshness.sql) |
+| **freshness**<br>표별 신선도 (전체 교체) | 표 1개 | (dataset_name, table_name) | 없음 / 없음 | 각 데이터셋 __TABLES__ (행 수·변경 시각), INFORMATION_SCHEMA.PARTITIONS (마지막 파티션) | 파이프라인 상태 확인 (화면 소비 없음) |  | [09_freshness.sql](sql/09_freshness.sql) |
 | **reconciliation**<br>대조·범위·무결성 검사 결과 (행 추가) | 실행 1회 × 검사 항목 | (run_id, check_id) | DATE(checked_at) / 없음 | raw.db_payments·db_applications·db_subscriptions·db_venues, staging.events_clean·int_session·int_person_day·fct_order·ad_spend·dim_contract, marts.daily_metrics·weekly_cohort·daily_channel·weekly_activity·weekly_audience_funnel·weekly_path·person_day, marts.daily_revenue·daily_subscription·daily_venue_registry·daily_event·venue_registry·monthly_contract, raw.search_log·eval_queries·eval_labels·eval_tasks·eval_batches, staging.int_search·int_label, marts.daily_search·weekly_eval_ops·weekly_batch | load_all.sh 8단계. passed = FALSE 가 하나라도 있으면 파이프라인이 exit 1 |  | [reconciliation.sql](checks/reconciliation.sql) |
 
 ## 계보
@@ -409,7 +409,7 @@ flowchart LR
 
 ## 마지막 실행
 
-검사 run `20261003T035235Z` (2026-10-03 12:54 KST): 41/41 통과
+검사 run `20261018T152221Z` (2026-10-19 00:22 KST): 41/41 통과
 
 단계별 마지막 기록 (`ops.build_log`, 시각 KST):
 
@@ -453,11 +453,11 @@ flowchart LR
 | 7 | marts.weekly_audience_funnel | 20260925T095356Z | 2026-09-25 19:04 | 6 | 11,210 | 92,475,586 | ok |
 | 7 | marts.weekly_path | 20260925T095356Z | 2026-09-25 19:04 | 8 | 82,592 | 756,196,522 | ok |
 | 7 | marts.person_day | 20260925T095356Z | 2026-09-25 19:04 | 9 | 805,640 | 57,534,232 | ok |
-| 7 | marts.daily_search | 20261003T035235Z | 2026-10-03 12:53 | 9 | 11,159 | 5,580,527 | ok |
 | 7 | marts.daily_query | 20261003T035235Z | 2026-10-03 12:54 | 9 | 47,353 | 6,328,779 | ok |
 | 7 | marts.weekly_eval_ops | 20261003T035235Z | 2026-10-03 12:54 | 4 | 90 | 11,083,702 | ok |
 | 7 | marts.weekly_rater | 20261003T035235Z | 2026-10-03 12:54 | 5 | 479 | 9,705,199 | ok |
 | 7 | marts.weekly_batch | 20261003T035235Z | 2026-10-03 12:54 | 4 | 76 | 2,300,523 | ok |
-| 8 | ops.reconciliation | 20261003T035235Z | 2026-10-03 12:54 | 6 | 0 | 792,939,328 | ok |
-| 9 | ops.freshness | 20261003T035235Z | 2026-10-03 12:54 | 9 | 58 | 31,460,806 | ok |
+| 7 | marts.daily_search | 20261018T152221Z | 2026-10-19 00:22 | 8 | 11,159 | 5,580,527 | ok |
+| 8 | ops.reconciliation | 20261018T152221Z | 2026-10-19 00:22 | 7 | 0 | 792,939,328 | ok |
+| 9 | ops.freshness | 20261018T152221Z | 2026-10-19 00:23 | 11 | 58 | 31,460,806 | ok |
 

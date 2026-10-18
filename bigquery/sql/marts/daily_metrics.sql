@@ -3,7 +3,7 @@
 -- 키: 이 네 열
 -- 파티션·클러스터: kst_date / channel1, device_platform, member_seg
 -- 원천: staging.int_person_day
--- 소비: 개요·탐색·행사·결제 흐름·회원 탭 스코어보드와 추이. 세그먼트 조합의 합 = 전체. ops.reconciliation
+-- 소비: 개요·퍼널·행사·결제(흐름 보기)·회원(회원·구독 보기) 탭 스코어보드와 추이. 세그먼트 조합의 합 = 전체. ops.reconciliation
 -- 검사: C3·R4
 --
 -- 사람 열은 그날 고유 사람 수다. 여러 날을 더하면 '사람·일'이 된다(기간 고유 사람은 weekly_activity·monthly_summary).

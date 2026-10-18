@@ -3,7 +3,7 @@
 -- 키: 이 다섯 열
 -- 파티션·클러스터: kst_date / step_order, channel1, device_platform, member_seg
 -- 원천: staging.int_person_day
--- 소비: 탐색 탭 방문 퍼널 5단계. 막대 = 이전 단계 대비
+-- 소비: 퍼널 탭 방문 퍼널 5단계(사람 단위 person_day 가 없을 때 폴백). 막대 = 첫 단계 대비
 --
 -- 단계는 누적 조건이다(각 단계가 앞 단계 조건을 모두 포함). 같은 날 안에서 판정한다.
 --   landing     방문 (자동 로드 아닌 세션)

@@ -3,7 +3,7 @@
 -- 키: 이 다섯 열
 -- 파티션·클러스터: cohort_week / week_offset, channel1, device_platform, member_seg
 -- 원천: staging.int_person_day (방문·첫 방문), staging.dim_member (가입일)
--- 소비: 회원 탭 리텐션 곡선, 주간 탭 코호트 히트맵 W1~W12. 리텐션 = retained / cohort_size (화면에서 나눈다).
+-- 소비: 회원 탭 리텐션 곡선, 주간·월간 탭 주간 보기 코호트 히트맵 W1~W12. 리텐션 = retained / cohort_size (화면에서 나눈다).
 --       marts.monthly_summary (W1), ops.reconciliation
 -- 검사: C4·R1·R2
 --

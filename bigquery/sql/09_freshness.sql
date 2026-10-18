@@ -3,7 +3,7 @@
 -- 키: (dataset_name, table_name)
 -- 파티션·클러스터: 없음 / 없음
 -- 원천: 각 데이터셋 __TABLES__ (행 수·변경 시각), INFORMATION_SCHEMA.PARTITIONS (마지막 파티션)
--- 소비: 대시보드 데이터 탭 기준일, 파이프라인 상태 확인
+-- 소비: 파이프라인 상태 확인 (화면 소비 없음)
 --
 -- 표 정의는 00_ops_tables.sql.
 -- 매개변수: @run_id STRING

@@ -3,7 +3,7 @@
 -- 키: 이 네 열
 -- 파티션·클러스터: week_start / requester
 -- 원천: staging.int_label
--- 소비: 평가 운영 탭 스코어보드·추이·지침 버전 비교. ops.reconciliation
+-- 소비: 평가 운영 탭 스코어보드·추이·지침 버전 비교, 주간·월간 탭 주간 브리핑. ops.reconciliation
 -- 검사: C18·C19
 --
 -- 비율·카파는 저장하지 않는다. 정확도 = gold_correct ÷ gold_labels(첫 제출), 일치율 = agree_pairs ÷ label_pairs(최종 라벨),
