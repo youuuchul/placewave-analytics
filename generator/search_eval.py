@@ -45,6 +45,9 @@ PROMOTION_START = date(2026, 5, 4)
 GUIDELINE_V2 = date(2026, 6, 1)
 CAMPAIGN_ADHOC = date(2026, 9, 1)
 PRELAUNCH_ADHOC = date(2026, 7, 6)
+REINDEX_BUG = (date(2026, 9, 1), date(2026, 9, 4))  # 가을 캠페인 대비 재색인에서 구분자(·) 정규화 누락, 9/5 핫픽스
+REINDEX_BUG_ZERO = 0.9  # 회귀 기간 구분자 검색어 중 클릭이 없던 요청이 결과 0건이 될 확률
+REGRESSION_ADHOC = date(2026, 9, 8)  # 회귀 검증용 검색팀 긴급 배치
 
 GA_MISSING_SHARE = 0.015  # 서버에만 남은 요청 비중 (GA 미수집)
 MATCH_WINDOW_US = 3_000_000
@@ -300,6 +303,7 @@ class Builder:
     def __init__(self, cat: Catalog, seed: int) -> None:
         self.cat = cat
         self.rng = np.random.default_rng(seed)
+        self.bug_rng = np.random.default_rng([seed, 3])  # 재색인 회귀 전용 난수열. 기존 난수 흐름을 바꾸지 않는다
         self.log: list[dict[str, Any]] = []
         self.raters: list[dict[str, Any]] = []
         self.batches: list[dict[str, Any]] = []
@@ -387,21 +391,35 @@ class Builder:
                 if count == 0:
                     top = []
             med = 120 if rk == "v1" else 95
-            self.log.append(
-                {
-                    "request_id": f"q{n:08d}",
-                    "requested_at": datetime.fromtimestamp(ts / 1e6, UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-                    "kst_date": d,
-                    "user_pseudo_id": cid,
-                    "query_raw": term,
-                    "ranker_version": rk,
-                    "results_count": count,
-                    "results": [{"position": p, "item_type": t, "item_id": i} for p, t, i in top],
-                    "promoted_event_id": self.promoted(term, d) if count else None,
-                    "latency_ms": int(rng.lognormal(math.log(med), 0.35)),
-                    "_ga": nxt is not None,
-                }
-            )
+            row = {
+                "request_id": f"q{n:08d}",
+                "requested_at": datetime.fromtimestamp(ts / 1e6, UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+                "kst_date": d,
+                "user_pseudo_id": cid,
+                "query_raw": term,
+                "ranker_version": rk,
+                "results_count": count,
+                "results": [{"position": p, "item_type": t, "item_id": i} for p, t, i in top],
+                "promoted_event_id": self.promoted(term, d) if count else None,
+                "latency_ms": int(rng.lognormal(math.log(med), 0.35)),
+                "_ga": nxt is not None,
+            }
+            if (
+                click is None
+                and "·" in term
+                and REINDEX_BUG[0] <= d <= REINDEX_BUG[1]
+                and self.bug_rng.random() < REINDEX_BUG_ZERO
+            ):
+                row["_bug"] = (row["results_count"], row["results"], row["promoted_event_id"])
+                row.update(results_count=0, results=[], promoted_event_id=None)
+            self.log.append(row)
+
+    def set_reindex_bug(self, on: bool) -> None:
+        """재색인 회귀로 0건이 된 요청을 회귀 상태(on) 또는 원래 결과(off)로 둔다."""
+        for r in self.log:
+            if "_bug" in r:
+                count, results, promoted = (0, [], None) if on else r["_bug"]
+                r.update(results_count=count, results=results, promoted_event_id=promoted)
 
     # ---------- 평가 운영 ----------
 
@@ -565,16 +583,32 @@ class Builder:
         pairs = [{"query": q, "item_type": "event", "item_id": e, "pos": 0, "ranker": None} for q, e in keys]
         self.add_batch("promotion", purpose, created, due, prio, pairs)
 
-    def plan_batches(self) -> None:
+    def plan_with_regression(self) -> None:
+        """재색인 회귀를 넣어 배치를 계획한다. 라벨 시뮬레이션은 회귀가 없을 때의 계획이 끝난 난수 지점에서
+        시작해, 회귀의 영향을 받는 9/7 배치 이전의 과제·라벨이 회귀 추가 전과 같게 남는다."""
+        start = self.rng.bit_generator.state
+        self.set_reindex_bug(False)
+        self.plan_batches(regression=False)
+        after = self.rng.bit_generator.state
+        self.batches, self.tasks, self.queries = [], [], []
+        self.rng.bit_generator.state = start
+        self.set_reindex_bug(True)
+        self.plan_batches(regression=True)
+        self.rng.bit_generator.state = after
+
+    def plan_batches(self, regression: bool = True) -> None:
         """한 해의 배치 일정. 목표는 그 시점 평가 인력 용량에 맞춘다."""
         days = [PROGRAM_START]
         d = monday(PROGRAM_START) + timedelta(days=7)
         while d <= SNAPSHOT - timedelta(days=3):
             days.append(d)
             d += timedelta(days=7)
-        for d in sorted({*days, CAMPAIGN_ADHOC}):
+        for d in sorted({*days, CAMPAIGN_ADHOC, *([REGRESSION_ADHOC] if regression else [])}):
             if d == CAMPAIGN_ADHOC:
                 self.promotion_batch(d, 2400, "adhoc", 4, 1)
+                continue
+            if d == REGRESSION_ADHOC:
+                self.search_batch(d, "adhoc", 480, (0.8, 0.2, 0.0))
                 continue
             active = [r for r in self.raters if r["joined_at"] <= d and (r["left_at"] is None or r["left_at"] > d)]
             cap_tasks = sum(r["weekly_target"] for r in active) / LABELS_PER_TASK
@@ -758,6 +792,8 @@ def summarize(b: Builder) -> dict[str, Any]:
         "zero_rate_ab_v1": round(zr([r for r in ab if r["ranker_version"] == "v1"]), 4),
         "zero_rate_ab_v2": round(zr([r for r in ab if r["ranker_version"] == "v2"]), 4),
         "zero_rate_v2_after": round(zr([r for r in b.log if r["kst_date"] >= RANKER_V2_ALL]), 4),
+        "zero_rate_reindex_bug": round(zr([r for r in b.log if REINDEX_BUG[0] <= r["kst_date"] <= REINDEX_BUG[1]]), 4),
+        "reindex_bug_zeroed": sum("_bug" in r for r in b.log),
         "batches": len(b.batches),
         "tasks": len(b.tasks),
         "labels": len(b.labels),
@@ -803,6 +839,8 @@ def validate(b: Builder) -> list[str]:
         errs.append("지침 v2 정답셋 정확도가 v1 보다 높지 않음")
     if not 0.005 < s["ga_missing"] / s["search_log"] < 0.03:
         errs.append("GA 미수집 요청 비중 범위 밖")
+    if not s["zero_rate_reindex_bug"] > 2 * s["zero_rate_v2_after"]:
+        errs.append("재색인 회귀 기간 0건 비율이 v2 전체 적용 후 평균의 2배를 넘지 않음")
     return errs
 
 
@@ -839,7 +877,7 @@ def main() -> None:
     b.build_log(searches)
     logger.info("서버 로그 %d건", len(b.log))
     b.build_raters()
-    b.plan_batches()
+    b.plan_with_regression()
     b.simulate()
     errs = validate(b)
     for k, v in summarize(b).items():
