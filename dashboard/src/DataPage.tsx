@@ -29,7 +29,7 @@ interface CatalogTable {
   columns: CatalogColumn[]
 }
 
-interface Catalog {
+export interface Catalog {
   built_at: string
   project: string
   location: string
@@ -46,7 +46,7 @@ const LAYER_LABEL: Record<string, string> = {
 
 const idOf = (t: CatalogTable) => `${t.layer}.${t.name}`
 
-function useCatalog(): Catalog | null | 'missing' {
+export function useCatalog(): Catalog | null | 'missing' {
   const [cat, setCat] = useState<Catalog | null | 'missing'>(null)
   useEffect(() => {
     fetch(`${import.meta.env.BASE_URL}catalog.json`)
