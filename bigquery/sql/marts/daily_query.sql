@@ -6,9 +6,11 @@
 -- 소비: 검색 탭 실패 검색어 표
 --
 -- 실패 검색어(화면 판정) = 기간 안 검색 20건 이상이고 결과 0건 비율 30% 이상. 기간이 화면에서 정해지므로 판정은 저장하지 않는다.
--- first_eval_date·first_failed_eval_date·failed_eval_dates 는 검색어 속성(모든 행에 같은 값). 평가 배치에 처음 편입된 날 /
--- 실패 검색어 출처로 처음 편입된 날 / 실패 출처로 편입된 날 전부(화면은 기간 시작 ~ 기간 끝 + 7일 안의 첫 날을 평가 편입일로 쓴다 —
--- 실패가 반복되면 그때의 편입을 본다).
+-- first_eval_date·first_failed_eval_date·failed_eval_dates·eval_dates 는 검색어 속성(모든 행에 같은 값). 평가 배치에 처음 편입된 날 /
+-- 실패 검색어 출처로 처음 편입된 날 / 실패 출처로 편입된 날 전부 / 검색팀 배치(실패·상위·무작위 출처)에 편입된 날 전부.
+-- 화면은 eval_dates 중 기간 시작 ~ 기간 끝 + 7일 안의 첫 날을 평가 편입일로 쓴다 — 실패가 반복되면 그때의 편입을 보고,
+-- 상위 검색량 출처로 들어간 실패 검색어도 검색 결과에 라벨이 붙었으므로 편입으로 센다. 프로모션 추천 슬롯 배치(promoted)는
+-- 검색 결과가 아니라 추천 행사를 평가하므로 뺀다.
 
 CREATE OR REPLACE TABLE marts.daily_query (
   kst_date DATE OPTIONS(description='날짜 (KST, 세션 시작일). 일 파티션'),
@@ -24,7 +26,8 @@ CREATE OR REPLACE TABLE marts.daily_query (
   reformulated_searches INT64 OPTIONS(description='재검색 요청 수'),
   first_eval_date DATE OPTIONS(description='검색어 속성: 평가 배치에 처음 편입된 날. 없으면 NULL'),
   first_failed_eval_date DATE OPTIONS(description='검색어 속성: 실패 검색어 출처(failed)로 처음 편입된 날. 없으면 NULL'),
-  failed_eval_dates STRING OPTIONS(description='검색어 속성: 실패 검색어 출처(failed)로 편입된 날 전부(YYYY-MM-DD 오름차순, 쉼표 구분). 없으면 NULL')
+  failed_eval_dates STRING OPTIONS(description='검색어 속성: 실패 검색어 출처(failed)로 편입된 날 전부(YYYY-MM-DD 오름차순, 쉼표 구분). 없으면 NULL'),
+  eval_dates STRING OPTIONS(description='검색어 속성: 검색팀 배치(출처 failed·head·random)에 편입된 날 전부(YYYY-MM-DD 오름차순, 쉼표 구분). 프로모션 추천 슬롯(promoted) 제외. 없으면 NULL')
 )
 PARTITION BY kst_date
 CLUSTER BY query_norm
@@ -35,7 +38,8 @@ WITH ev AS (
     query_norm,
     MIN(sampled_at) AS first_eval_date,
     MIN(IF(source = 'failed', sampled_at, NULL)) AS first_failed_eval_date,
-    STRING_AGG(DISTINCT IF(source = 'failed', FORMAT_DATE('%F', sampled_at), NULL), ',' ORDER BY IF(source = 'failed', FORMAT_DATE('%F', sampled_at), NULL)) AS failed_eval_dates
+    STRING_AGG(DISTINCT IF(source = 'failed', FORMAT_DATE('%F', sampled_at), NULL), ',' ORDER BY IF(source = 'failed', FORMAT_DATE('%F', sampled_at), NULL)) AS failed_eval_dates,
+    STRING_AGG(DISTINCT IF(source != 'promoted', FORMAT_DATE('%F', sampled_at), NULL), ',' ORDER BY IF(source != 'promoted', FORMAT_DATE('%F', sampled_at), NULL)) AS eval_dates
   FROM raw.eval_queries
   GROUP BY 1
 )
@@ -53,7 +57,8 @@ SELECT
   COUNTIF(s.is_reformulated) AS reformulated_searches,
   ANY_VALUE(ev.first_eval_date) AS first_eval_date,
   ANY_VALUE(ev.first_failed_eval_date) AS first_failed_eval_date,
-  ANY_VALUE(ev.failed_eval_dates) AS failed_eval_dates
+  ANY_VALUE(ev.failed_eval_dates) AS failed_eval_dates,
+  ANY_VALUE(ev.eval_dates) AS eval_dates
 FROM staging.int_search AS s
 LEFT JOIN ev USING (query_norm)
 WHERE s.kst_date BETWEEN DATE '2000-01-01' AND DATE '2099-12-31'

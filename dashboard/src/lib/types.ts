@@ -288,8 +288,8 @@ export interface DailyQuery extends Seg {
   ga_matched_searches: number
   clicked_searches: number
   reformulated_searches: number
-  /** 실패 출처로 편입된 날 전부, 쉼표 구분 오름차순 */
-  failed_eval_dates: string | null
+  /** 검색팀 배치(실패·상위·무작위 출처)에 편입된 날 전부, 쉼표 구분 오름차순 */
+  eval_dates: string | null
 }
 
 export interface WeeklyEvalOps {
