@@ -1,6 +1,8 @@
 import type { MouseEvent, ReactNode } from 'react'
 import { DATA_NOTE_ID } from './components/Header'
 import { useCatalog } from './DataPage'
+import { GroupChip } from './reports/Frame'
+import { REPORTS } from './reports/registry'
 
 const REPO = 'https://github.com/youuuchul/placewave-analytics'
 
@@ -475,9 +477,9 @@ const DOCS: { label: string; sub: string; href: string; internal?: 'data' | 'met
   { label: '저장소', sub: '생성기·SQL·대시보드 코드', href: REPO },
 ]
 
-function Section({ n, title, children }: { n: number; title: string; children: ReactNode }) {
+function Section({ n, title, children, id }: { n: number; title: string; children: ReactNode; id?: string }) {
   return (
-    <section className="flex flex-col gap-4">
+    <section id={id} className="flex scroll-mt-6 flex-col gap-4">
       <h3 className="flex items-baseline gap-2 text-[15px] font-semibold text-ink">
         <span className="tnum text-xs font-medium text-muted">{String(n).padStart(2, '0')}</span>
         {title}
@@ -508,19 +510,38 @@ function useScale() {
   return { members, venues, events, searches, labels }
 }
 
+type Target = 'data' | 'metrics' | 'reports' | ''
+
+const BIZ_ID = 'business-model'
+const REPORTS_ID = 'reports'
+
 export default function About({
   hrefs,
   onPage,
+  onReport,
+  reportHref,
 }: {
-  hrefs: Record<'data' | 'metrics', string>
-  onPage: (page: 'data' | 'metrics') => void
+  hrefs: Record<Target, string>
+  onPage: (page: Target) => void
+  onReport: (id: string) => void
+  reportHref: (id: string) => string
 }) {
   const scale = useScale()
-  const open = (page: 'data' | 'metrics') => (e: MouseEvent<HTMLAnchorElement>) => {
+  const open = (page: Target) => (e: MouseEvent<HTMLAnchorElement>) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return
     e.preventDefault()
     onPage(page)
   }
+  const jump = (id: string) => (e: MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault()
+    document.getElementById(id)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+  }
+  const report = (id: string) => (e: MouseEvent<HTMLAnchorElement>) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return
+    e.preventDefault()
+    onReport(id)
+  }
+  const tile = 'card flex h-full flex-col gap-2 p-4 transition-shadow hover:shadow-[0_0_0_1px_var(--axis)] sm:p-5'
   return (
     <main className="mx-auto flex max-w-[1280px] flex-col gap-12 px-4 pb-20 pt-8 sm:px-6">
       <div className="flex flex-col gap-3">
@@ -545,6 +566,33 @@ export default function About({
         </p>
       </div>
 
+      <nav aria-label="세 묶음" className="grid gap-3 md:grid-cols-3">
+        <a href={`#${BIZ_ID}`} onClick={jump(BIZ_ID)} className={tile}>
+          <span className="text-xs font-medium text-muted">1 · 비즈니스 시나리오</span>
+          <span className="text-[15px] font-semibold text-ink">수수료 · 멤버십 · 파트너 플랜 세 축의 가상 플랫폼</span>
+          <span className="text-[13px] leading-relaxed text-ink2">1년차 거래액 13.3억, 플랫폼 매출 2.65억 — 서비스와 돈의 흐름</span>
+          <span className="mt-auto text-xs font-medium text-accent">비즈니스 모델 ↓</span>
+        </a>
+        <a href={hrefs['']} onClick={open('')} className={tile}>
+          <span className="text-xs font-medium text-muted">2 · 모니터링 대시보드</span>
+          <span className="text-[15px] font-semibold text-ink">질문에서 출발한 탭 9개</span>
+          <span className="text-[13px] leading-relaxed text-ink2">어느 단계에서 빠지나 · 파트너·멤버십이 거래를 늘리나 · 검색은 어디서 실패하나</span>
+          <span className="mt-auto text-xs font-medium text-accent">대시보드 →</span>
+        </a>
+        <a href={hrefs.reports} onClick={open('reports')} className={tile}>
+          <span className="text-xs font-medium text-muted">3 · 보고서</span>
+          <span className="text-[15px] font-semibold text-ink">실험 1 · 개선 1 · 이슈 1</span>
+          <ul className="flex flex-col gap-1 text-[13px] leading-snug text-ink2">
+            {REPORTS.map((r) => (
+              <li key={r.id}>
+                <span className="text-muted">{r.code}</span> {r.conclusion}
+              </li>
+            ))}
+          </ul>
+          <span className="mt-auto text-xs font-medium text-accent">보고서 목록 →</span>
+        </a>
+      </nav>
+
       <Section n={1} title="프로덕트">
         <p className="max-w-[720px] text-[14px] leading-relaxed text-ink2">
           Placewave는 도심의 공간 — 카페·바·라운지·라이브홀·루프탑·팝업 — 과 그곳에서 열리는 이벤트를 찾아보고, 신청하고,
@@ -558,12 +606,12 @@ export default function About({
         </p>
         <p className="max-w-[720px] text-[14px] leading-relaxed text-ink2">
           검색은 장르·상권·행사 유형·공간명으로 들어오는 또 하나의 입구입니다. 2026년 4월부터 검색 결과의 관련성을 사람이 평가하는
-          프로그램을 운영했고, 그 라벨로 만든 랭킹 v2를 7월에 기기 절반에 먼저 노출한 뒤 전체에 적용했습니다. 마지막 질문 — 검색은
+          프로그램을 운영했고, 그 라벨로 만든 새 랭킹을 7월에 기존 랭킹과 기기 단위 무작위 50:50으로 비교한 뒤 전체에 적용했습니다. 마지막 질문 — 검색은
           어디서 실패하고, 평가와 랭킹 개선이 그 실패를 줄였는가.
         </p>
       </Section>
 
-      <Section n={2} title="비즈니스 모델">
+      <Section n={2} title="비즈니스 모델" id={BIZ_ID}>
         <p className="max-w-[720px] text-[14px] leading-relaxed text-ink2">
           플랫폼 매출은 수수료 · 멤버십 · 파트너 플랜 세 갈래이고, 티켓 거래액은 그 규모를 재는 지표입니다.
         </p>
@@ -615,14 +663,29 @@ export default function About({
         </ol>
       </Section>
 
-      <Section n={4} title="데이터 흐름">
+      <Section n={4} title="보고서" id={REPORTS_ID}>
+        <ul className="grid gap-3 md:grid-cols-3">
+          {REPORTS.map((r) => (
+            <li key={r.id}>
+              <a href={reportHref(r.id)} onClick={report(r.id)} className={tile}>
+                <GroupChip meta={r} />
+                <span className="text-[14px] font-semibold leading-snug text-ink">{r.title}</span>
+                <span className="text-[13px] leading-relaxed text-ink2">{r.conclusion}</span>
+                <span className="tnum mt-auto text-xs text-muted">{r.period}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </Section>
+
+      <Section n={5} title="데이터 흐름">
         <div className="card p-4 sm:p-6">
           <FlowWide />
           <FlowTall />
         </div>
       </Section>
 
-      <Section n={5} title="문서">
+      <Section n={6} title="문서">
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {DOCS.map((d) => (
             <li key={d.label}>
