@@ -39,13 +39,13 @@
     "name": "genre",
     "type": "STRING",
     "mode": "NULLABLE",
-    "description": "대표 장르: 힙합 / 하우스/테크노 / EDM / 라운지/재즈 / K-pop/믹스 / 라이브"
+    "description": "대표 장르: 힙합 / 시티팝/디스코 / 일렉트로닉 / 재즈/소울 / K-pop/팝 / 어쿠스틱"
   },
   {
     "name": "venue_type",
     "type": "STRING",
     "mode": "NULLABLE",
-    "description": "공간 유형: 클럽 / 라운지바 / 펍 / 루프탑 / 라이브홀 / 파티룸"
+    "description": "공간 유형: 팝업 스페이스 / 라운지 / 바 / 루프탑 / 라이브홀 / 카페"
   },
   {
     "name": "capacity_band",
