@@ -7,8 +7,8 @@ type Page = State['page']
 export const DATA_NOTE_ID = 'data-note'
 
 export function goPage(s: State, set: (patch: Partial<State>) => void, page: Page, anchor = '') {
-  window.history.pushState(null, '', toHref({ ...s, page }) + (anchor ? `#${anchor}` : ''))
-  set({ page })
+  window.history.pushState(null, '', toHref({ ...s, page, r: '' }) + (anchor ? `#${anchor}` : ''))
+  set({ page, r: '' })
   setTimeout(() => {
     const el = anchor ? document.getElementById(anchor) : null
     if (el) el.scrollIntoView({ block: 'start' })
@@ -38,7 +38,7 @@ function PageLink({
   }
   return (
     <a
-      href={toHref({ ...s, page }) + (anchor ? `#${anchor}` : '')}
+      href={toHref({ ...s, page, r: '' }) + (anchor ? `#${anchor}` : '')}
       onClick={onClick}
       aria-current={s.page === page && !anchor ? 'page' : undefined}
       className={className}
@@ -50,6 +50,7 @@ function PageLink({
 
 const NAV: { page: Page; label: string; short: string }[] = [
   { page: '', label: '대시보드', short: '대시보드' },
+  { page: 'reports', label: '보고서', short: '보고서' },
   { page: 'about', label: '프로젝트 개요', short: '개요' },
   { page: 'metrics', label: '지표 가이드', short: '지표' },
   { page: 'data', label: '데이터', short: '데이터' },

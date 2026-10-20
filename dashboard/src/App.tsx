@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react'
-import { campaignSpans, resolveRange, spanRange } from './lib/agg'
+import { campaignSpans, resolveRange } from './lib/agg'
 import { md } from './lib/date'
 import { type State, type TabId, toHref, useUrlState } from './lib/state'
 import type { Data } from './lib/types'
@@ -8,13 +8,15 @@ import { MonthLine, PeriodLine, SegmentControls, SegmentLine, WeekLine } from '.
 import { Segmented, Select } from './components/ui'
 import Overview from './tabs/Overview'
 import FunnelTab from './tabs/FunnelTab'
-import Search, { rankerSpan } from './tabs/Search'
+import Search from './tabs/Search'
 import EvalOps, { evalWeeks } from './tabs/EvalOps'
 import About from './About'
 import DataPage from './DataPage'
 import MetricsPage from './MetricsPage'
+import Reports from './Reports'
 import Spaces from './tabs/Spaces'
 import Header, { goPage } from './components/Header'
+import { openReport } from './components/ReportLink'
 import Events from './tabs/Events'
 import Members from './tabs/Members'
 import Acquisition from './tabs/Acquisition'
@@ -36,10 +38,6 @@ const TABS: TabDef[] = [
     id: 'search',
     label: '검색',
     el: Search,
-    views: [
-      { value: 'quality', label: '품질' },
-      { value: 'ranker', label: '랭킹 실험' },
-    ],
   },
   {
     id: 'events',
@@ -145,17 +143,17 @@ export default function App() {
   const legacy = (s.tab as string) === 'explore' ? (s.view === 'venue' ? 'events' : 'funnel') : s.tab
   const tab = TABS.find((t) => t.id === legacy) ?? TABS[0]
   const view = tab.views ? (tab.views.some((v) => v.value === s.view) ? s.view : tab.views[0].value) : ''
-  const isTarget = (t: TabId, v: string) => v === 'campaign' || (t === 'search' && v === 'ranker')
+  const isTarget = (_t: TabId, v: string) => v === 'campaign'
   const target = isTarget(tab.id, view)
   const p = s.p === '' || (s.p === 'target' && !target) ? (target ? 'target' : '28') : s.p
   const st: State = { ...s, tab: tab.id, view, p }
-  const searchRows = ready(useTable(data, 'daily_search', tab.id === 'search'))
-  const span = useMemo(() => (searchRows ? rankerSpan(searchRows) : null), [searchRows])
-  const range = useMemo(() => {
-    if (!data) return null
-    if (tab.id === 'search' && view === 'ranker' && p === 'target' && span) return spanRange(span.from, span.to)
-    return resolveRange(st, data)
-  }, [data, st.p, st.d, st.from, st.to, st.camp, tab.id, view, span])
+  const range = useMemo(() => (data ? resolveRange(st, data) : null), [data, st.p, st.d, st.from, st.to, st.camp])
+
+  // 옛 랭킹 실험 보기 주소(덱 링크)는 실험 보고서로 넘긴다.
+  const legacyRanker = s.page === '' && s.tab === 'search' && s.view === 'ranker'
+  useEffect(() => {
+    if (legacyRanker) set({ page: 'reports', r: 'ab-ranker-v2', tab: 'overview', view: '', p: '', from: '', to: '' })
+  }, [legacyRanker])
   const venues = ready(useTable(data, 'daily_venue', tab.id === 'events' && view === 'venue')) ?? []
   const events = ready(useTable(data, 'daily_event', tab.id === 'events' && view === 'event')) ?? []
 
@@ -175,9 +173,24 @@ export default function App() {
       <div className="min-h-screen">
         {header}
         <About
-          hrefs={{ data: toHref({ ...s, page: 'data' }), metrics: toHref({ ...s, page: 'metrics' }) }}
+          hrefs={{
+            data: toHref({ ...s, page: 'data', r: '' }),
+            metrics: toHref({ ...s, page: 'metrics', r: '' }),
+            reports: toHref({ ...s, page: 'reports', r: '' }),
+            '': toHref({ ...s, page: '', r: '' }),
+          }}
           onPage={(page) => goPage(s, set, page)}
+          onReport={(id) => openReport(s, set, id)}
+          reportHref={(id) => toHref({ ...s, page: 'reports', r: id })}
         />
+      </div>
+    )
+
+  if (s.page === 'reports')
+    return (
+      <div className="min-h-screen">
+        {header}
+        <Reports data={data} s={s} set={set} />
       </div>
     )
 
@@ -262,11 +275,7 @@ export default function App() {
         min={min}
         max={max}
         extra={
-          view === 'campaign'
-            ? { value: 'target', label: '캠페인 기간' }
-            : tab.id === 'search' && view === 'ranker'
-              ? { value: 'target', label: '실험 기간' }
-              : undefined
+          view === 'campaign' ? { value: 'target', label: '캠페인 기간' } : undefined
         }
       />
     )

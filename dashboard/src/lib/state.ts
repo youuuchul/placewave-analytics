@@ -26,8 +26,9 @@ export interface State {
   sg: string
   sp: 'all' | 'partner' | 'other'
   rq: 'all' | 'search' | 'promotion'
-  page: '' | 'about' | 'data' | 'metrics'
+  page: '' | 'about' | 'data' | 'metrics' | 'reports'
   table: string
+  r: string
 }
 
 export const DEFAULTS: State = {
@@ -55,6 +56,7 @@ export const DEFAULTS: State = {
   rq: 'all',
   page: '',
   table: '',
+  r: '',
 }
 
 function read(): State {

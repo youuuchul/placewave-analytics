@@ -1,62 +1,21 @@
 import { useMemo } from 'react'
 import { bucketed, groupSum, inRange, segFilter, sum, uniqueByMasks } from '../lib/agg'
-import { addDays, md, mondayOf } from '../lib/date'
+import { md, mondayOf } from '../lib/date'
 import { dec, num, pct, ratio } from '../lib/format'
+import { applyRate, avgPos, ctr, FAILED_MIN, queryStats, rankerSpan, reform, SEARCH_KEYS, zeroRate } from '../lib/experiments'
 import { QUERY_INTENT, S } from '../lib/labels'
 import { F } from '../lib/persons'
 import { ready, useTable, waitOf } from '../lib/source'
-import type { DailyQuery, DailySearch } from '../lib/types'
+import type { DailySearch } from '../lib/types'
+import { ReportLink } from '../components/ReportLink'
 import { TimeChart } from '../components/charts'
 import { DataTable, type Col } from '../components/DataTable'
 import { Card, Empty, Legend, Tile, TileRow } from '../components/ui'
 import { delta, grain, ptDelta, type TabProps, vsLabel, weekTip } from './common'
 
-const KEYS = [
-  'searches',
-  'zero_result_searches',
-  'ga_matched_searches',
-  'matched_result_searches',
-  'clicked_searches',
-  'first_click_position_sum',
-  'first_click_position_sq_sum',
-  'top3_clicks',
-  'reformulated_searches',
-  'search_sessions',
-  'search_sessions_applied',
-] as const satisfies readonly (keyof DailySearch)[]
-type K = (typeof KEYS)[number]
-type Sums = Record<K, number>
+const KEYS = SEARCH_KEYS
 
-const FAILED_MIN = 20
-const FAILED_ZERO = 0.3
-
-const zeroRate = (t: Sums) => ratio(t.zero_result_searches, t.searches)
-const ctr = (t: Sums) => ratio(t.clicked_searches, t.matched_result_searches)
-const avgPos = (t: Sums) => ratio(t.first_click_position_sum, t.clicked_searches)
-const top3 = (t: Sums) => ratio(t.top3_clicks, t.clicked_searches)
-const reform = (t: Sums) => ratio(t.reformulated_searches, t.ga_matched_searches)
-const applyRate = (t: Sums) => ratio(t.search_sessions_applied, t.search_sessions)
-const clickPerSearch = (t: Sums) => ratio(t.clicked_searches, t.ga_matched_searches)
-
-/** v1·v2 가 같은 날 각각 그날 검색의 10% 이상인 기간 = 랭킹 50% 노출 실험 기간(자정 넘긴 세션의 소수 섞임 제외). */
-export function rankerSpan(rows: DailySearch[]): { from: string; to: string; v2All: string | null } | null {
-  const by = new Map<string, { v1: number; v2: number }>()
-  for (const r of rows) {
-    const z = by.get(r.kst_date) ?? { v1: 0, v2: 0 }
-    if (r.ranker_version === 'v1') z.v1 += r.searches
-    else z.v2 += r.searches
-    by.set(r.kst_date, z)
-  }
-  const both = [...by.entries()]
-    .filter(([, z]) => Math.min(z.v1, z.v2) >= 0.1 * (z.v1 + z.v2))
-    .map(([d]) => d)
-    .sort()
-  if (!both.length) return null
-  const to = both[both.length - 1]
-  return { from: both[0], to, v2All: addDays(to, 1) }
-}
-
-function Quality({ data, s, range, rows }: TabProps & { rows: DailySearch[] }) {
+function Quality({ data, s, set, range, rows }: TabProps & { rows: DailySearch[] }) {
   const seg = segFilter(s)
   const pdL = useTable(data, 'person_day')
   const qL = useTable(data, 'daily_query')
@@ -75,8 +34,8 @@ function Quality({ data, s, range, rows }: TabProps & { rows: DailySearch[] }) {
   const trend = b.rows.map((r) => ({ date: r.date, zero: zeroRate(r), ctr: ctr(r) }))
   const marks = span
     ? [
-        { x: span.from, label: 'v2 50%' },
-        { x: span.v2All!, label: 'v2 전체' },
+        { x: span.from, label: 'A/B 테스트 시작' },
+        { x: span.v2All!, label: '새 랭킹 전체 적용' },
       ]
         .map((m) => ({ ...m, x: b.weekly ? mondayOf(m.x) : m.x }))
         .filter((m) => trend.some((t) => t.date === m.x))
@@ -108,28 +67,7 @@ function Quality({ data, s, range, rows }: TabProps & { rows: DailySearch[] }) {
   }, [data])
 
   const qRows = ready(qL)
-  const queries = useMemo(() => {
-    if (!qRows) return []
-    const m = new Map<string, { q: DailyQuery; searches: number; zero: number; matched: number; clicked: number; reform: number }>()
-    for (const r of qRows) {
-      if (r.kst_date < range.from || r.kst_date > range.to || !seg(r)) continue
-      const z = m.get(r.query_norm) ?? { q: r, searches: 0, zero: 0, matched: 0, clicked: 0, reform: 0 }
-      z.searches += r.searches
-      z.zero += r.zero_result_searches
-      z.matched += r.ga_matched_searches
-      z.clicked += r.clicked_searches
-      z.reform += r.reformulated_searches
-      m.set(r.query_norm, z)
-    }
-    const evalBy = addDays(range.to, 7)
-    return [...m.values()]
-      .filter((z) => z.searches >= FAILED_MIN)
-      .map((z) => ({
-        ...z,
-        failed: z.zero / z.searches >= FAILED_ZERO,
-        evalDate: z.q.eval_dates?.split(',').find((d) => d >= range.from && d <= evalBy) ?? null,
-      }))
-  }, [qRows, range.from, range.to, s.ch, s.pf, s.ms])
+  const queries = useMemo(() => (qRows ? queryStats(qRows, range.from, range.to, seg) : []), [qRows, range.from, range.to, s.ch, s.pf, s.ms])
   const failed = queries.filter((q) => q.failed)
   const failedIn = failed.filter((q) => q.evalDate)
   type QRow = (typeof queries)[number]
@@ -206,12 +144,15 @@ function Quality({ data, s, range, rows }: TabProps & { rows: DailySearch[] }) {
         title="결과 0건 비율 · 결과 클릭률"
         meta={grain(b.weekly)}
         right={
-          <Legend
-            items={[
-              { label: '결과 0건', color: S(4), kind: 'line' },
-              { label: '클릭률', color: S(1), kind: 'line' },
-            ]}
-          />
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <Legend
+              items={[
+                { label: '결과 0건', color: S(4), kind: 'line' },
+                { label: '클릭률', color: S(1), kind: 'line' },
+              ]}
+            />
+            {marks.length > 0 && <ReportLink s={s} set={set} id="ab-ranker-v2" label="실험 보고서 보기" />}
+          </div>
         }
       >
         {cur.searches === 0 ? (
@@ -257,202 +198,6 @@ function Quality({ data, s, range, rows }: TabProps & { rows: DailySearch[] }) {
   )
 }
 
-/** 두 비율의 차이와 95% 구간(정규 근사). */
-function diffCi(x1: number, n1: number, x2: number, n2: number): { d: number; lo: number; hi: number } | null {
-  if (!n1 || !n2) return null
-  const p1 = x1 / n1
-  const p2 = x2 / n2
-  const se = Math.sqrt((p1 * (1 - p1)) / n1 + (p2 * (1 - p2)) / n2)
-  const d = p2 - p1
-  return { d, lo: d - 1.96 * se, hi: d + 1.96 * se }
-}
-
-/** 두 평균의 차이와 95% 구간(웰치, 정규 근사). 합·제곱합·표본 수로 계산한다. */
-function meanDiffCi(s1: number, q1: number, n1: number, s2: number, q2: number, n2: number): { d: number; lo: number; hi: number } | null {
-  if (n1 < 2 || n2 < 2) return null
-  const m1 = s1 / n1
-  const m2 = s2 / n2
-  const se = Math.sqrt((q1 - n1 * m1 * m1) / (n1 - 1) / n1 + (q2 - n2 * m2 * m2) / (n2 - 1) / n2)
-  const d = m2 - m1
-  return { d, lo: d - 1.96 * se, hi: d + 1.96 * se }
-}
-
-const DENOM_TIP = '결과 0건이 줄어 분모(결과 있는 검색)가 늘었다. 검색당 클릭은 차이 없음'
-
-function Ranker({ s, range, rows }: TabProps & { rows: DailySearch[] }) {
-  const seg = segFilter(s)
-  const segRows = useMemo(() => rows.filter(seg), [rows, s.ch, s.pf, s.ms])
-  const inWin = inRange(segRows, range.from, range.to)
-  const by = groupSum(inWin, (r) => r.ranker_version, [...KEYS])
-  const zero = Object.fromEntries(KEYS.map((k) => [k, 0])) as Sums
-  const v1 = by.get('v1') ?? zero
-  const v2 = by.get('v2') ?? zero
-
-  const lines: {
-    id: string
-    label: string
-    a: number | null
-    b: number | null
-    fmt: (v: number | null) => string
-    ci: ReturnType<typeof diffCi>
-    ciFmt?: (v: number) => string
-    down?: boolean
-  }[] = [
-    { id: 'Q02', label: '검색 수', a: v1.searches, b: v2.searches, fmt: num, ci: null },
-    {
-      id: 'Q03',
-      label: '결과 0건 비율',
-      a: zeroRate(v1),
-      b: zeroRate(v2),
-      fmt: (v) => pct(v),
-      ci: diffCi(v1.zero_result_searches, v1.searches, v2.zero_result_searches, v2.searches),
-      down: true,
-    },
-    {
-      id: 'Q05',
-      label: '평균 첫 클릭 순위',
-      a: avgPos(v1),
-      b: avgPos(v2),
-      fmt: (v) => dec(v, 2),
-      ci: meanDiffCi(
-        v1.first_click_position_sum,
-        v1.first_click_position_sq_sum,
-        v1.clicked_searches,
-        v2.first_click_position_sum,
-        v2.first_click_position_sq_sum,
-        v2.clicked_searches,
-      ),
-      ciFmt: (v) => `${v > 0 ? '+' : ''}${v.toFixed(2)}`,
-      down: true,
-    },
-    {
-      id: 'Q06',
-      label: '상위 3위 클릭 비중',
-      a: top3(v1),
-      b: top3(v2),
-      fmt: (v) => pct(v),
-      ci: diffCi(v1.top3_clicks, v1.clicked_searches, v2.top3_clicks, v2.clicked_searches),
-    },
-    {
-      id: 'Q04',
-      label: '결과 클릭률',
-      a: ctr(v1),
-      b: ctr(v2),
-      fmt: (v) => pct(v),
-      ci: diffCi(v1.clicked_searches, v1.matched_result_searches, v2.clicked_searches, v2.matched_result_searches),
-    },
-    {
-      id: 'Q12',
-      label: '검색당 클릭',
-      a: clickPerSearch(v1),
-      b: clickPerSearch(v2),
-      fmt: (v) => pct(v),
-      ci: diffCi(v1.clicked_searches, v1.ga_matched_searches, v2.clicked_searches, v2.ga_matched_searches),
-    },
-    {
-      id: 'Q07',
-      label: '재검색률',
-      a: reform(v1),
-      b: reform(v2),
-      fmt: (v) => pct(v),
-      ci: diffCi(v1.reformulated_searches, v1.ga_matched_searches, v2.reformulated_searches, v2.ga_matched_searches),
-      down: true,
-    },
-    {
-      id: 'Q08',
-      label: '검색 세션 신청 전환',
-      a: applyRate(v1),
-      b: applyRate(v2),
-      fmt: (v) => pct(v, 2),
-      ci: diffCi(v1.search_sessions_applied, v1.search_sessions, v2.search_sessions_applied, v2.search_sessions),
-    },
-  ]
-  const pp = (v: number) => `${v > 0 ? '+' : ''}${(v * 100).toFixed(1)}%p`
-  const verdict = (ci: NonNullable<ReturnType<typeof diffCi>>, down?: boolean) => {
-    if (ci.lo <= 0 && ci.hi >= 0) return { text: '차이 없음', color: 'var(--muted)' }
-    const better = down ? ci.hi < 0 : ci.lo > 0
-    return { text: better ? '개선' : '악화', color: better ? 'var(--good)' : 'var(--bad)' }
-  }
-  const verdicts = new Map(lines.map((l) => [l.id, l.ci ? verdict(l.ci, l.down) : null]))
-  const denomEffect =
-    verdicts.get('Q04')?.text === '악화' && verdicts.get('Q12')?.text === '차이 없음' && verdicts.get('Q03')?.text === '개선'
-
-  const daily = (key: (t: Sums) => number | null) =>
-    [...new Set(inWin.map((r) => r.kst_date))].sort().map((d) => {
-      const day = inWin.filter((r) => r.kst_date === d)
-      const g = groupSum(day, (r) => r.ranker_version, [...KEYS])
-      return { date: d, v1: key(g.get('v1') ?? zero), v2: key(g.get('v2') ?? zero) }
-    })
-  const series = [
-    { key: 'v1', label: 'v1', color: S(3) },
-    { key: 'v2', label: 'v2', color: S(1) },
-  ]
-  const legend = <Legend items={series.map((x) => ({ label: x.label, color: x.color, kind: 'line' as const }))} />
-
-  if (!v1.searches || !v2.searches)
-    return (
-      <Card title="랭킹 v1 · v2 비교">
-        <Empty h={160} />
-      </Card>
-    )
-
-  return (
-    <div className="flex flex-col gap-4">
-      <Card title="랭킹 v1 · v2 비교" meta={`기기 해시 50% 배정 · ${md(range.from)}~${md(range.to)}`}>
-        <div className="-mx-4 overflow-x-auto px-4 sm:-mx-5 sm:px-5">
-          <table className="w-full min-w-[620px] border-collapse text-[13px]">
-            <colgroup>
-              <col />
-              <col className="w-[13%]" />
-              <col className="w-[13%]" />
-              <col className="w-[30%]" />
-              <col className="w-[18%]" />
-            </colgroup>
-            <thead>
-              <tr className="border-b border-axis text-muted">
-                <th className="py-2 text-left font-medium">지표</th>
-                <th className="py-2 pr-3 text-right font-medium">v1</th>
-                <th className="py-2 pr-3 text-right font-medium">v2</th>
-                <th className="py-2 pr-3 text-right font-medium">차이 (95% 구간)</th>
-                <th className="py-2 text-right font-medium">판정</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lines.map((l) => {
-                const v = verdicts.get(l.id)
-                const f = l.ciFmt ?? pp
-                const note = l.id === 'Q04' && denomEffect
-                return (
-                  <tr key={l.id} className="border-b border-line">
-                    <td className="py-2 text-ink2">{l.label}</td>
-                    <td className="tnum py-2 pr-3 text-right text-ink">{l.fmt(l.a)}</td>
-                    <td className="tnum py-2 pr-3 text-right text-ink">{l.fmt(l.b)}</td>
-                    <td className="tnum py-2 pr-3 text-right text-ink2">
-                      {l.ci ? `${f(l.ci.d)} (${f(l.ci.lo)} ~ ${f(l.ci.hi)})` : '—'}
-                    </td>
-                    <td className="py-2 text-right font-medium" style={{ color: v?.color }} title={note ? DENOM_TIP : undefined}>
-                      {v?.text ?? '—'}
-                      {note && <span className="font-normal text-muted"> · 분모 효과</span>}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card title="결과 0건 비율" meta="일별" right={legend}>
-          <TimeChart data={daily(zeroRate)} kind="line" series={series} yFormat={(v) => pct(v, 0)} valueFormat={(v) => pct(v)} decimals />
-        </Card>
-        <Card title="평균 첫 클릭 순위" meta="일별" right={legend}>
-          <TimeChart data={daily(avgPos)} kind="line" series={series} yFormat={(v) => dec(v, 1)} valueFormat={(v) => dec(v, 2)} decimals />
-        </Card>
-      </div>
-    </div>
-  )
-}
-
 export default function Search(p: TabProps) {
   const l = useTable(p.data, 'daily_search')
   const rows = ready(l)
@@ -462,5 +207,5 @@ export default function Search(p: TabProps) {
         {null}
       </Card>
     )
-  return p.s.view === 'ranker' ? <Ranker {...p} rows={rows} /> : <Quality {...p} rows={rows} />
+  return <Quality {...p} rows={rows} />
 }

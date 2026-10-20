@@ -7,9 +7,10 @@ import type { Data, WeeklyBatch, WeeklyEvalOps, WeeklyRater } from '../lib/types
 import { ScatterPlot, TimeChart } from '../components/charts'
 import { DataTable, type Col } from '../components/DataTable'
 import { Card, type Delta, Empty, Legend, Tile, TileRow } from '../components/ui'
+import { ReportLink } from '../components/ReportLink'
 import type { TabProps } from './common'
 
-const OPS_KEYS = [
+export const OPS_KEYS = [
   'labels',
   'rework_labels',
   'handle_seconds',
@@ -24,16 +25,16 @@ const OPS_KEYS = [
   'labels_g3',
   'tasks_completed',
 ] as const satisfies readonly (keyof WeeklyEvalOps)[]
-type Ops = Record<(typeof OPS_KEYS)[number], number>
+export type Ops = Record<(typeof OPS_KEYS)[number], number>
 
 const LOW_ACC = 0.8
 const LOW_MIN_GOLD = 10
-const GUIDELINE_V2 = '2026-06-01'
+export const GUIDELINE_V2 = '2026-06-01'
 
-const acc = (t: Ops) => ratio(t.gold_correct, t.gold_labels)
-const agree = (t: Ops) => ratio(t.agree_pairs, t.label_pairs)
-const perLabel = (t: Ops) => ratio(t.handle_seconds, t.labels)
-const rework = (t: Ops) => ratio(t.rework_labels, t.labels)
+export const acc = (t: Ops) => ratio(t.gold_correct, t.gold_labels)
+export const agree = (t: Ops) => ratio(t.agree_pairs, t.label_pairs)
+export const perLabel = (t: Ops) => ratio(t.handle_seconds, t.labels)
+export const rework = (t: Ops) => ratio(t.rework_labels, t.labels)
 
 /** 코헨 카파(평가자 쌍 풀링): (Po − Pe) ÷ (1 − Pe), Pe = Σ 등급 비중². */
 export function kappa(t: Ops): number | null {
@@ -74,7 +75,7 @@ export function teamPace(data: Data, wk: string): number {
   return n / 14
 }
 
-function status(b: WeeklyBatch, risk: Set<string>): { text: string; color?: string } {
+export function status(b: WeeklyBatch, risk: Set<string>): { text: string; color?: string } {
   if (b.remaining_tasks <= 0) return { text: '완료', color: 'var(--good)' }
   if (b.days_to_due < 0) return { text: '마감 지남', color: 'var(--bad)' }
   if (risk.has(b.batch_id)) return { text: '위험', color: 'var(--bad)' }
@@ -103,7 +104,7 @@ interface RaterRow {
   agree_pairs: number
 }
 
-export default function EvalOps({ data, s }: TabProps) {
+export default function EvalOps({ data, s, set }: TabProps) {
   const weeks = evalWeeks(data)
   const wk = weeks.includes(s.wk) ? s.wk : weeks[weeks.length - 1]
   const prevWk = addDays(wk, -7)
@@ -176,7 +177,7 @@ export default function EvalOps({ data, s }: TabProps) {
     internal: groupWeek.get(`${w}|internal`)?.labels ?? 0,
     vendor: groupWeek.get(`${w}|vendor`)?.labels ?? 0,
   }))
-  const marks = trendWeeks.includes(GUIDELINE_V2) ? [{ x: GUIDELINE_V2, label: '지침 v2' }] : []
+  const marks = trendWeeks.includes(GUIDELINE_V2) ? [{ x: GUIDELINE_V2, label: '평가 지침 개정' }] : []
 
   const byGuide = groupSum(
     ops.filter((r) => r.week_start <= wk),
@@ -407,7 +408,12 @@ export default function EvalOps({ data, s }: TabProps) {
         </Card>
       </div>
 
-      <Card title="지침 버전 비교" metricId="L09" meta={`${md(wk)} 주까지 누적`}>
+      <Card
+        title="평가 지침 개정 전 · 후"
+        metricId="L09"
+        meta={`${md(wk)} 주까지 누적`}
+        right={<ReportLink s={s} set={set} id="guide-v2" label="개선 보고서 보기" />}
+      >
         <div className="-mx-4 overflow-x-auto px-4 sm:-mx-5 sm:px-5">
           <table className="w-full min-w-[560px] border-collapse text-[13px]">
             <thead>
@@ -424,7 +430,7 @@ export default function EvalOps({ data, s }: TabProps) {
             <tbody>
               {guideRows.map(({ g, t }) => (
                 <tr key={g} className="border-b border-line">
-                  <td className="py-2 text-ink2">{g}</td>
+                  <td className="py-2 text-ink2">{g === 'v1' ? '개정 전 (v1)' : '개정 후 (v2)'}</td>
                   <td className="tnum py-2 pr-3 text-right text-ink">{num(t.labels)}</td>
                   <td className="tnum py-2 pr-3 text-right text-ink">{pct(acc(t))}</td>
                   <td className="tnum py-2 pr-3 text-right text-ink">{pct(agree(t))}</td>
