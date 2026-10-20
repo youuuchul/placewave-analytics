@@ -5,7 +5,7 @@
 **이 저장소의 수치는 전부 가상 서비스 시나리오와 분포 규칙으로 생성한 데이터다.** 실제 서비스·회사의 데이터, 코드, 식별자는 들어 있지 않다. 설계는 업무 경험에서 온 일반적인 패턴을 새로 작성한 것이다.
 
 - 대시보드: `https://placewave-analytics.vercel.app`
-- 프로젝트 개요: `https://placewave-analytics.vercel.app/?page=about` · 데이터 페이지(스키마·미리보기): `https://placewave-analytics.vercel.app/?page=data`
+- 프로젝트 개요: `https://placewave-analytics.vercel.app/?page=about` · 보고서: `https://placewave-analytics.vercel.app/?page=reports` · 데이터 페이지(스키마·미리보기): `https://placewave-analytics.vercel.app/?page=data`
 
 ## 화면
 
@@ -19,7 +19,7 @@
 | **데이터** | **공간** |
 | ![데이터 페이지 — 층별 표 목록, 스키마·컬럼 설명, 마트 미리보기](docs/img/data.png) | ![공간 탭 — 등록·파트너 공간, 서울 상권 분포 지도, 파트너 공간 표](docs/img/venues.png) |
 
-탭 9개(개요 / 퍼널 / 검색 / 행사·결제 / 회원 / 공간 / 유입·광고 / 평가 운영 / 주간·월간)와 프로젝트 개요·지표 가이드·데이터 페이지. 필터(기간·채널·플랫폼·회원)는 마트에 그 축이 있는 카드에만 붙이고, 상태는 전부 URL에 남는다. 탭별 구성과 산식은 [docs/dashboard.md](docs/dashboard.md).
+탭 9개(개요 / 퍼널 / 검색 / 행사·결제 / 회원 / 공간 / 유입·광고 / 평가 운영 / 주간·월간)의 모니터링 대시보드, 실험·개선·이슈를 한 건씩 읽는 보고서 페이지(실험 E1 랭킹 A/B 테스트 · 개선 X1 평가 지침 개정 · 이슈 I1 9/1 재색인 회귀), 프로젝트 개요·지표 가이드·데이터 페이지. 필터(기간·채널·플랫폼·회원)는 마트에 그 축이 있는 카드에만 붙이고, 상태는 전부 URL에 남는다. 탭별 구성과 산식은 [docs/dashboard.md](docs/dashboard.md).
 
 ## 비즈니스 모델
 
