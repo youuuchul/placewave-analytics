@@ -30,6 +30,20 @@ export default function X1({ data }: { data: Data }) {
   const firstV2 = weeks.find((w) => w >= GUIDELINE_V2) ?? GUIDELINE_V2
   const around = weeks.filter((w) => w >= weeks[Math.max(0, weeks.indexOf(firstV2) - 1)] && w <= weeks[Math.min(weeks.length - 1, weeks.indexOf(firstV2) + 3)])
 
+  const band = (k: number | null) => (k == null ? '—' : k > 0.8 ? '거의 완전' : k > 0.6 ? '상당' : k > 0.4 ? '보통' : k > 0.2 ? '약간' : '낮음')
+  const at = (i: number) => trend[weeks.indexOf(firstV2) + i]
+  const prevWk = at(-1)
+  const after3 = [at(0), at(1), at(2)].filter(Boolean)
+  const wk4 = at(3)
+  const secTxt = (t: { sec: number | null } | undefined) => (t?.sec == null ? '—' : t.sec.toFixed(1))
+  const gt = (x: number | null, y: number | null) => x != null && y != null && x > y
+  const better = [gt(acc(b), acc(a)), gt(agree(b), agree(a)), gt(kappa(b), kappa(a)), gt(rework(a), rework(b))].filter(Boolean).length
+  const preAcc = weeks
+    .filter((w) => w < firstV2)
+    .slice(-3)
+    .map((w) => trend[weeks.indexOf(w)].acc ?? 0)
+  const rising = preAcc.length === 3 && preAcc[2] > preAcc[0]
+  const leftover = ops.filter((r) => r.week_start === firstV2 && r.guideline_version === 'v1').reduce((x, r) => x + r.labels, 0)
   const pp = (x: number) => `${(x * 100).toFixed(1)}%p`
   const rows: [string, string, string, string][] = [
     ['라벨 수', num(a.labels), num(b.labels), '—'],
@@ -140,9 +154,11 @@ export default function X1({ data }: { data: Data }) {
       <Block title="해석">
         <Bullets
           items={[
-            '품질 지표 넷이 모두 개정 후 쪽이 좋다. 정답셋 정확도 79.6% → 86.2%, 일치율 71.6% → 78.9%, 카파 0.59 → 0.71(우연 일치를 뺀 일치도가 보통 → 상당 수준), 재작업률 3.9% → 2.7%.',
-            '비용은 개정 직후 3주에 몰렸다. 건당 처리 시간이 개정 전 주 28.3초에서 35.7 · 35.1 · 33.6초로 늘었다가 4주째 26.3초로 개정 전보다 낮게 돌아와, 누적 평균은 28.4초로 같다.',
-            '주별 품질 추이를 보면 개정 전 마지막 주들에도 정확도가 오르는 중이었다. 그래서 표의 차이 전부를 지침 덕으로 볼 수 없다.',
+            `품질 지표 넷 중 ${better}개가 개정 후 쪽이 좋다. 정답셋 정확도 ${pct(acc(a))} → ${pct(acc(b))}, 일치율 ${pct(agree(a))} → ${pct(agree(b))}, 카파 ${dec(kappa(a), 2)} → ${dec(kappa(b), 2)}(우연 일치를 뺀 일치도가 ${band(kappa(a))} → ${band(kappa(b))} 수준), 재작업률 ${pct(rework(a))} → ${pct(rework(b))}.`,
+            `비용은 개정 직후 3주에 몰렸다. 건당 처리 시간이 개정 전 주 ${secTxt(prevWk)}초에서 ${after3.map(secTxt).join(' · ')}초로 늘었다가 4주째 ${secTxt(wk4)}초로 돌아왔고, 누적 평균은 ${dec(perLabel(a), 1)}초 → ${dec(perLabel(b), 1)}초다.`,
+            rising
+              ? '주별 품질 추이를 보면 개정 전 마지막 주들에도 정확도가 오르는 중이었다. 그래서 표의 차이 전부를 지침 덕으로 볼 수 없다.'
+              : '개정 전 마지막 3주의 정확도는 오르는 추세가 아니었다. 다만 대조군이 없어 차이 전부를 지침 덕으로 볼 수는 없다(한계).',
           ]}
         />
       </Block>
@@ -151,9 +167,8 @@ export default function X1({ data }: { data: Data }) {
         <Bullets
           items={[
             '대조군이 없다. 같은 기간 평가자 숙련(입사 후 적응)과 구성 변화(5월 확대, 7~8월 외부 평가자 교체)가 함께 움직여 개정 효과만 떼어 낼 수 없다.',
-            '개정 주에 옛 지침 배치의 잔여 라벨이 11건뿐이라 같은 주 안의 두 지침 비교도 할 수 없다.',
+            `개정 주에 옛 지침 배치의 잔여 라벨이 ${num(leftover)}건뿐이라 같은 주 안의 두 지침 비교도 할 수 없다.`,
             '정답셋 정확도는 정답셋 과제(과제의 약 10%)에서만 잰다. 일치율·카파는 같은 과제를 함께 본 평가자 쌍에서 잰다.',
-            '가상 데이터에서 지침 효과는 생성 규칙으로 넣은 것이다. 보여 주려는 것은 효과 크기가 아니라 비용까지 같이 읽는 방법이다.',
           ]}
         />
       </Block>
@@ -182,12 +197,12 @@ export default function X1({ data }: { data: Data }) {
         />
       </Block>
 
-      <Block title="대시보드에서 보기">
+      <Block title="라벨링 운영 대시보드에서 보기">
         <DashLinks
           items={[
-            { label: '평가 운영 탭 · 개정 주', q: 'tab=evalops&wk=2026-06-01' },
-            { label: '평가 운영 탭 · 개정 3주째', q: 'tab=evalops&wk=2026-06-15' },
-            { label: '평가 운영 탭 · 최근 주', q: `tab=evalops&wk=${last}` },
+            { label: '라벨링 운영 · 개정 주', q: 'page=reports&r=labeling-ops&wk=2026-06-01' },
+            { label: '라벨링 운영 · 개정 3주째', q: 'page=reports&r=labeling-ops&wk=2026-06-15' },
+            { label: '라벨링 운영 · 최근 주', q: `page=reports&r=labeling-ops&wk=${last}` },
           ]}
         />
       </Block>

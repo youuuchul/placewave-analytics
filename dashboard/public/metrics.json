@@ -204,6 +204,7 @@
     {
       "id": "evalops",
       "name": "라벨링 운영 (보고서)",
+      "report": true,
       "question": "이번 주 라벨링 목표를 품질 기준 안에서 채우고 있는가, 막힌 곳은 어디인가. 검색 품질 개선 보고서의 라벨링 운영 단계에서 본다",
       "users": [
         "검색 운영",
@@ -519,6 +520,20 @@
       ],
       "why": "노쇼·환불 위험",
       "direction": "down"
+    },
+    {
+      "id": "C22",
+      "name": "결제자",
+      "tab": "events",
+      "group": "convert",
+      "definition": "기간 안에 티켓을 1건 이상 결제한 사람 수(기간 고유)",
+      "formula": "고유(paid)",
+      "unit": "명",
+      "denominator": "—",
+      "mart_columns": [
+        "person_day.flags(paid)"
+      ],
+      "why": "결제 건수가 소수의 반복 구매로 늘었는지, 결제하는 사람이 늘었는지 가른다"
     },
     {
       "id": "C07",

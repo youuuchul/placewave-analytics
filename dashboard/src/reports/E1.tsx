@@ -9,6 +9,7 @@ import {
   fmtP,
   holm,
   inSpan,
+  mde,
   p95Diff,
   ratioEstimate,
   signedMs,
@@ -22,7 +23,8 @@ import type { ExpRankerRequest } from '../lib/types'
 import { TimeChart } from '../components/charts'
 import { Card, Legend } from '../components/ui'
 import { Block, Bullets, Dataset, DashLinks, Para, Scroll, SideTable, TONE, type Cell } from './Frame'
-import { CRITERIA, GUARD, ROLES } from './ExpDesign'
+import { CRITERIA, ROLES, guardCall, guardPass } from './ExpDesign'
+import { interimCheck } from './ExpCheck'
 
 const ciText = (c: ArmCompare | { metric: { diff: (v: number) => string; bound: (v: number) => string }; ci: { d: number; lo: number; hi: number } } | null) =>
   c ? `${c.metric.diff(c.ci.d)} (${c.metric.bound(c.ci.lo)} ~ ${c.metric.bound(c.ci.hi)})` : '—'
@@ -39,9 +41,11 @@ export interface ResultLine {
   holm: number | null
   call: string
   tone: 'good' | 'bad' | 'muted'
+  /** 가드레일만: 통과 여부 */
+  pass: boolean | null
 }
 
-/** 결과 표 한 줄씩: 주 지표는 단일 검정, 보조 지표는 Holm 보정, 가드레일은 허용 폭 대비. 화면과 대조 스크립트가 같은 규칙을 쓴다. */
+/** 결과 표 한 줄씩: 주 지표는 단일 검정, 보조 지표는 Holm 보정, 가드레일은 설계서 규칙(유의한 하락 없음·응답 예산). */
 export function resultLines(run: ExpRankerRequest[]): ResultLine[] {
   const cmp = Object.fromEntries(ROLES.filter((x) => x.m).map((x) => [x.key, compareArms(run, x.m!)]))
   const lat = p95Diff(run)
@@ -50,7 +54,7 @@ export function resultLines(run: ExpRankerRequest[]): ResultLine[] {
   const holmOf = Object.fromEntries(sec.map((k, i) => [k, adj[i]]))
   return ROLES.map((x): ResultLine => {
     if (x.key === 'p95') {
-      const ok = lat.ci.hi <= GUARD.p95.limit
+      const ok = guardPass('p95', lat.ci)
       return {
         key: 'p95',
         role: x.role,
@@ -61,19 +65,20 @@ export function resultLines(run: ExpRankerRequest[]): ResultLine[] {
         naive: '—',
         p: lat.ci.p,
         holm: null,
-        call: ok ? '허용 폭 안' : '허용 폭 밖',
+        call: guardCall('p95', ok),
         tone: ok ? 'good' : 'bad',
+        pass: ok,
       }
     }
     const c = cmp[x.key]!
     const m = x.m!
     let call: string
     let tone: ResultLine['tone']
+    let pass: boolean | null = null
     if (x.role === '가드레일') {
-      const limit = x.key === 'ctr' ? GUARD.ctr.limit : GUARD.apply.limit
-      const ok = c.ci.lo >= limit
-      call = ok ? '허용 폭 안' : '허용 폭 밖'
-      tone = ok ? 'good' : 'bad'
+      pass = guardPass(x.key as 'ctr' | 'apply', c.ci)
+      call = guardCall(x.key as 'ctr' | 'apply', pass)
+      tone = pass ? 'good' : 'bad'
     } else {
       const v = x.role === '보조 지표' && holmOf[x.key] >= 0.05 ? '차이 없음' : verdict(c.ci, m.down)
       call = v
@@ -91,6 +96,7 @@ export function resultLines(run: ExpRankerRequest[]): ResultLine[] {
       holm: x.role === '보조 지표' ? holmOf[x.key] : null,
       call,
       tone,
+      pass,
     }
   })
 }
@@ -103,7 +109,8 @@ export default function E1({ rows }: { rows: ExpRankerRequest[] }) {
   const s = srm(dev.control, dev.treatment)
   const preS = compareArms(pre, EXP_METRICS.success)
   const primary = lines[0]
-  const guardsOk = lines.filter((l) => l.role === '가드레일').every((l) => l.call === '허용 폭 안')
+  const guards = lines.filter((l) => l.role === '가드레일')
+  const guardsOk = guards.every((l) => l.pass)
   const launch = primary.call === '개선' && guardsOk && s.p >= 0.001
 
   // 기기 2대 이상인 사람이 두 집단을 함께 봤는가
@@ -113,6 +120,24 @@ export default function E1({ rows }: { rows: ExpRankerRequest[] }) {
     const multi = [...arms.values()].filter((a) => a.size > 1).length
     return { multi, persons: arms.size }
   }, [run])
+
+  const ck = useMemo(() => interimCheck(rows), [rows])
+  const aaOff = ck.aa.filter((c) => c && c.ci.p < 0.05 && c.metric.id !== 'success')
+  const sc = compareArms(run, EXP_METRICS.success)
+  const widthRatio = sc?.naive ? (sc.ci.hi - sc.ci.lo) / (sc.naive.hi - sc.naive.lo) : 1
+  const perDevice = run.length / Math.max(1, dev.control + dev.treatment)
+  const w1 = compareArms(inSpan(run, AB.firstWeek), EXP_METRICS.success)
+  const w2 = compareArms(
+    run.filter((r) => r.kst_date > AB.firstWeek[1]),
+    EXP_METRICS.success,
+  )
+  const novel = w1 != null && w2 != null && w2.ci.hi < w1.ci.d
+  const applyMde = (() => {
+    const e = ratioEstimate(inSpan(rows, AB.baseline), EXP_METRICS.apply)
+    return e ? mde(e, 1) : null
+  })()
+  const applyLine = guards.find((l) => l.key === 'apply')
+  const failed = guards.filter((l) => !l.pass).map((l) => l.label)
 
   const days = eachDay(AB.run[0], AB.run[1])
   const daily = days.map((d) => {
@@ -157,8 +182,11 @@ export default function E1({ rows }: { rows: ExpRankerRequest[] }) {
     <>
       <Block title="배경">
         <Para>
-          7/6 실험 설계서대로 {md(AB.run[0])}~{md(AB.run[1])} 2주 동안 기기 해시 50:50 으로 기존 랭킹(대조군)과 새 랭킹(실험군)을 비교했다. 7/20 진행 점검에서
-          배정·실험 전 비교·가드레일은 기준 안이었다. 이 보고서는 기간이 끝난 뒤 한 번 하는 판정이다.
+          7/6 실험 설계서대로 {md(AB.run[0])}~{md(AB.run[1])} 2주 동안 기기 해시 50:50 으로 기존 랭킹(대조군)과 새 랭킹(실험군)을 비교했다.{' '}
+          {ck.watch.length
+            ? `7/20 진행 점검은 ${ck.watch.join(' · ')}를 결과 보고에서 함께 보기로 하고 계속 진행했다.`
+            : '7/20 진행 점검에서 배정·실험 전 비교·가드레일은 기준 안이었다.'}{' '}
+          이 보고서는 기간이 끝난 뒤 한 번 하는 판정이다.
         </Para>
       </Block>
 
@@ -168,6 +196,7 @@ export default function E1({ rows }: { rows: ExpRankerRequest[] }) {
           rows={[
             ['배정 비율 (2주, 검색한 기기)', `대조군 ${num(dev.control)} · 실험군 ${num(dev.treatment)} (${pct(s.share)} : ${pct(1 - s.share)}) · 카이제곱 p ${fmtP(s.p)}`],
             ['실험 전 2주 검색 성공률 차이', preS ? `${ciText(preS)} · p ${fmtP(preS.ci.p)}` : '—'],
+            ...aaOff.map((c) => [`실험 전 2주 ${c!.metric.label} 차이`, `${ciText(c)} · p ${fmtP(c!.ci.p)}`]),
             ['기기 2대 이상으로 두 집단을 함께 본 사람', `${num(both.multi)}명 (기간 중 검색한 사람의 ${pct(both.multi / Math.max(1, both.persons))})`],
           ]}
         />
@@ -238,12 +267,18 @@ export default function E1({ rows }: { rows: ExpRankerRequest[] }) {
           items={[
             `주 지표 검색 성공률은 ${primary.c} → ${primary.t}, 차이 ${primary.ci}로 구간 하한이 0보다 크다(p ${fmtP(primary.p)}).`,
             `보조 지표는 Holm 보정 뒤에도 ${lines.filter((l) => l.role === '보조 지표' && l.call === '개선').map((l) => l.label).join(' · ') || '없음'}이 개선이다. 결과 0건이 줄어 검색이 해석되고, 관련도 높은 결과가 위로 와서 첫 클릭 순위가 앞당겨졌다.`,
-            `가드레일 3개는 ${guardsOk ? '모두 허용 폭 안이다' : '허용 폭을 넘은 항목이 있다'}. ${lines
-              .filter((l) => l.role === '가드레일')
-              .map((l) => `${l.label} ${l.ci}`)
-              .join(', ')}.`,
-            '요청을 독립으로 본 구간은 기기 단위 구간보다 좁다. 한 기기의 검색끼리는 성향이 비슷해 정보가 겹치기 때문이며, 판정은 기기 단위 구간으로 했다.',
-            '일별 성공률 차이는 첫 날부터 마지막 날까지 비슷한 폭으로 이어져, 첫 며칠에만 몰린 신규성 효과로 보이지 않는다. 의도 유형·플랫폼별 차이는 탐색용이다.',
+            `가드레일 3개는 ${guardsOk ? '모두 통과했다' : `${failed.join(' · ')}이 통과하지 못했다`}. ${guards.map((l) => `${l.label} ${l.ci}`).join(', ')}.`,
+            ...(applyLine && applyLine.pass && sc
+              ? [
+                  `검색 세션 신청 전환 차이는 ${applyLine.ci}로 구간이 넓다. 설계서의 최소 검출 효과(±${((applyMde ?? 0) * 100).toFixed(2)}%p)보다 작은 변화는 2주로 가려내지 못하므로, 전체 적용 뒤 주 단위로 이어서 본다.`,
+                ]
+              : []),
+            widthRatio >= 1.05
+              ? `기기 단위 구간이 요청을 독립으로 본 구간보다 ${widthRatio.toFixed(2)}배 넓다. 한 기기의 검색끼리 성향이 비슷해 정보가 겹치기 때문이며, 판정은 기기 단위 구간으로 했다.`
+              : `기기 단위 구간과 요청을 독립으로 본 구간의 폭이 거의 같다(${widthRatio.toFixed(2)}배). 기기당 검색이 2주에 평균 ${perDevice.toFixed(1)}건이라 기기 안 상관의 영향이 작다. 판정은 설계서대로 기기 단위 구간으로 했다.`,
+            `주별로 나누면 검색 성공률 차이는 첫 주 ${ciText(w1)}, 둘째 주 ${ciText(w2)}다. ${
+              novel ? '둘째 주 효과가 첫 주보다 작아 신규성 효과가 섞였을 수 있다' : '둘째 주에도 효과가 이어져 첫 며칠에만 몰린 신규성 효과로 보이지 않는다'
+            }. 의도 유형·플랫폼별 차이는 탐색용이다.`,
           ]}
         />
       </Block>
@@ -251,8 +286,10 @@ export default function E1({ rows }: { rows: ExpRankerRequest[] }) {
       <Block title="결정">
         <Para>
           {launch
-            ? `출시. 주 지표가 개선이고 가드레일이 모두 허용 폭 안이며 배정 비율에 이상이 없어 설계서의 출시 조건을 채웠다. ${AB.v2All} 부터 모든 세션에 새 랭킹을 적용했다.`
-            : '보류. 설계서의 출시 조건을 채우지 못했다.'}
+            ? `출시. 주 지표가 개선이고 가드레일 3개가 모두 통과했으며 배정 비율에 이상이 없어 설계서의 출시 조건을 채웠다. ${md(AB.v2All)} 부터 모든 세션에 새 랭킹을 적용했다.`
+            : primary.call !== '개선'
+              ? '보류. 주 지표가 개선되지 않아 설계서의 출시 조건을 채우지 못했다.'
+              : `출시하지 않는다. ${failed.join(' · ') || '배정 비율'}이 설계서 기준을 넘었다.`}
         </Para>
       </Block>
 

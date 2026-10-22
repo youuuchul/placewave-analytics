@@ -4,26 +4,42 @@ import { AB, EXP_METRICS, armDevices, compareArms, fmtP, inSpan, p95Diff, signed
 import { num, pct } from '../lib/format'
 import type { DailySearch, ExpRankerRequest } from '../lib/types'
 import { Block, Bullets, Para, SideTable } from './Frame'
-import { GUARD } from './ExpDesign'
+import { CRITERIA, guardCall, guardPass, type GuardKey } from './ExpDesign'
 
 const ci = (c: ArmCompare | null) => (c ? `${c.metric.diff(c.ci.d)} (${c.metric.bound(c.ci.lo)} ~ ${c.metric.bound(c.ci.hi)})` : '—')
 
-export default function ExpCheck({ rows, search }: { rows: ExpRankerRequest[]; search: DailySearch[] }) {
-  const week = useMemo(() => inSpan(rows, AB.firstWeek), [rows])
-  const pre = useMemo(() => inSpan(rows, AB.pre), [rows])
+/** 첫 주 진행 점검(배정·실험 전 A/A·가드레일). 진행 점검 보고서와 결과 보고의 배경 문장이 같은 판정을 쓴다. */
+export function interimCheck(rows: ExpRankerRequest[]) {
+  const week = inSpan(rows, AB.firstWeek)
+  const pre = inSpan(rows, AB.pre)
   const dev = armDevices(week)
   const s = srm(dev.control, dev.treatment)
-  const req = { control: week.filter((r) => r.arm === 'control').length, treatment: week.filter((r) => r.arm === 'treatment').length }
-  const mismatch = week.filter((r) => r.ranker_version !== (r.arm === 'treatment' ? 'v2' : 'v1')).length
   const aa = [EXP_METRICS.success, EXP_METRICS.zero, EXP_METRICS.pos, EXP_METRICS.ctr, EXP_METRICS.apply].map((m) => compareArms(pre, m))
-  const preDev = armDevices(pre)
   const gCtr = compareArms(week, EXP_METRICS.ctr)
   const gApply = compareArms(week, EXP_METRICS.apply)
-  const gLat = useMemo(() => p95Diff(week), [week])
+  const gLat = p95Diff(week)
+  const guards = [
+    { key: 'ctr' as const, label: '결과 클릭률', ok: gCtr ? guardPass('ctr', gCtr.ci) : false },
+    { key: 'apply' as const, label: '검색 세션 신청 전환', ok: gApply ? guardPass('apply', gApply.ci) : false },
+    { key: 'p95' as const, label: '응답 시간 p95', ok: guardPass('p95', gLat.ci) },
+  ]
+  const guardOut = guards.filter((g) => !g.ok).map((g) => g.label)
+  const aaOff = aa.filter((c) => c && c.ci.p < 0.05).map((c) => c!.metric.label)
+  const stop = s.p < 0.001 || guardOut.length > 0
+  const watch = aaOff.map((l) => `실험 전 ${l} 차이`)
+  return { week, pre, dev, s, aa, gCtr, gApply, gLat, guards, guardOut, stop, watch }
+}
+
+export default function ExpCheck({ rows, search }: { rows: ExpRankerRequest[]; search: DailySearch[] }) {
+  const ck = useMemo(() => interimCheck(rows), [rows])
+  const { week, pre, dev, s, aa, gCtr, gApply, gLat, guardOut, stop, watch } = ck
+  const req = { control: week.filter((r) => r.arm === 'control').length, treatment: week.filter((r) => r.arm === 'treatment').length }
+  const mismatch = week.filter((r) => r.ranker_version !== (r.arm === 'treatment' ? 'v2' : 'v1')).length
+  const preDev = armDevices(pre)
   const wk = search.filter((r) => r.kst_date >= AB.firstWeek[0] && r.kst_date <= AB.firstWeek[1])
   const logged = wk.reduce((a, r) => a + r.ga_logged_searches, 0)
   const total = wk.reduce((a, r) => a + r.searches, 0)
-  const status = (worst: number, limit: number, up = false) => ((up ? worst <= limit : worst >= limit) ? '허용 폭 안' : '허용 폭 밖')
+  const status = (key: GuardKey, c: { lo: number; hi: number }) => guardCall(key, guardPass(key, c))
 
   return (
     <>
@@ -57,21 +73,21 @@ export default function ExpCheck({ rows, search }: { rows: ExpRankerRequest[]; s
 
       <Block title="가드레일 감시 (첫 주)">
         <SideTable
-          heads={['가드레일', '대조군', '실험군', '차이 (95% 구간)', '허용 폭', '상태']}
+          heads={['가드레일', '대조군', '실험군', '차이 (95% 구간)', '기준', '상태']}
           rows={[
             gCtr
-              ? ['결과 클릭률', gCtr.metric.fmt(gCtr.c.value), gCtr.metric.fmt(gCtr.t.value), ci(gCtr), GUARD.ctr.label, status(gCtr.ci.lo, GUARD.ctr.limit)]
-              : ['결과 클릭률', '—', '—', '—', GUARD.ctr.label, '—'],
+              ? ['결과 클릭률', gCtr.metric.fmt(gCtr.c.value), gCtr.metric.fmt(gCtr.t.value), ci(gCtr), CRITERIA.ctr, status('ctr', gCtr.ci)]
+              : ['결과 클릭률', '—', '—', '—', CRITERIA.ctr, '—'],
             gApply
-              ? ['검색 세션 신청 전환', gApply.metric.fmt(gApply.c.value), gApply.metric.fmt(gApply.t.value), ci(gApply), GUARD.apply.label, status(gApply.ci.lo, GUARD.apply.limit)]
-              : ['검색 세션 신청 전환', '—', '—', '—', GUARD.apply.label, '—'],
+              ? ['검색 세션 신청 전환', gApply.metric.fmt(gApply.c.value), gApply.metric.fmt(gApply.t.value), ci(gApply), CRITERIA.apply, status('apply', gApply.ci)]
+              : ['검색 세션 신청 전환', '—', '—', '—', CRITERIA.apply, '—'],
             [
               '응답 시간 p95',
               `${gLat.c.toFixed(0)}ms`,
               `${gLat.t.toFixed(0)}ms`,
               `${signedMs(gLat.ci.d)} (${signedMs(gLat.ci.lo)} ~ ${signedMs(gLat.ci.hi)})`,
-              GUARD.p95.label,
-              status(gLat.ci.hi, GUARD.p95.limit, true),
+              CRITERIA.p95,
+              status('p95', gLat.ci),
             ],
           ]}
         />
@@ -87,7 +103,13 @@ export default function ExpCheck({ rows, search }: { rows: ExpRankerRequest[]; s
       </Block>
 
       <Block title="결정">
-        <Para>계속 진행한다. 배정·실험 전 비교·가드레일 모두 설계서 기준 안이다. 효과 판정은 기간이 끝난 7/27 결과 보고에서 한 번만 한다.</Para>
+        <Para>
+          {stop
+            ? `중단한다. ${s.p < 0.001 ? '배정 비율이 50:50에서 벗어났다' : `${guardOut.join(' · ')}이 가드레일을 넘었다`}.`
+            : watch.length
+              ? `계속 진행하되 ${watch.join(' · ')}를 결과 보고에서 함께 본다. 설계서의 중단 조건(배정 비율 이상, 가드레일 유의한 하락·응답 예산 초과)에는 해당하지 않는다. 효과 판정은 기간이 끝난 ${md(AB.v2All)} 결과 보고에서 한 번만 한다.`
+              : `계속 진행한다. 배정·실험 전 비교·가드레일 모두 설계서 기준 안이다. 효과 판정은 기간이 끝난 ${md(AB.v2All)} 결과 보고에서 한 번만 한다.`}
+        </Para>
       </Block>
     </>
   )

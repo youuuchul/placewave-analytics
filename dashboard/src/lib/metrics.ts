@@ -22,6 +22,8 @@ export interface TabGuide {
   question: string
   users: string[]
   key_metrics: string[]
+  /** 대시보드 탭이 아니라 보고서 안에 있는 지표 묶음 */
+  report?: boolean
 }
 
 /** 북극성 지표 절. 문구는 metrics.json 에만 두고 화면은 읽어서 그린다. */

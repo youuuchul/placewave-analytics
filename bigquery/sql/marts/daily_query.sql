@@ -3,7 +3,7 @@
 -- 키: 이 다섯 열
 -- 파티션·클러스터: kst_date / query_norm
 -- 원천: staging.int_search, raw.eval_queries
--- 소비: 검색 탭 실패 검색어 표
+-- 소비: 검색 탭 실패 검색어 표, 보고서 실패 검색어 발견·재색인 회귀
 --
 -- 실패 검색어(화면 판정) = 기간 안 검색 20건 이상이고 결과 0건 비율 30% 이상. 기간이 화면에서 정해지므로 판정은 저장하지 않는다.
 -- first_eval_date·first_failed_eval_date·failed_eval_dates·eval_dates 는 검색어 속성(모든 행에 같은 값). 평가 배치에 처음 편입된 날 /

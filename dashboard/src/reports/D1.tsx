@@ -40,6 +40,14 @@ export default function D1({ queries }: { queries: DailyQuery[] }) {
       .map(([w, qs]) => ({ date: w, failed: [...qs.values()].filter(([s, z]) => s >= FAILED_MIN && z / s >= FAILED_ZERO).length }))
   }, [queries])
 
+  const byIntent = Object.entries(
+    failed.reduce<Record<string, number>>((a, q) => ({ ...a, [q.q.query_intent]: (a[q.q.query_intent] ?? 0) + 1 }), {}),
+  ).sort((x, y) => y[1] - x[1])
+  const weeks = (from: string, to: string) => weekly.filter((w) => w.date >= from && w.date <= to).map((w) => w.failed)
+  const pre = weeks('2026-02-02', '2026-07-06')
+  const post = weeks('2026-07-27', '2026-08-24')
+  const regWeek = weekly.find((w) => w.date === '2026-08-31')?.failed ?? 0
+
   const table: Cell[][] = [...stats]
     .sort((x, y) => Number(y.failed) - Number(x.failed) || y.zero / y.searches - x.zero / x.searches)
     .map((q) => [
@@ -122,10 +130,10 @@ export default function D1({ queries }: { queries: DailyQuery[] }) {
       <Block title="해석">
         <Bullets
           items={[
-            '검색 20건 이상 검색어 35개 중 20개가 실패 기준을 넘었고, 이 20개가 같은 기간 결과 0건의 73.6%를 차지했다. 실패는 드문 오타가 아니라 자주 찾는 검색어에 몰려 있었다.',
-            '실패 검색어는 상권 9개 · 공간명 8개 · 장르 3개였고 행사 유형은 없었다. 여러 이름을 묶은 상권(홍대·합정·연남)·장르(시티팝/디스코)와 공간명 일부만 친 검색어가 많아, 정확 일치 위주인 기존 랭킹이 놓치는 유형이라고 가설을 세웠다. 이 가설이 새 랭킹의 동의어·부분 일치(단계 3)로 이어진다.',
-            '20개 모두 4/1 첫 평가 배치에 들어갔다(실패 출처 12 · 상위 검색량 출처 8).',
-            '주 단위로 보면 실패 검색어는 2~6월 주당 5~14개였다가 새 랭킹 전체 적용(7/27) 뒤 0개가 됐고, 재색인 회귀 주(8/31)에 9개로 다시 나타났다(단계 4).',
+            `검색 20건 이상 검색어 ${num(stats.length)}개 중 ${num(failed.length)}개가 실패 기준을 넘었고, 이 ${num(failed.length)}개가 같은 기간 결과 0건의 ${pct(failedZero / total.zero)}를 차지했다. 실패는 드문 오타가 아니라 자주 찾는 검색어에 몰려 있었다.`,
+            `실패 검색어를 의도로 나누면 ${byIntent.map(([k, n]) => `${QUERY_INTENT[k] ?? k} ${n}개`).join(' · ')}다. __D1_PATTERN__`,
+            `${num(firstBatch)}개가 ${md(FIRST_BATCH)} 첫 평가 배치에 들어갔다.`,
+            `주 단위로 보면 실패 검색어는 평가 착수 전후(2~6월) 주당 ${Math.min(...pre)}~${Math.max(...pre)}개였고, 새 랭킹 전체 적용(7/27) 뒤 ${Math.max(...post) === 0 ? '0개가 됐다' : `주당 ${Math.max(...post)}개 이하로 줄었다`}. 재색인 회귀 주(8/31)에 ${regWeek}개로 다시 나타났다(단계 7).`,
           ]}
         />
       </Block>

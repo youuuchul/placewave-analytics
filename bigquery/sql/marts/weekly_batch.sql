@@ -3,7 +3,7 @@
 -- 키: (week_start, batch_id)
 -- 파티션·클러스터: week_start / requester
 -- 원천: staging.int_label, raw.eval_batches
--- 소비: 평가 운영 탭 목표 대비 진척·마감 위험 배치·배치 표, 주간·월간 탭 주간 브리핑. ops.reconciliation
+-- 소비: 보고서 라벨링 운영 단계 목표 대비 진척·마감 위험 배치·배치 표, 재색인 회귀 단계 대응 주 배치. ops.reconciliation
 -- 검사: I7
 --
 -- as_of_date = 그 주 마지막 날과 라벨 마지막 관측일 중 이른 날. 누적 값은 as_of_date 까지.

@@ -147,6 +147,7 @@ def validate(data: Path, weeks: int, end_date: date) -> tuple[list[tuple[str, bo
     boundary_rows: list[tuple[str, int, str]] = []
     sub_us: dict[str, list[int]] = defaultdict(list)
     ga_search: dict[str, set[str]] = {"search": set(), "select_search_result": set()}
+    apply_sessions: set[tuple[str, int]] = set()
 
     with gzip.open(raw / "ga4_events.ndjson.gz", "rt", encoding="utf-8") as f:
         for line in f:
@@ -162,6 +163,8 @@ def validate(data: Path, weeks: int, end_date: date) -> tuple[list[tuple[str, bo
                     last_day_pay += 1
             if e in ga_search:
                 ga_search[e].add(str(_param(r, "search_id")))
+            elif e == "apply_event":
+                apply_sessions.add((r["user_pseudo_id"], r["ga_session_id"]))
             k = (r["user_pseudo_id"], r["ga_session_id"])
             s = sessions.get(k)
             if s is None:
@@ -401,7 +404,11 @@ def validate(data: Path, weeks: int, end_date: date) -> tuple[list[tuple[str, bo
         "prop_missing": prop_missing,
         "prop_mismatch": prop_mismatch,
     }
-    v2_lines = _v2(ctx, check, start_date, end_date) + _search(raw, check, ga_search) + _churn(raw, check, end_date)
+    v2_lines = (
+        _v2(ctx, check, start_date, end_date)
+        + _search(raw, check, ga_search, apply_sessions)
+        + _churn(raw, check, end_date)
+    )
     marker = "\n## 주별 추이"
     summary = summary.replace(marker, "\n".join(v2_lines) + "\n" + marker, 1)
     return checks, summary
@@ -911,13 +918,14 @@ def _v2(ctx: dict[str, Any], check: Any, start_date: date, end_date: date) -> li
     return out
 
 
-def _search(raw: Path, check: Any, ga_ids: dict[str, set[str]]) -> list[str]:
+def _search(raw: Path, check: Any, ga_ids: dict[str, set[str]], apply_sessions: set[tuple[str, int]]) -> list[str]:
     """검색 서버 요청·클릭 로그 단언과 랭킹 구간별 요약.
 
     Args:
         raw: 원천 디렉터리.
         check: 단언 기록 함수.
         ga_ids: GA search·select_search_result 이벤트의 search_id 집합.
+        apply_sessions: GA apply_event 가 있는 (기기, 세션) 집합.
 
     Returns:
         요약 마크다운 줄.
@@ -989,6 +997,19 @@ def _search(raw: Path, check: Any, ga_ids: dict[str, set[str]]) -> list[str]:
     bug, after = stat["재색인 회귀 9/1~9/4"], stat["전체 적용 후 (v2, 회귀 제외)"]
     check(
         "재색인 회귀 기간 결과 0건 비율 > 전체 적용 후의 2배", bug[1] > 2 * after[1], f"{bug[1]:.3f} vs {after[1]:.3f}"
+    )
+    sess_click: dict[tuple[str, int], bool] = {}
+    for r in reqs.values():
+        k = (r["user_pseudo_id"], r["ga_session_id"])
+        sess_click[k] = sess_click.get(k, False) or r["request_id"] in first
+    won = [k for k, v in sess_click.items() if v]
+    lost = [k for k, v in sess_click.items() if not v]
+    a_won = sum(k in apply_sessions for k in won) / max(1, len(won))
+    a_lost = sum(k in apply_sessions for k in lost) / max(1, len(lost))
+    check(
+        "검색 세션 신청률: 결과를 누른 세션 > 끝내 못 누른 세션 (검색 품질이 신청에 닿는다)",
+        a_won > a_lost,
+        f"{a_won:.4f} ({len(won):,}세션) vs {a_lost:.4f} ({len(lost):,}세션)",
     )
     lines = ["", "## 검색 (세션 시작일 기준 구간)", "", "| 구간 | 요청 | 결과 0건 | 검색 성공률 |", "|---|---|---|---|"]
     lines += [f"| {k} | {n:,} | {z:.3f} | {c:.3f} |" for k, (n, z, c) in stat.items()]

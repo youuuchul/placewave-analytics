@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { inRange, sum } from '../lib/agg'
 import { md } from '../lib/date'
-import { queryStats, SEARCH_KEYS, zeroRate } from '../lib/experiments'
+import { queryStats, SEARCH_KEYS, success, zeroRate } from '../lib/experiments'
 import { num, pct } from '../lib/format'
 import { PURPOSE, QUERY_INTENT, REQUESTER, S } from '../lib/labels'
 import type { Data, DailyQuery, DailySearch, WeeklyBatch } from '../lib/types'
@@ -45,6 +45,15 @@ export default function I1({ data, search, queries }: { data: Data; search: Dail
   const risk = riskIds(batches, teamPace(data, BATCH_WEEK))
   const atRisk = batches.filter((b) => risk.has(b.batch_id))
 
+  const range = (from: string, to: string) => {
+    const v = trend.filter((t) => t.date >= from && t.date <= to).flatMap((t) => (t.all == null ? [] : [t.all]))
+    return v.length ? `${pct(Math.min(...v))}~${pct(Math.max(...v))}` : '—'
+  }
+  const failedRegion = failed.filter((q) => region(q.q)).length
+  const failedIn = failed.filter((q) => q.evalDate)
+  const evalDays = [...new Set(failedIn.map((q) => q.evalDate!))].sort().map(md)
+  const [before, during, after] = phase
+
   const table: Cell[][] = days.flatMap((d) => {
     const day = win.filter((r) => r.kst_date === d)
     return (
@@ -75,6 +84,8 @@ export default function I1({ data, search, queries }: { data: Data; search: Dail
             ['결과 0건 비율 · 전체', ...phase.map((p) => pct(zeroRate(p.all)))],
             ['결과 0건 비율 · 상권 검색어', ...phase.map((p) => pct(zeroRate(p.reg)))],
             ['결과 0건 비율 · 상권 외', ...phase.map((p) => pct(zeroRate(p.rest)))],
+            ['검색 성공률 · 전체', ...phase.map((p) => pct(success(p.all)))],
+            ['검색 성공률 · 상권 검색어', ...phase.map((p) => pct(success(p.reg)))],
           ]}
         />
       </Block>
@@ -87,7 +98,7 @@ export default function I1({ data, search, queries }: { data: Data; search: Dail
             ['대응', '9/5 핫픽스(구분자 정규화) · 9/7 주간 학습 배치에 실패 검색어 편입 · 9/8 회귀 검증 긴급 배치(480과제, 마감 4일, 우선순위 1)'],
             [
               '비용 측정',
-              '마감 위험 규칙: 진행 중 배치를 우선순위 → 생성일 순으로 줄 세워, 앞 배치까지 남은 과제 누적을 팀 처리량(최근 14일 완료 과제 ÷ 14)으로 나눈 일수가 마감까지 남은 일수보다 길면 위험(평가 운영 탭과 같은 규칙)',
+              '마감 위험 규칙: 진행 중 배치를 우선순위 → 생성일 순으로 줄 세워, 앞 배치까지 남은 과제 누적을 팀 처리량(최근 14일 완료 과제 ÷ 14)으로 나눈 일수가 마감까지 남은 일수보다 길면 위험(라벨링 운영 대시보드와 같은 규칙)',
             ],
             ['비교 구간', '회귀 전 8/29~8/31 · 회귀 중 9/1~9/4 · 핫픽스 후 9/5~9/8. 대조군 없는 전후 비교다'],
           ]}
@@ -159,10 +170,10 @@ export default function I1({ data, search, queries }: { data: Data; search: Dail
       <Block title="해석">
         <Bullets
           items={[
-            '0건 증가는 상권 검색어에 몰렸다. 상권 외 의도의 0건 비율은 회귀 전후와 같은 수준이라 캠페인 유입 변화로 설명되지 않는다.',
-            '일 결과 0건 비율이 직전 3.3~5.9%에서 9/1~9/4 14.5~19.1%로 뛰었고, 9/5 핫픽스 뒤 3.1~6.2%로 돌아왔다. 결과 클릭이 있던 검색은 그대로라(행동 로그 고정) 0건 비율에만 나타났다.',
-            '그 주 실패 검색어 9개는 모두 상권 검색어이고, 모두 9/7 주간 학습 배치와 9/8 회귀 검증 배치에 편입됐다. 감지에서 평가까지 흐름이 이어졌다.',
-            '비용: 회귀 검증 배치가 우선순위 1로 대기열 앞에 서면서 같은 주 정기 배치가 밀려 마감 위험 배치가 3개 나왔다. 학습 데이터 지연보다 사용자에게 보이는 회귀 확인을 먼저 뒀다.',
+            `0건 증가는 상권 검색어에 몰렸다. 상권 검색어의 결과 0건 비율이 ${pct(zeroRate(before.reg))} → ${pct(zeroRate(during.reg))}로 오르는 동안 상권 외는 ${pct(zeroRate(before.rest))} → ${pct(zeroRate(during.rest))}였다. 캠페인 유입 변화였다면 의도와 상관없이 함께 움직였을 것이다.`,
+            `일 결과 0건 비율은 회귀 전 ${range(PHASES[0].from, PHASES[0].to)}, 회귀 중 ${range(PHASES[1].from, PHASES[1].to)}, 핫픽스 후 ${range(PHASES[2].from, PHASES[2].to)}였다. 같은 구간 상권 검색어의 검색 성공률은 ${pct(success(before.reg))} → ${pct(success(during.reg))} → ${pct(success(after.reg))}로 0건 비율과 반대로 움직였다.`,
+            `그 주 실패 검색어 ${failed.length}개 중 ${failedRegion}개가 상권 검색어이고, ${failedIn.length}개가 ${evalDays.join(' · ') || '—'} 평가 배치에 들어갔다. 감지에서 평가까지 흐름이 이어졌다.`,
+            `비용: 회귀 검증 배치가 우선순위 1로 대기열 앞에 서면서 같은 주 마감 위험 배치가 ${atRisk.length}개 나왔다. 학습 데이터 지연보다 사용자에게 보이는 회귀 확인을 먼저 뒀다.`,
           ]}
         />
       </Block>
@@ -207,7 +218,7 @@ export default function I1({ data, search, queries }: { data: Data; search: Dail
           items={[
             { label: '검색 탭 · 회귀 주', q: 'tab=search&p=custom&from=2026-09-01&to=2026-09-07' },
             { label: '검색 탭 · 8/29~9/14', q: `tab=search&p=custom&from=${FROM}&to=${TO}` },
-            { label: '평가 운영 탭 · 대응 주', q: `tab=evalops&wk=${BATCH_WEEK}` },
+            { label: '라벨링 운영 · 대응 주', q: `page=reports&r=labeling-ops&wk=${BATCH_WEEK}` },
           ]}
         />
       </Block>

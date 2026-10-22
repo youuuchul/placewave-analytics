@@ -66,7 +66,7 @@ export default function MetricsPage() {
       <div className="flex items-baseline gap-3">
         <h2 className="text-[26px] font-semibold leading-tight tracking-tight text-ink">지표 가이드</h2>
         <span className="tnum text-sm text-muted">
-          지표 {spec.metrics.length} · 탭 {spec.tabs.length}
+          지표 {spec.metrics.length} · 탭 {spec.tabs.filter((t) => !t.report).length}
         </span>
       </div>
 

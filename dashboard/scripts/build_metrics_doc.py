@@ -46,7 +46,7 @@ def render(spec: dict) -> str:
         "(예외: 화면 계약상 `monthly_summary.w1_retention`). 산식의 원본은 `bigquery/sql/` 의 마트 생성 SQL 이며,"
         " 이 문서는 그 열을 가리킨다. 대시보드의 `지표 가이드` 페이지와 타일 이름 옆 `?` 가 같은 원본을 보여준다.",
         "",
-        f"지표 {len(spec['metrics'])}개 · 탭 {len(spec['tabs'])}개.",
+        f"지표 {len(spec['metrics'])}개 · 탭 {sum(not t.get('report') for t in spec['tabs'])}개.",
         "",
         "수익 축: "
         + " · ".join(

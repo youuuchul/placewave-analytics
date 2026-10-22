@@ -3,7 +3,7 @@
 -- 키: 이 여섯 열
 -- 파티션·클러스터: kst_date / query_intent, ranker_version
 -- 원천: staging.int_search
--- 소비: 검색 탭 스코어보드·추이·의도 유형·랭킹 버전 분해, 주간·월간 탭 주간 브리핑. ops.reconciliation
+-- 소비: 검색 탭 스코어보드·추이·의도 유형, 주간·월간 탭 주간 브리핑, 보고서 진행 점검·재색인 회귀. ops.reconciliation
 -- 검사: C16·I8
 --
 -- 비율은 저장하지 않는다. 검색 지표는 모두 서버 요청이 기준이다: 검색 성공률 = clicked ÷ searches,

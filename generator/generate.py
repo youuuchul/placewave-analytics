@@ -74,6 +74,10 @@ DEVICE2_USE = 0.5  # 가입 이후 방문에서 2번째 기기를 쓸 확률
 GA_SEARCH_LOSS = 0.015  # 검색·결과 클릭 GA 이벤트가 수집되지 않는 비중 (서버 로그에는 남는다)
 REFORM_SAME = 0.6  # 결과를 누르지 않고 다시 검색할 때 같은 대상을 다시 찾는 비중 (나머지는 다른 검색어)
 ZERO_RESEARCH = 1.8  # 결과 0건이면 다시 검색할 가중 배수
+# 결과를 누르지 않은 검색 뒤 세션을 끝낼 확률 (결과 0건 / 결과는 있으나 클릭 없음). seed 전이에는 검색 결과 뒤
+# 종료가 없어, 클릭을 검색 엔진이 정하면 실패한 검색도 결국 같은 비율로 신청에 닿아 검색 품질이 신청과 무관해진다
+ZERO_EXIT = 0.35
+NOCLICK_EXIT = 0.20
 CANCEL_PER_SESSION = 0.03  # 보유 신청 1건당 이후 세션에서 취소할 확률
 PAY_SUCCESS = 0.71  # 유료 행사 신청 후 결제 완료 비율
 MEMBER_APPLY_NUDGE = 0.10  # 로그인 회원이 행사 상세에서 신청 화면으로 바로 가는 추가 확률 (연 티켓 매출 규모 보정)
@@ -882,7 +886,16 @@ class Generator:
             base[targets.index(t)] = 0.0
         zero = base.copy()
         zero[targets.index("search_result")] *= ZERO_RESEARCH
-        self.no_click_chain = {False: (targets, base / base.sum()), True: (targets, zero / zero.sum())}
+
+        def with_exit(w: np.ndarray, share: float) -> np.ndarray:
+            out = w / w.sum() * (1.0 - share)
+            out[targets.index(END)] += share
+            return out
+
+        self.no_click_chain = {
+            False: (targets, with_exit(base, NOCLICK_EXIT)),
+            True: (targets, with_exit(zero, ZERO_EXIT)),
+        }
 
     # ---- 광고 계획
 

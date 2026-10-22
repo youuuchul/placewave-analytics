@@ -5,12 +5,15 @@ import { num } from '../lib/format'
 import type { ExpRankerRequest } from '../lib/types'
 import { Block, Bullets, Para, SideTable, Spec } from './Frame'
 
-/** 가드레일 허용 폭(나빠지는 쪽). 설계서에서 정하고 진행 점검·결과 보고가 같은 값을 쓴다. */
-export const GUARD = {
-  ctr: { label: '−2.0%p', limit: -0.02 },
-  apply: { label: '−0.50%p', limit: -0.005 },
-  p95: { label: '+30ms', limit: 30 },
-}
+/**
+ * 가드레일 규칙. 설계서에서 정하고 진행 점검·결과 보고가 같은 규칙을 쓴다.
+ * 비율 가드레일은 나빠지는 쪽으로 유의한 차이가 없어야 한다(차이 95% 구간 상한 ≥ 0). 2주 표본의 최소 검출 효과보다 좁은 허용 폭은
+ * 효과가 없어도 통과할 수 없어서다. 응답 시간은 검색 응답 목표(p95 250ms) 안에 머무는 예산(차이 구간 상한 ≤ +50ms).
+ */
+export const GUARD = { p95: { label: '+50ms', limit: 50 }, slo: 250 }
+export type GuardKey = 'ctr' | 'apply' | 'p95'
+export const guardPass = (key: GuardKey, ci: { lo: number; hi: number }) => (key === 'p95' ? ci.hi <= GUARD.p95.limit : ci.hi >= 0)
+export const guardCall = (key: GuardKey, ok: boolean) => (ok ? (key === 'p95' ? '예산 안' : '통과') : key === 'p95' ? '예산 초과' : '유의한 하락')
 
 export const ROLES: { role: '주 지표' | '보조 지표' | '가드레일'; m: RatioMetric | null; key: string; def: string }[] = [
   { role: '주 지표', m: EXP_METRICS.success, key: 'success', def: '결과를 1번 이상 클릭한 검색 ÷ 전체 검색' },
@@ -29,9 +32,9 @@ export const CRITERIA: Record<string, string> = {
   pos: 'Holm 보정 p < 0.05 일 때 방향 판정',
   top3: 'Holm 보정 p < 0.05 일 때 방향 판정',
   reform: 'Holm 보정 p < 0.05 일 때 방향 판정',
-  ctr: `나빠지는 쪽 구간 끝이 ${GUARD.ctr.label} 안`,
-  apply: `나빠지는 쪽 구간 끝이 ${GUARD.apply.label} 안`,
-  p95: `나빠지는 쪽 구간 끝이 ${GUARD.p95.label} 안`,
+  ctr: '유의한 하락 없음 (구간 상한 ≥ 0)',
+  apply: '유의한 하락 없음 (구간 상한 ≥ 0)',
+  p95: `구간 상한 ≤ ${GUARD.p95.label}`,
 }
 
 export default function ExpDesign({ rows }: { rows: ExpRankerRequest[] }) {
@@ -40,6 +43,7 @@ export default function ExpDesign({ rows }: { rows: ExpRankerRequest[] }) {
   const devices = dev.control + dev.treatment
   const sessions = base.filter((r) => r.is_session_first).length
   const lat = base.map((r) => r.latency_ms).sort((a, b) => a - b)
+  const p95 = quantileSorted(lat, 0.95)
   const est = Object.fromEntries(ROLES.filter((x) => x.m).map((x) => [x.key, ratioEstimate(base, x.m!)]))
   const mdeOf = (k: string) => (est[k] ? mde(est[k]!, 1) : null)
   const success = est.success
@@ -82,13 +86,15 @@ export default function ExpDesign({ rows }: { rows: ExpRankerRequest[] }) {
             x.role,
             x.m?.label ?? '응답 시간 p95',
             x.def,
-            x.m ? (est[x.key] ? x.m.fmt(est[x.key]!.value) : '—') : `${quantileSorted(lat, 0.95).toFixed(0)}ms`,
+            x.m ? (est[x.key] ? x.m.fmt(est[x.key]!.value) : '—') : `${p95.toFixed(0)}ms`,
             CRITERIA[x.key],
           ])}
         />
         <Para>
-          가드레일 허용 폭은 결과 클릭률 {GUARD.ctr.label}, 검색 세션 신청 전환 {GUARD.apply.label}, 응답 시간 p95 {GUARD.p95.label}로 정한다. 신청 전환은
-          검색에서 이어지는 매출 흐름이라 작은 하락도 막고, 응답 시간은 동의어 확장·재정렬로 늘어날 수 있어 사용자가 느끼는 수준 전에 멈춘다.
+          가드레일은 새 랭킹이 검색 밖의 흐름을 해치지 않는지 본다. 2주 표본으로 가려낼 수 있는 변화는 결과 클릭률 {pp(mdeOf('ctr'))}, 검색 세션 신청
+          전환 {pp(mdeOf('apply'), 2)} 이상이라(아래 표본 크기), 이보다 좁은 허용 폭을 두면 효과가 없어도 통과할 수 없다. 그래서 두 비율 가드레일은
+          나빠지는 쪽으로 유의한 차이가 없을 것으로 판정하고, 신청 전환은 전체 적용 뒤에도 주 단위로 이어서 본다. 응답 시간은 동의어 확장·재정렬로 늘
+          수 있어, 기준선 p95 {p95.toFixed(0)}ms 에서 검색 응답 목표 {GUARD.slo}ms 를 넘지 않는 {GUARD.p95.label} 를 예산으로 둔다.
         </Para>
       </Block>
 
@@ -106,8 +112,8 @@ export default function ExpDesign({ rows }: { rows: ExpRankerRequest[] }) {
         />
         <Para>
           최소 검출 효과는 양측 α 0.05, 검정력 0.8 기준이고, 기준선 2주의 기기 단위 분산(델타 방법)을 집단당 기기 수로 나눠 구했다. 검색 성공률은{' '}
-          {pp(mdeS)} 이상의 차이를 잡을 수 있다. 신청 전환은 세션당 전환이 드물어 {pp(mdeOf('apply'), 2)}보다 작은 하락은 이 기간으로 검출하지 못하므로,
-          가드레일 판정은 구간이 허용 폭을 넘는지로 본다.
+          {pp(mdeS)} 이상의 차이를 잡을 수 있다. 신청 전환은 세션당 전환이 드물어 {pp(mdeOf('apply'), 2)}보다 작은 변화는 이 기간으로 검출하지 못한다.
+          가드레일을 허용 폭이 아니라 유의한 하락 여부로 둔 이유다.
         </Para>
       </Block>
 
@@ -115,9 +121,9 @@ export default function ExpDesign({ rows }: { rows: ExpRankerRequest[] }) {
         <SideTable
           heads={['결정', '조건']}
           rows={[
-            ['출시', '주 지표 95% 구간 하한 > 0, 그리고 가드레일 3개 모두 나빠지는 쪽 구간 끝이 허용 폭 안'],
-            ['보류', '주 지표 차이 없음, 또는 가드레일 구간이 허용 폭에 걸침. 원인을 나눠 보고 다시 설계한다'],
-            ['중단', '배정 비율 이상(SRM p < 0.001), 또는 가드레일 구간 전체가 허용 폭 밖, 또는 응답 장애'],
+            ['출시', '주 지표 95% 구간 하한 > 0, 그리고 가드레일 3개 모두 통과'],
+            ['보류', '주 지표 차이 없음. 원인을 나눠 보고 다시 설계한다'],
+            ['중단', '배정 비율 이상(SRM p < 0.001), 비율 가드레일의 유의한 하락, 응답 시간 예산 초과, 또는 응답 장애'],
           ]}
         />
       </Block>
