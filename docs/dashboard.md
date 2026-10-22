@@ -269,7 +269,7 @@
 
 - 한 단계의 칸 순서: 한 줄 결론 → 배경·질문 → 무엇을 바꿨나(발견은 무엇을 정했나, 이슈는 무엇이 바뀌었나) → 설계 → 결과 → 해석 → 한계 → 데이터셋 구성(경로·그레인·지표별 분자·분모 열·기간 규칙·기간 내 마트 행 수·재현 SQL `bigquery/reports/*.sql` 링크·기간 내 집계 표 + CSV 내려받기) → 대시보드에서 보기(딥링크). 설계서·진행 점검은 그 시점에 쓸 수 있는 칸만 둔다. 방어용 예상 질문 칸은 두지 않는다(설계 근거는 설계서 본문에)
 - 단계 id 는 묶음으로 바꾸기 전 보고서 주소와 같다(`r=ab-ranker-v2` 등). 옛 주소 `?tab=search&view=ranker`(검색 탭 랭킹 실험 보기)는 `?page=reports&r=ab-ranker-v2` 로 넘긴다
-- 대조: `npm run check:reports` 가 보고서 표(D1 요약·실패 검색어, E1 결과 비교 표, X1 개정 전·후, I1 구간)를 마트 파일에서 따로 계산한 값과 비교해 어긋나면 exit 1(빌드 결과를 preview 로 띄운 뒤, `NP_BASE` 로 주소 지정). BigQuery 재집계 대조는 `docs/reconciliation_dashboard.md` §9
+- 대조: `npm run check:reports` 가 보고서 표(D1 요약·실패 검색어, A/B 설계서 기준선·표본, 진행 점검 배정·A/A·가드레일, 결과 보고 비교 표, X1 개정 전·후, I1 구간)를 마트 파일에서 따로 계산한 값과 비교해 어긋나면 exit 1(빌드 결과를 preview 로 띄운 뒤, `NP_BASE` 로 주소 지정). BigQuery 재집계 대조는 `docs/reconciliation_dashboard.md` §2·§3
 
 ## 6. 캡처
 
