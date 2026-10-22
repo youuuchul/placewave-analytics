@@ -56,7 +56,19 @@ export interface Ci {
   d: number
   lo: number
   hi: number
+  /** 양측 p값(같은 정규 근사, z = d ÷ 표준오차) */
+  p: number
 }
+
+/** 양측 p값 = erfc(|z| ÷ √2). Abramowitz–Stegun 7.1.26 근사(오차 1.5e-7). */
+function pTwo(z: number): number {
+  const x = Math.abs(z) / Math.SQRT2
+  const t = 1 / (1 + 0.3275911 * x)
+  return t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429)))) * Math.exp(-x * x)
+}
+
+/** p값 표기: 0.001 미만은 부등호, 아니면 소수 셋째 자리. */
+export const fmtP = (p: number) => (p < 0.001 ? '< 0.001' : p.toFixed(3))
 
 /** 두 비율의 차이(뒤 − 앞)와 95% 구간(정규 근사). */
 export function diffCi(x1: number, n1: number, x2: number, n2: number): Ci | null {
@@ -65,7 +77,7 @@ export function diffCi(x1: number, n1: number, x2: number, n2: number): Ci | nul
   const p2 = x2 / n2
   const se = Math.sqrt((p1 * (1 - p1)) / n1 + (p2 * (1 - p2)) / n2)
   const d = p2 - p1
-  return { d, lo: d - 1.96 * se, hi: d + 1.96 * se }
+  return { d, lo: d - 1.96 * se, hi: d + 1.96 * se, p: se > 0 ? pTwo(d / se) : 1 }
 }
 
 /** 두 평균의 차이와 95% 구간(웰치, 정규 근사). 합·제곱합·표본 수로 계산한다. */
@@ -75,7 +87,7 @@ export function meanDiffCi(s1: number, q1: number, n1: number, s2: number, q2: n
   const m2 = s2 / n2
   const se = Math.sqrt((q1 - n1 * m1 * m1) / (n1 - 1) / n1 + (q2 - n2 * m2 * m2) / (n2 - 1) / n2)
   const d = m2 - m1
-  return { d, lo: d - 1.96 * se, hi: d + 1.96 * se }
+  return { d, lo: d - 1.96 * se, hi: d + 1.96 * se, p: se > 0 ? pTwo(d / se) : 1 }
 }
 
 export type Verdict = '개선' | '악화' | '차이 없음'
@@ -105,6 +117,8 @@ export interface CompareLine {
   ciFmt: (v: number) => string
   /** 차이 (95% 구간) 칸 글자. 예: −16.5%p (−18.0 ~ −15.0) */
   ciText: string | null
+  /** p값 칸 글자 */
+  pText: string | null
   /** 화면에 쓰는 판정. 분모 효과·판정 제외는 원래 판정 대신 쓴다 */
   call: string | null
   tone: 'good' | 'bad' | 'muted'
@@ -121,7 +135,7 @@ export function compareRanker(rows: DailySearch[]): { a: SearchSums; b: SearchSu
   const a = by.get('v1') ?? ZERO_SUMS
   const b = by.get('v2') ?? ZERO_SUMS
   const p1 = (v: number | null) => pct(v)
-  type Spec = Omit<CompareLine, 'call' | 'tone' | 'tip' | 'ciText'> & { down?: boolean; excluded?: boolean; bound?: (v: number) => string }
+  type Spec = Omit<CompareLine, 'call' | 'tone' | 'tip' | 'ciText' | 'pText'> & { down?: boolean; excluded?: boolean; bound?: (v: number) => string }
   const spec: Spec[] = [
     { id: 'Q02', label: '검색 수', a: a.searches, b: b.searches, fmt: num, ci: null, ciFmt: pp },
     {
@@ -210,7 +224,11 @@ export function compareRanker(rows: DailySearch[]): { a: SearchSums; b: SearchSu
   const denomEffect = raw.get('Q04') === '악화' && raw.get('Q12') === '차이 없음' && raw.get('Q03') === '개선'
   const lines = spec.map(({ down: _d, excluded, bound, ...spec1 }): CompareLine => {
     const b = bound ?? spec1.ciFmt
-    const l = { ...spec1, ciText: spec1.ci ? `${spec1.ciFmt(spec1.ci.d)} (${b(spec1.ci.lo)} ~ ${b(spec1.ci.hi)})` : null }
+    const l = {
+      ...spec1,
+      ciText: spec1.ci ? `${spec1.ciFmt(spec1.ci.d)} (${b(spec1.ci.lo)} ~ ${b(spec1.ci.hi)})` : null,
+      pText: spec1.ci ? fmtP(spec1.ci.p) : null,
+    }
     const v = raw.get(l.id) ?? null
     if (excluded) return { ...l, call: '판정 제외', tone: 'muted', tip: EXCLUDED_TIP }
     if (l.id === 'Q04' && denomEffect) return { ...l, call: '분모 효과', tone: 'muted', tip: DENOM_TIP }

@@ -7,7 +7,6 @@ import { QUERY_INTENT, S } from '../lib/labels'
 import { F } from '../lib/persons'
 import { ready, useTable, waitOf } from '../lib/source'
 import type { DailySearch } from '../lib/types'
-import { ReportLink } from '../components/ReportLink'
 import { TimeChart } from '../components/charts'
 import { DataTable, type Col } from '../components/DataTable'
 import { Card, Empty, Legend, Tile, TileRow } from '../components/ui'
@@ -15,7 +14,7 @@ import { delta, grain, ptDelta, type TabProps, vsLabel, weekTip } from './common
 
 const KEYS = SEARCH_KEYS
 
-function Quality({ data, s, set, range, rows }: TabProps & { rows: DailySearch[] }) {
+function Quality({ data, s, range, rows }: TabProps & { rows: DailySearch[] }) {
   const seg = segFilter(s)
   const pdL = useTable(data, 'person_day')
   const qL = useTable(data, 'daily_query')
@@ -32,11 +31,15 @@ function Quality({ data, s, set, range, rows }: TabProps & { rows: DailySearch[]
   const span = rankerSpan(rows)
   const b = bucketed(segRows, [...KEYS], range)
   const trend = b.rows.map((r) => ({ date: r.date, zero: zeroRate(r), ctr: ctr(r) }))
+  // 주 단위에서는 A/B 시작과 전체 적용이 2주 차이라 이름이 겹친다. 표식 하나로 합친다
   const marks = span
-    ? [
-        { x: span.from, label: 'A/B 테스트 시작' },
-        { x: span.v2All!, label: '새 랭킹 전체 적용' },
-      ]
+    ? (b.weekly
+        ? [{ x: span.from, label: '새 랭킹 A/B → 전체 적용' }]
+        : [
+            { x: span.from, label: 'A/B 테스트 시작' },
+            { x: span.v2All!, label: '새 랭킹 전체 적용' },
+          ]
+      )
         .map((m) => ({ ...m, x: b.weekly ? mondayOf(m.x) : m.x }))
         .filter((m) => trend.some((t) => t.date === m.x))
     : []
@@ -144,15 +147,12 @@ function Quality({ data, s, set, range, rows }: TabProps & { rows: DailySearch[]
         title="결과 0건 비율 · 결과 클릭률"
         meta={grain(b.weekly)}
         right={
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-            <Legend
-              items={[
-                { label: '결과 0건', color: S(4), kind: 'line' },
-                { label: '클릭률', color: S(1), kind: 'line' },
-              ]}
-            />
-            {marks.length > 0 && <ReportLink s={s} set={set} id="ab-ranker-v2" label="실험 보고서 보기" />}
-          </div>
+          <Legend
+            items={[
+              { label: '결과 0건', color: S(4), kind: 'line' },
+              { label: '클릭률', color: S(1), kind: 'line' },
+            ]}
+          />
         }
       >
         {cur.searches === 0 ? (

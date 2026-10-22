@@ -7,7 +7,6 @@ import type { Data, WeeklyBatch, WeeklyEvalOps, WeeklyRater } from '../lib/types
 import { ScatterPlot, TimeChart } from '../components/charts'
 import { DataTable, type Col } from '../components/DataTable'
 import { Card, type Delta, Empty, Legend, Tile, TileRow } from '../components/ui'
-import { ReportLink } from '../components/ReportLink'
 import type { TabProps } from './common'
 
 export const OPS_KEYS = [
@@ -104,7 +103,7 @@ interface RaterRow {
   agree_pairs: number
 }
 
-export default function EvalOps({ data, s, set }: TabProps) {
+export default function EvalOps({ data, s }: TabProps) {
   const weeks = evalWeeks(data)
   const wk = weeks.includes(s.wk) ? s.wk : weeks[weeks.length - 1]
   const prevWk = addDays(wk, -7)
@@ -412,7 +411,6 @@ export default function EvalOps({ data, s, set }: TabProps) {
         title="평가 지침 개정 전 · 후"
         metricId="L09"
         meta={`${md(wk)} 주까지 누적`}
-        right={<ReportLink s={s} set={set} id="guide-v2" label="개선 보고서 보기" />}
       >
         <div className="-mx-4 overflow-x-auto px-4 sm:-mx-5 sm:px-5">
           <table className="w-full min-w-[560px] border-collapse text-[13px]">

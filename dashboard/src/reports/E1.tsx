@@ -72,6 +72,10 @@ export default function E1({ rows }: { rows: DailySearch[] }) {
           items={[
             ['배정', '기기 단위 무작위 50:50 배정(기기 ID 해시). 같은 기기는 기간 내내 같은 군'],
             [
+              '배정 점검',
+              '기간 중 검색한 기기는 대조군 1,217 · 실험군 1,160(51.2% : 48.8%). 50:50 기대와의 차이는 p 0.242(카이제곱 적합도)로 배정 비율 이상(SRM)이 없다. 두 군을 모두 본 기기는 1대로, 7/26 밤 세션이 자정을 넘겨 전체 적용(7/27)에 걸린 경우다',
+            ],
+            [
               '기간',
               span ? (
                 <span className="tnum">
@@ -92,7 +96,7 @@ export default function E1({ rows }: { rows: DailySearch[] }) {
             ],
             [
               '판정',
-              '차이 = 실험군 − 대조군. 95% 구간(비율은 정규 근사, 평균 첫 클릭 순위는 웰치)이 0을 넘으면 지표 방향에 따라 개선·악화, 0을 포함하면 차이 없음',
+              '차이 = 실험군 − 대조군. 95% 구간(비율은 정규 근사, 평균 첫 클릭 순위는 웰치)이 0을 넘으면 지표 방향에 따라 개선·악화, 0을 포함하면 차이 없음. p값은 같은 근사의 양측 검정(유의수준 0.05)이라 구간 판정과 결론이 같다. 출시 판정은 주 지표 하나로 하고, 보조·가드레일 4개는 본페로니 기준(0.05 ÷ 4 = 0.0125)으로 봐도 판정이 같다',
             ],
           ]}
         />
@@ -104,10 +108,11 @@ export default function E1({ rows }: { rows: DailySearch[] }) {
             <table data-report="ab-ranker-v2" className="w-full min-w-[620px] border-collapse text-[13px]">
               <colgroup>
                 <col />
-                <col className="w-[14%]" />
-                <col className="w-[14%]" />
-                <col className="w-[28%]" />
-                <col className="w-[15%]" />
+                <col className="w-[12%]" />
+                <col className="w-[12%]" />
+                <col className="w-[26%]" />
+                <col className="w-[10%]" />
+                <col className="w-[13%]" />
               </colgroup>
               <thead>
                 <tr className="border-b border-axis text-muted">
@@ -115,6 +120,7 @@ export default function E1({ rows }: { rows: DailySearch[] }) {
                   <th className="py-2 pr-3 text-right font-medium">{G1}</th>
                   <th className="py-2 pr-3 text-right font-medium">{G2}</th>
                   <th className="py-2 pr-3 text-right font-medium">차이 (95% 구간)</th>
+                  <th className="py-2 pr-3 text-right font-medium">p값</th>
                   <th className="py-2 text-right font-medium">판정</th>
                 </tr>
               </thead>
@@ -127,6 +133,7 @@ export default function E1({ rows }: { rows: DailySearch[] }) {
                     <td className="tnum py-2 pr-3 text-right text-ink2">
                       {l.ciText ?? '—'}
                     </td>
+                    <td className="tnum py-2 pr-3 text-right text-ink2">{l.pText ?? '—'}</td>
                     <td className="py-2 text-right font-medium" style={{ color: TONE[l.tone] }} title={l.tip}>
                       {l.call ?? '—'}
                     </td>
@@ -149,9 +156,9 @@ export default function E1({ rows }: { rows: DailySearch[] }) {
       <Block title="해석">
         <Bullets
           items={[
-            '주 지표(결과 0건 비율)와 보조 지표(평균 첫 클릭 순위, 상위 3위 클릭 비중)가 모두 실험군 쪽으로 개선됐고 95% 구간이 0을 넘는다.',
-            '결과 클릭률이 내려간 것은 분모 효과다. 대조군에서 0건이던 검색에 결과가 생기면서 분모(결과가 있는 매칭 검색)가 늘었는데 클릭 수는 그대로였다. 분모를 매칭 검색 전체로 둔 검색당 클릭은 구간이 0을 포함해 차이가 없다.',
-            '가드레일(검색당 클릭, 재검색률)은 차이가 없다. 새 랭킹이 결과를 늘리면서 사용자 행동을 해치지 않았다고 읽는다.',
+            '주 지표(결과 0건 비율)와 보조 지표(평균 첫 클릭 순위, 상위 3위 클릭 비중)가 모두 실험군 쪽으로 개선됐고 95% 구간이 0을 넘는다(p < 0.001).',
+            '결과 클릭률이 내려간 것은 분모 효과다. 대조군에서 0건이던 검색에 결과가 생기면서 분모(결과가 있는 매칭 검색)가 늘었는데, 이 데이터의 클릭 행동은 랭킹과 무관하게 고정돼 클릭 수는 그대로였다(한계 3). 분모를 매칭 검색 전체로 둔 검색당 클릭은 구간이 0을 포함해 차이가 없다(p 0.252).',
+            '가드레일(검색당 클릭 p 0.252, 재검색률 p 0.242)은 차이가 없다. 다만 이 데이터는 클릭·재검색 행동이 랭킹과 무관하게 만들어져 가드레일이 움직일 수 없다. 실제 서비스라면 두 지표가 출시를 막을 수 있는 지표이고, 여기서는 판정 규칙이 동작하는지 확인하는 용도로 읽는다.',
           ]}
         />
       </Block>
@@ -161,7 +168,7 @@ export default function E1({ rows }: { rows: DailySearch[] }) {
           items={[
             '두 변경(평가 라벨 학습, 동의어·부분 일치)을 한 번에 넣어 각각의 효과를 나눌 수 없다.',
             '배정 단위가 기기라 기기 2대 이상을 쓰는 사람(회원의 35%)은 두 군을 모두 볼 수 있다. 오염은 차이를 줄이는 방향이라 결과는 보수적이다.',
-            '가상 데이터의 행동 로그(클릭·신청)는 랭킹과 무관하게 고정돼 있다. 그래서 검색 세션 신청 전환은 값만 보이고 판정에서 뺐다.',
+            '가상 데이터의 행동 로그(클릭·재검색·신청)는 랭킹과 무관하게 고정돼 있다. 그래서 검색 세션 신청 전환은 값만 보이고 판정에서 뺐고, 결과 클릭률 하락과 가드레일의 차이 없음도 이 고정에서 나온다. 랭킹 효과는 결과 0건 비율과 클릭 순위에서만 볼 수 있다.',
           ]}
         />
       </Block>

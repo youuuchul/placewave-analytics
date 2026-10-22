@@ -31,18 +31,28 @@ const K = ['searches', 'zero_result_searches', 'ga_matched_searches', 'matched_r
 const win = search.filter((r) => r.kst_date >= span[0] && r.kst_date <= span[1])
 const a = add(win.filter((r) => r.ranker_version === 'v1'), K)
 const b = add(win.filter((r) => r.ranker_version === 'v2'), K)
+// 양측 p = erfc(|z|/√2). 화면(A–S 7.1.26)과 다른 근사(Numerical Recipes erfcc, 체비쇼프)로 다시 센다
+const erfc = (x) => {
+  const t = 1 / (1 + 0.5 * Math.abs(x))
+  const r = t * Math.exp(-x * x - 1.26551223 + t * (1.00002368 + t * (0.37409196 + t * (0.09678418 + t * (-0.18628806 + t * (0.27886807 + t * (-1.13520398 + t * (1.48851587 + t * (-0.82215223 + t * 0.17087277)))))))))
+  return x >= 0 ? r : 2 - r
+}
+const pText = (z) => {
+  const p = erfc(Math.abs(z) / Math.SQRT2)
+  return p < 0.001 ? '< 0.001' : p.toFixed(3)
+}
 const prop = (x1, n1, x2, n2) => {
   const p1 = x1 / n1, p2 = x2 / n2, se = Math.sqrt((p1 * (1 - p1)) / n1 + (p2 * (1 - p2)) / n2)
-  return [p1, p2, p2 - p1, p2 - p1 - 1.96 * se, p2 - p1 + 1.96 * se]
+  return [p1, p2, p2 - p1, p2 - p1 - 1.96 * se, p2 - p1 + 1.96 * se, (p2 - p1) / se]
 }
 const mean = (s1, q1, c1, s2_, q2, c2) => {
   const m1 = s1 / c1, m2 = s2_ / c2
   const se = Math.sqrt((q1 - c1 * m1 * m1) / (c1 - 1) / c1 + (q2 - c2 * m2 * m2) / (c2 - 1) / c2)
-  return [m1, m2, m2 - m1, m2 - m1 - 1.96 * se, m2 - m1 + 1.96 * se]
+  return [m1, m2, m2 - m1, m2 - m1 - 1.96 * se, m2 - m1 + 1.96 * se, (m2 - m1) / se]
 }
-const row = ([p1, p2, d, lo, hi], f, g, gb = g) => [f(p1), f(p2), `${g(d)} (${gb(lo)} ~ ${gb(hi)})`]
+const row = ([p1, p2, d, lo, hi, z], f, g, gb = g) => [f(p1), f(p2), `${g(d)} (${gb(lo)} ~ ${gb(hi)})`, pText(z)]
 const e1 = {
-  Q02: [n0(a.searches), n0(b.searches), '—'],
+  Q02: [n0(a.searches), n0(b.searches), '—', '—'],
   Q03: row(prop(a.zero_result_searches, a.searches, b.zero_result_searches, b.searches), pct, pp, ppb),
   Q05: row(mean(a.first_click_position_sum, a.first_click_position_sq_sum, a.clicked_searches, b.first_click_position_sum, b.first_click_position_sq_sum, b.clicked_searches), (v) => v.toFixed(2), s2),
   Q06: row(prop(a.top3_clicks, a.clicked_searches, b.top3_clicks, b.clicked_searches), pct, pp, ppb),
