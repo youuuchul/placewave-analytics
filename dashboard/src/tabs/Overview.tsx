@@ -165,7 +165,7 @@ export default function Overview({ data, s, set, range }: TabProps) {
     { label: '파트너 공간', unit: '곳', cur: pEnd?.partner_total ?? null, prev: pPrevEnd?.partner_total ?? null },
     { label: '계약 해지', unit: '건', cur: pSum(range.from, range.to), prev: pSum(range.prevFrom, range.prevTo), lowerIsBetter: true },
     { label: '플랜 MRR', unit: '원', cur: pEnd?.mrr ?? null, prev: pPrevEnd?.mrr ?? null, format: won },
-    { label: '파트너 거래액 비중', unit: '', cur: share(rCur), prev: share(rPrev), format: (v) => pct(v) },
+    { label: '파트너 거래액 비중', unit: '', cur: share(rCur), prev: share(rPrev), format: (v) => pct(v), rate: true },
   ]
   const sCur = subSum(data.daily_subscription, range.from, range.to)
   const sPrev = subSum(data.daily_subscription, range.prevFrom, range.prevTo)

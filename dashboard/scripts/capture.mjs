@@ -1,5 +1,5 @@
 // 헤드리스 캡처: 빌드 결과(dist)를 vite preview 로 띄우고 탭별 화면을 captures/ 에 저장한다.
-//   npm run build && npm run capture            탭 6개 × 라이트
+//   npm run build && npm run capture            탭·보고서 × 라이트
 //   npm run capture -- --all                    + 보기 전환·1일·다크·폰 폭·데이터 페이지
 //   NP_CATALOG=/tmp/catalog.json npm run capture -- --all   catalog.json 을 이 파일로 대체해 찍는다
 //   NP_DATA=/tmp/np_v2/data npm run capture -- --all        dist/data/ 요청을 이 폴더 파일로 대체해 찍는다(샘플 데이터)
@@ -25,7 +25,8 @@ const tabs = [
   ['03_events', 'tab=events'],
   ['04_members', 'tab=members'],
   ['05_acquisition', 'tab=acquisition'],
-  ['91_evalops', 'tab=evalops'],
+  ['91_reports', 'page=reports'],
+  ['92_labeling_ops', 'page=reports&r=labeling-ops'],
   ['06_periodic', 'tab=periodic'],
   ['61_venues', 'tab=venues'],
 ]
@@ -54,12 +55,15 @@ const extras = [
   ['79_venues_1year', 'tab=venues&p=365'],
   ['80_members_subscription_1year', 'tab=members&view=subscription&p=365'],
   ['92_search_1year', 'tab=search&p=365'],
-  ['93_search_ranker', 'tab=search&view=ranker'],
+  ['93_report_ab_result', 'page=reports&r=ab-ranker-v2'],
+  ['105_report_ab_design', 'page=reports&r=ab-ranker-design'],
+  ['106_report_ab_check', 'page=reports&r=ab-ranker-check'],
+  ['107_report_reindex', 'page=reports&r=issue-reindex-0901'],
   ['94_search_90_ios_member', 'tab=search&p=90&pf=ios&ms=member'],
   ['95_search_1day', 'tab=search&p=1'],
-  ['96_evalops_0615_promotion', 'tab=evalops&wk=2026-06-15&rq=promotion'],
-  ['97_evalops_0706', 'tab=evalops&wk=2026-07-06'],
-  ['98_evalops_0907', 'tab=evalops&wk=2026-09-07'],
+  ['96_labeling_ops_0615_promotion', 'page=reports&r=labeling-ops&wk=2026-06-15&rq=promotion'],
+  ['97_labeling_ops_0706', 'page=reports&r=labeling-ops&wk=2026-07-06'],
+  ['98_labeling_ops_0907', 'page=reports&r=labeling-ops&wk=2026-09-07'],
   ['99_periodic_paid', 'tab=periodic&ch=paid'],
 ]
 
@@ -201,9 +205,9 @@ try {
     await shoot('81_metrics_top', 'page=metrics', { wait: 'main section', clip: true })
     await shoot('100_search_dark', 'tab=search', { scheme: 'dark' })
     await shoot('101_search_phone', 'tab=search', { viewport: { width: 390, height: 844 }, scale: 2 })
-    await shoot('102_evalops_dark', 'tab=evalops', { scheme: 'dark' })
-    await shoot('103_evalops_phone', 'tab=evalops', { viewport: { width: 390, height: 844 }, scale: 2 })
-    await shoot('104_evalops_scatter_hover', 'tab=evalops&wk=2026-07-06', { section: '처리 속도 × 정확도', hover: [0.85, 0.6] })
+    await shoot('102_labeling_ops_dark', 'page=reports&r=labeling-ops', { scheme: 'dark' })
+    await shoot('103_reports_phone', 'page=reports&r=ab-ranker-v2', { viewport: { width: 390, height: 844 }, scale: 2 })
+    await shoot('104_labeling_ops_scatter_hover', 'page=reports&r=labeling-ops&wk=2026-07-06', { section: '처리 속도 × 정확도', hover: [0.85, 0.6] })
     await shoot('77_header_phone_metrics', 'page=metrics', { viewport: { width: 390, height: 300 }, scale: 2, wait: 'header', clip: true })
   }
   await browser.close()

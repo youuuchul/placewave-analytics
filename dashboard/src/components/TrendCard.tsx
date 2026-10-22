@@ -29,6 +29,8 @@ export interface FixedTile {
   format?: (v: number) => string
   /** 낮을수록 좋은 지표(해지 등)면 true — 증가를 나쁜 색으로 */
   lowerIsBetter?: boolean
+  /** 비율 지표면 true — 증감을 %p(차이)로 */
+  rate?: boolean
 }
 
 type Grain = 'auto' | 'hour' | 'day' | 'week' | 'month'
@@ -130,7 +132,7 @@ export function change(cur: number | null, prev: number | null): number | null {
   return cur == null || prev == null || prev === 0 ? null : cur / prev - 1
 }
 
-export function DeltaMark({ v, suffix, lowerIsBetter = false }: { v: number | null; suffix?: string; lowerIsBetter?: boolean }) {
+export function DeltaMark({ v, suffix, lowerIsBetter = false, points = false }: { v: number | null; suffix?: string; lowerIsBetter?: boolean; points?: boolean }) {
   if (v == null || !Number.isFinite(v)) return <span className="text-muted">—{suffix ? ` ${suffix}` : ''}</span>
   const flat = Math.abs(v) < 0.0005
   const color = flat ? 'var(--muted)' : v > 0 !== lowerIsBetter ? 'var(--good)' : 'var(--bad)'
@@ -138,7 +140,8 @@ export function DeltaMark({ v, suffix, lowerIsBetter = false }: { v: number | nu
     <span className="tnum whitespace-nowrap">
       <span style={{ color }} className="font-medium">
         {flat ? '' : v > 0 ? '▲ ' : '▼ '}
-        {(Math.abs(v) * 100).toFixed(1)}%
+        {(Math.abs(v) * 100).toFixed(1)}
+        {points ? '%p' : '%'}
       </span>
       {suffix && <span className="text-muted"> {suffix}</span>}
     </span>
@@ -466,7 +469,7 @@ export default function TrendCard<D extends Partial<Seg> & { kst_date: string },
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart
                   data={series.points}
-                  margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
+                  margin={{ top: 8, right: 18, bottom: 0, left: 0 }}
                   onMouseMove={(st) => {
                     hoverIdx.current = st?.activeTooltipIndex == null ? null : Number(st.activeTooltipIndex)
                   }}
@@ -602,7 +605,11 @@ export default function TrendCard<D extends Partial<Seg> & { kst_date: string },
               </div>
               {hasPrev && (
                 <div className="text-[11px]">
-                  <DeltaMark v={change(t.cur, t.prev)} lowerIsBetter={t.lowerIsBetter} />
+                  <DeltaMark
+                    v={t.rate ? (t.cur == null || t.prev == null ? null : t.cur - t.prev) : change(t.cur, t.prev)}
+                    lowerIsBetter={t.lowerIsBetter}
+                    points={t.rate}
+                  />
                 </div>
               )}
             </div>

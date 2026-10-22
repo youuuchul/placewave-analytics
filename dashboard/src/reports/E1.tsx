@@ -253,7 +253,7 @@ export default function E1({ rows }: { rows: ExpRankerRequest[] }) {
         >
           <TimeChart data={daily} kind="line" series={series} yFormat={(v) => pct(v, 0)} valueFormat={(v) => pct(v)} decimals />
         </Card>
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="flex flex-col gap-4">
           <Card title="의도 유형별 검색 성공률" meta="탐색적 · 보정 없음">
             <SideTable heads={['의도', '검색', '대조군', '실험군', '차이 (95% 구간)']} rows={seg('query_intent', QUERY_INTENT)} />
           </Card>

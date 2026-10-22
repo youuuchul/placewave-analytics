@@ -109,7 +109,7 @@ export function TimeChart({
   return (
     <div style={{ height }} className="-ml-2">
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }} barCategoryGap="22%">
+        <ComposedChart data={data} margin={{ top: 8, right: 18, bottom: 0, left: 0 }} barCategoryGap="22%">
           <CartesianGrid vertical={false} stroke="var(--line)" strokeWidth={1} />
           <XAxis
             dataKey={xKey}
