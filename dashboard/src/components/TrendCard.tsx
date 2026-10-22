@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import { CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, type XAxisTickContentProps } from 'recharts'
 import type { Range } from '../lib/agg'
 import { addDays, addMonths, diffDays, eachDay, md, WEEKDAYS, weekday, ym } from '../lib/date'
 import { compact, num } from '../lib/format'
@@ -484,7 +484,17 @@ export default function TrendCard<D extends Partial<Seg> & { kst_date: string },
                   <CartesianGrid vertical={false} stroke="var(--line)" strokeWidth={1} />
                   <XAxis
                     dataKey="x"
-                    tick={{ fill: 'var(--muted)', fontSize: 11 }}
+                    tick={(t: XAxisTickContentProps) => (
+                      <text
+                        x={Number(t.x)}
+                        y={Number(t.y) + 12}
+                        fill="var(--muted)"
+                        fontSize={11}
+                        textAnchor={t.payload?.value === series.points[series.points.length - 1]?.x ? 'end' : 'middle'}
+                      >
+                        {String(t.payload?.value ?? '')}
+                      </text>
+                    )}
                     tickLine={false}
                     axisLine={{ stroke: 'var(--axis)' }}
                     interval={axisStep(series.points.length)}
