@@ -30,7 +30,7 @@
 - **세그먼트.** `channel1`(첫 유입 paid/non_paid)·`device_platform`(첫 방문 기기 ios/android/web)·`member_seg`(member/guest) 는 사람당 1개라 조합 합이 전체다. `member_seg` 는 일·시간 마트에서 그날 0시 기준이며 가입 당일은 `guest` 다. 예외: `daily_channel` 의 `channel1~3` 은 세션 라스트클릭 채널이다.
 - **사람 수 합산.** 사람 열은 같은 날(주·월) 안에서 세그먼트끼리만 더할 수 있다. 여러 날을 더하면 같은 사람이 중복된다. 화면의 기간 고유 사람 수는 `person_day` 비트로 다시 세고, 주·월 고유는 `weekly_activity`·`monthly_summary` 를 쓴다.
 - **로그 vs 원장.** 결제·신청·취소의 건수·금액은 원장이 기준이다(`daily_event`·`daily_venue`·`daily_revenue`·`monthly_summary`). `daily_metrics`·`hourly_metrics`·`daily_channel`·`daily_ad` 의 `applies`·`pay_count`·`pay_amount`·`cancels` 는 로그 이벤트 기준이며 원장과의 일치는 검사 C1·C2·C9 가 확인한다.
-- **매출 세 갈래.** 플랫폼 매출 = 거래 수수료(티켓 정가 × 공간 등급별 율 — 비파트너 10%·베이직 5%·프로 3%) + 멤버십(소비자 월 9,900원) + 파트너 플랜(공간 월 49,000·149,000원). 거래액(GMV)·티켓 결제액은 규모 지표이고 매출이 아니다. 멤버 할인 15%는 플랫폼 부담이라 수수료는 정가 기준으로 계산하고 할인은 멤버십 비용으로 본다. 매출은 세그먼트 축이 없으므로 세그먼트 필터를 걸면 매출 타일·카드는 화면에서 빠진다.
+- **매출 세 갈래.** 플랫폼 매출 = 거래 수수료(티켓 정가 × 공간 등급별 율: 비파트너 10%·베이직 5%·프로 3%) + 멤버십(소비자 월 9,900원) + 파트너 플랜(공간 월 49,000·149,000원). 거래액(GMV)·티켓 결제액은 규모 지표이고 매출이 아니다. 멤버 할인 15%는 플랫폼 부담이라 수수료는 정가 기준으로 계산하고 할인은 멤버십 비용으로 본다. 매출은 세그먼트 축이 없으므로 세그먼트 필터를 걸면 매출 타일·카드는 화면에서 빠진다.
 - **비율.** 마트는 분자·분모 열만 두고 화면이 필터 적용 후 각각 합산한 뒤 나눈다. 비율의 증감은 %p, 건수·금액의 증감은 %.
 
 ## 방문·활동
@@ -67,7 +67,7 @@
 | 코드 | 이름 | 탭 | 축 | 단위 | 정의 | 산식 | 분모 | 마트 열 | 의의 |
 |---|---|---|---|---|---|---|---|---|---|
 | C01 | 신규 방문자 대비 가입 | 회원 | — | 사람 | 신규 방문자 대비 가입한 사람 | Σ signups ÷ Σ new_persons | 신규 방문자 | `daily_metrics.signups`, `daily_metrics.new_persons` | 첫 방문을 회원으로 바꾸는 힘 |
-| C06 | 취소율 | 행사·결제 | — | 건 | 기간 안에 일어난 취소 건을 기간 안 신청 건으로 나눈 값(취소일 기준 — 분자의 취소가 기간 이전 신청분일 수 있다) | Σ cancels ÷ Σ applies | 신청 | `daily_metrics.cancels`, `daily_metrics.applies` | 노쇼·환불 위험 |
+| C06 | 취소율 | 행사·결제 | — | 건 | 기간 안에 일어난 취소 건을 기간 안 신청 건으로 나눈 값(취소일 기준이라 분자의 취소가 기간 이전 신청분일 수 있다) | Σ cancels ÷ Σ applies | 신청 | `daily_metrics.cancels`, `daily_metrics.applies` | 노쇼·환불 위험 |
 | C07 | 결제자당 금액 | 행사·결제 | — | 원 | 기간 결제 금액을 기간 고유 결제자로 나눈 값 | Σ pay_amount ÷ 고유(paid) | 결제한 사람(기간 고유) | `daily_metrics.pay_amount`, `person_day.flags(paid)` | 사람당 지출 크기 |
 | C08 | 방문 퍼널 단계 | 퍼널 | — | 사람 | 랜딩 → 행사 상세 → 로그인·가입 → 신청 화면 → 결제, 같은 날 누적 조건 | 단계별 고유 사람 (person_day 비트 AND) | 이전 단계 | `funnel_daily.persons`, `person_day.flags` | 퍼널 탭의 뼈대 |
 | C09 | 오디언스별 퍼널 단계 | 퍼널 | — | 사람 × 주 | 그 주 그 오디언스 중 그 단계까지 도달한 사람 | Σ step_k ÷ Σ landing | 그 오디언스의 랜딩 | `weekly_audience_funnel.persons` | 누구에게 어느 단계가 막히는가 |
@@ -113,18 +113,18 @@
 
 | 코드 | 이름 | 탭 | 축 | 단위 | 정의 | 산식 | 분모 | 마트 열 | 의의 |
 |---|---|---|---|---|---|---|---|---|---|
-| M01 | 플랫폼 매출 | 개요 | 플랫폼 매출 | 원 | 거래 수수료 + 멤버십 + 파트너 플랜. 티켓 결제액은 포함하지 않는다 | Σ net_amount (kind 전체 — ticket 행의 net 은 수수료) | — | `daily_revenue.net_amount`, `daily_revenue.kind` | 플랫폼이 실제로 가져가는 돈의 한 숫자 |
+| M01 | 플랫폼 매출 | 개요 | 플랫폼 매출 | 원 | 거래 수수료 + 멤버십 + 파트너 플랜. 티켓 결제액은 포함하지 않는다 | Σ net_amount (kind 전체, ticket 행의 net 은 수수료) | — | `daily_revenue.net_amount`, `daily_revenue.kind` | 플랫폼이 실제로 가져가는 돈의 한 숫자 |
 | M02 | 티켓 결제액 | 행사·결제 | 거래 수수료 | 원 | 소비자가 티켓에 실제 낸 돈(정가 − 멤버 할인, 환불 제외). 매출이 아니다 | Σ paid_amount (kind = ticket) = Σ gmv_amount − Σ discount_amount | — | `daily_revenue.paid_amount`, `daily_revenue.kind` | 정산 규모. 거래액과의 차이가 멤버 할인 |
-| M03 | 구독 매출 | 개요 | 멤버십 | 원 | 소비자 멤버십 결제 합(월 9,900원 반복 결제) | Σ net_amount (kind = membership) | — | `daily_revenue.net_amount`, `daily_revenue.kind` | 반복 매출 — 수익 3축 중 멤버십 |
-| M04 | 파트너 플랜 매출 | 개요 | 파트너 플랜 | 원 | 파트너 플랜 월 요금(베이직 49,000 · 프로 149,000)을 일별로 나눠 쌓은 값 | Σ net_amount (kind = partner_plan) | — | `daily_revenue.net_amount`, `daily_revenue.kind` | 공급 측 반복 매출 — 거래액과 무관하게 발생 |
+| M03 | 구독 매출 | 개요 | 멤버십 | 원 | 소비자 멤버십 결제 합(월 9,900원 반복 결제) | Σ net_amount (kind = membership) | — | `daily_revenue.net_amount`, `daily_revenue.kind` | 수익 3축 중 멤버십의 반복 매출 |
+| M04 | 파트너 플랜 매출 | 개요 | 파트너 플랜 | 원 | 파트너 플랜 월 요금(베이직 49,000 · 프로 149,000)을 일별로 나눠 쌓은 값 | Σ net_amount (kind = partner_plan) | — | `daily_revenue.net_amount`, `daily_revenue.kind` | 거래액과 무관하게 발생하는 공급 측 반복 매출 |
 | M05 | 매출 구성 | 개요 | 플랫폼 매출 | 원 | 플랫폼 매출의 종류별(수수료·멤버십·파트너 플랜) 비중 | 종류별 Σ net_amount ÷ 플랫폼 매출 | 플랫폼 매출 | `daily_revenue.net_amount`, `daily_revenue.kind` | 매출이 한 갈래에 쏠리는지 |
 | M06 | 객단가 | 행사·결제 | 거래 수수료 | 원 | 환불되지 않은 티켓 결제 1건당 거래액(정가 기준) | Σ gmv_amount ÷ (Σ pay_count − Σ refund_count) (kind = ticket) | 환불 제외 티켓 결제 건수 | `daily_revenue.gmv_amount`, `daily_revenue.pay_count`, `daily_revenue.refund_count` | 가격대·상품 구성 변화 |
-| M07 | 멤버 할인액 | 행사·결제 | 멤버십 | 원 | 멤버가 파트너 공간 이벤트를 결제할 때 받은 15% 할인 합. 플랫폼이 부담한다 | Σ discount_amount (kind = ticket, 환불 제외) | — | `daily_revenue.discount_amount` | 멤버십 혜택의 비용 — 멤버십 순기여 = 멤버십 매출 − 할인액 |
+| M07 | 멤버 할인액 | 행사·결제 | 멤버십 | 원 | 멤버가 파트너 공간 이벤트를 결제할 때 받은 15% 할인 합. 플랫폼이 부담한다 | Σ discount_amount (kind = ticket, 환불 제외) | — | `daily_revenue.discount_amount` | 멤버십 혜택의 비용. 멤버십 순기여 = 멤버십 매출 − 할인액 |
 | M08 | 파트너 거래액 비중 | 행사·결제 | 거래 수수료 | 원 | 거래액 중 파트너 공간(베이직·프로) 이벤트에서 나온 몫 | Σ gmv_amount (fee_tier ∈ basic, pro) ÷ Σ gmv_amount (ticket) | 거래액 | `daily_revenue.fee_tier`, `daily_revenue.gmv_amount` | 파트너 플랜이 거래를 끌어오는가 |
-| M09 | 거래액 | 행사·결제 | 거래 수수료 | 원 | 결제 완료 티켓의 정가 합(환불 제외, 멤버 할인 전). 규모 지표이고 매출이 아니다 | Σ gmv_amount (kind = ticket) | — | `daily_revenue.gmv_amount` | 마켓플레이스 규모 — 수수료의 기반 |
+| M09 | 거래액 | 행사·결제 | 거래 수수료 | 원 | 결제 완료 티켓의 정가 합(환불 제외, 멤버 할인 전). 규모 지표이고 매출이 아니다 | Σ gmv_amount (kind = ticket) | — | `daily_revenue.gmv_amount` | 수수료의 기반이 되는 마켓플레이스 규모 |
 | M10 | 수수료 매출 | 개요 | 거래 수수료 | 원 | 티켓 정가 × 결제 시점 공간 등급 수수료율(비파트너 10% · 베이직 5% · 프로 3%). 환불 건은 0 | Σ net_amount (kind = ticket) | — | `daily_revenue.net_amount`, `daily_revenue.fee_tier` | 수익 3축 중 거래 수수료 |
-| M11 | 실효 수수료율 | 행사·결제 | 거래 수수료 | % | 거래액 중 수수료로 남는 비율(Take rate) | Σ net_amount (ticket) ÷ Σ gmv_amount (ticket) | 거래액 | `daily_revenue.net_amount`, `daily_revenue.gmv_amount` | 등급 구성 변화의 결과 — 건강 기준 5~7% |
-| M12 | 환불률 | 행사·결제 | 거래 수수료 | % | 티켓 결제 중 환불된 건 비율(금액은 보조 표기) | Σ refund_count ÷ Σ pay_count (kind = ticket) | 티켓 결제 건수 | `daily_revenue.refund_count`, `daily_revenue.pay_count`, `daily_revenue.refund_amount` | 거래 품질 — 건강 기준 10% 안쪽 |
+| M11 | 실효 수수료율 | 행사·결제 | 거래 수수료 | % | 거래액 중 수수료로 남는 비율(Take rate) | Σ net_amount (ticket) ÷ Σ gmv_amount (ticket) | 거래액 | `daily_revenue.net_amount`, `daily_revenue.gmv_amount` | 등급 구성 변화의 결과. 건강 기준 5~7% |
+| M12 | 환불률 | 행사·결제 | 거래 수수료 | % | 티켓 결제 중 환불된 건 비율(금액은 보조 표기) | Σ refund_count ÷ Σ pay_count (kind = ticket) | 티켓 결제 건수 | `daily_revenue.refund_count`, `daily_revenue.pay_count`, `daily_revenue.refund_amount` | 거래 품질. 건강 기준 10% 안쪽 |
 
 티켓 행: `gmv_amount`(정가, 환불 제외) − `discount_amount`(멤버 할인) = `paid_amount`, `net_amount` = 수수료(정가 × `fee_tier` 율, 환불 건 0). `fee_tier` 는 결제 시점 공간 등급(none·basic·pro)이며 티켓 행에만 값이 있다. 환불 건은 `pay_count`·`refund_count`·`refund_amount` 에만 들어간다.
 
@@ -140,13 +140,13 @@
 | S02 | 신규 구독 | 회원 | 멤버십 | 건 | 기간 안 시작한 구독 건수 | Σ new_subscribers | — | `daily_subscription.new_subscribers` | 구독 획득 |
 | S03 | 구독 해지 | 회원 | 멤버십 | 건 | 기간 안 끝난 구독 건수 | Σ churned_subscribers | — | `daily_subscription.churned_subscribers` | 구독 이탈 |
 | S04 | 구독 MRR | 회원 | 멤버십 | 원 | 기간 마지막 날 활성 구독자 × 월 요금 | mrr (기간 끝일) | — | `daily_subscription.mrr` | 월 반복 매출 규모 |
-| S05 | 구독 월 해지율 | 회원 | 멤버십 | % | 기간 해지를 구독자·월(월 평균 활성 구독자 × 개월 수)로 나눈 월 해지율. 단일 요금이라 매출 해지율과 같다 | Σ churned_subscribers ÷ (Σ 일별 active_subscribers ÷ 30) | 구독자·월 | `daily_subscription.churned_subscribers`, `daily_subscription.active_subscribers` | 멤버십 유지력 — 건강 기준 월 6% 안쪽 |
+| S05 | 구독 월 해지율 | 회원 | 멤버십 | % | 기간 해지를 구독자·월(월 평균 활성 구독자 × 개월 수)로 나눈 월 해지율. 단일 요금이라 매출 해지율과 같다 | Σ churned_subscribers ÷ (Σ 일별 active_subscribers ÷ 30) | 구독자·월 | `daily_subscription.churned_subscribers`, `daily_subscription.active_subscribers` | 멤버십 유지력. 건강 기준 월 6% 안쪽 |
 | S06 | 구독자 vs 비구독 회원 결제 | 회원 | 멤버십 | 사람 | 구독 중 방문한 회원 중 티켓을 결제한 사람(비구독 회원과 비교) | 고유(member ∧ subscribed ∧ paid) ÷ 고유(member ∧ subscribed ∧ visited) | 구독 중 방문한 회원 | `person_day.flags(subscribed)`, `person_day.flags(paid)` | 구독이 결제를 늘리는가 |
 | S07 | 구독자 티켓 결제 금액 | 회원 | 멤버십 | 원 | 구독 중인 사람이 결제한 티켓 결제액(멤버 할인 후, 환불 제외) | Σ subscriber_ticket_amount | — | `daily_subscription.subscriber_ticket_amount` | 구독자의 거래 기여 |
-| S08 | 구독 LTV(추정) | 회원 | 멤버십 | 원 | 구독자 1명이 해지 전까지 남기는 멤버십 순기여 추정 | (ARPU − 1인·월 멤버 할인) ÷ 구독 월 해지율. ARPU = 멤버십 매출 ÷ 구독자·월, 구독자·월 = Σ 일별 활성 ÷ 30 | 구독 월 해지율 | `daily_revenue.net_amount(membership)`, `daily_subscription.active_subscribers`, `daily_subscription.discount_amount`, `daily_subscription.churned_subscribers` | 할인을 뺀 멤버십의 장기 가치 — 획득 비용의 상한 |
+| S08 | 구독 LTV(추정) | 회원 | 멤버십 | 원 | 구독자 1명이 해지 전까지 남기는 멤버십 순기여 추정 | (ARPU − 1인·월 멤버 할인) ÷ 구독 월 해지율. ARPU = 멤버십 매출 ÷ 구독자·월, 구독자·월 = Σ 일별 활성 ÷ 30 | 구독 월 해지율 | `daily_revenue.net_amount(membership)`, `daily_subscription.active_subscribers`, `daily_subscription.discount_amount`, `daily_subscription.churned_subscribers` | 할인을 뺀 멤버십의 장기 가치. 획득 비용의 상한이 된다 |
 | S09 | 구독 코호트 유지율 | 회원 | 멤버십 | % | 구독 시작 월 코호트 중 n개월 뒤 월말에 활성인 비율 | retained ÷ cohort_size (month_offset = n) | 코호트 크기 | `subscription_cohort.retained`, `subscription_cohort.cohort_size` | 해지가 초기에 몰리는지, 시작 시기별로 다른지 |
 | S10 | 회원 대비 구독 비중 | 회원 | 멤버십 | % | 누적 회원 중 기간 끝일 활성 구독자 | active_subscribers (기간 끝일) ÷ Σ signups (기간 끝일까지, 전체) | 누적 회원 | `daily_subscription.active_subscribers`, `daily_metrics.signups` | 멤버십 침투율 |
-| S11 | 멤버 할인 부담률 | 회원 | 멤버십 | % | 멤버십 매출 중 멤버 할인으로 돌려준 비율 | Σ discount_amount ÷ Σ net_amount (membership) | 멤버십 매출 | `daily_subscription.discount_amount`, `daily_revenue.net_amount(membership)` | 혜택 비용이 멤버십 매출을 잠식하는지 — 건강 기준 30% 이하 |
+| S11 | 멤버 할인 부담률 | 회원 | 멤버십 | % | 멤버십 매출 중 멤버 할인으로 돌려준 비율 | Σ discount_amount ÷ Σ net_amount (membership) | 멤버십 매출 | `daily_subscription.discount_amount`, `daily_revenue.net_amount(membership)` | 혜택 비용이 멤버십 매출을 잠식하는지. 건강 기준 30% 이하 |
 
 구독은 회원만 가능하며 2025-12-01 출시. `person_day` 의 비트 32768 `subscribed` 가 그날 구독 활성 여부다. 구독자 vs 비구독 회원 비교는 member 코드인 날만 센다(한 사람이 기간 중 구독을 시작하면 양쪽에 모두 나타난다).
 
@@ -183,13 +183,13 @@
 | P01 | 등록 공간 | 공간 | — | 곳 | 기간 끝일까지 등록된 공간 누적 | Σ registered_total (기간 끝일, 상권 합) | — | `daily_venue_registry.registered_total` | 공급 측 목록의 크기 |
 | P02 | 파트너 공간 | 공간 | — | 곳 | 기간 끝일에 계약이 진행 중인 공간 | Σ partner_total (기간 끝일) | — | `daily_venue_registry.partner_total` | 유료 계약 공급자 규모 |
 | P06 | 파트너 전환율 | 공간 | — | 곳 | 등록 공간 중 파트너 공간 | 파트너 공간 ÷ 등록 공간 | 등록 공간 | `daily_venue_registry.partner_total`, `daily_venue_registry.registered_total` | 등록 공간을 유료 플랜으로 바꾸는 비율 |
-| P07 | 공간 28일 조회 | 공간 | — | 사람(일 합) | 기준일까지 28일간 그 공간 상세를 본 사람의 일별 합 | detail_viewers_28d | — | `venue_registry.detail_viewers_28d` | 공간별 수요의 크기 — 지도 점 크기 |
+| P07 | 공간 28일 조회 | 공간 | — | 사람(일 합) | 기준일까지 28일간 그 공간 상세를 본 사람의 일별 합 | detail_viewers_28d | — | `venue_registry.detail_viewers_28d` | 공간별 수요의 크기. 지도 점 크기로 쓴다 |
 | P08 | 공간 행사 수 | 공간 | — | 건 | 기준일까지 365일 그 공간에서 열린 행사 | events_365d | — | `venue_registry.events_365d` | 파트너 활동량 |
 | P09 | 공간 티켓 결제액 | 공간 | — | 원 | 기준일까지 365일 그 공간 이벤트의 티켓 결제액(멤버 할인 후, 환불 제외) | ticket_amount_365d | — | `venue_registry.ticket_amount_365d` | 공간별 거래 기여 |
 
 `daily_venue_registry` 의 `*_total`·`mrr_*` 은 그날 값이라 기간으로 더하지 않고 기간 마지막 날 값을 쓴다. `new_*`·`churned_*` 만 기간 합.
 
-`venue_registry` 는 기준일(`as_of_date`) 스냅샷이다. 파트너 판정은 `is_partner` 로만 한다 — 활성 계약이 없는 공간도 `plan`·계약일 열에 가장 최근 계약 값이 남는다. `status = closed` 공간은 지도·파트너 공간 표에서 뺀다. 상권별 표의 등록 수는 등록 공간 타일(`registered_total`, 폐업 포함 누적)과 맞추려고 폐업 공간을 포함한다.
+`venue_registry` 는 기준일(`as_of_date`) 스냅샷이다. 파트너 판정은 `is_partner` 로만 한다. 활성 계약이 없는 공간도 `plan`·계약일 열에 가장 최근 계약 값이 남는다. `status = closed` 공간은 지도·파트너 공간 표에서 뺀다. 상권별 표의 등록 수는 등록 공간 타일(`registered_total`, 폐업 포함 누적)과 맞추려고 폐업 공간을 포함한다.
 
 `daily_venue_registry` 의 축은 상권(`region`) 하나라 공간 탭 스코어보드·추이는 상권 선택만 받는다. 장르·파트너 여부는 기준일 스냅샷 `venue_registry` 를 쓰는 지도 카드 안에서만 고른다.
 
@@ -203,12 +203,12 @@
 | P04 | 계약 해지 | 공간 | 파트너 플랜 | 건 | 기간 안 끝난 파트너 계약 | Σ churned_contracts | — | `daily_venue_registry.churned_contracts` | 파트너 유지 |
 | P05 | 파트너 플랜 MRR | 공간 | 파트너 플랜 | 원 | 기간 끝일 활성 계약의 월 요금 합(베이직 49,000 · 프로 149,000). ARR = MRR × 12 | Σ (mrr_basic + mrr_pro) (기간 끝일) | — | `daily_venue_registry.mrr_basic`, `daily_venue_registry.mrr_pro` | 공급 측 반복 매출 규모 |
 | P10 | ARPA | 공간 | 파트너 플랜 | 원 | 활성 계약 1건당 월 플랜 요금(Average revenue per account) | mrr_eom ÷ contracts_eom (plan = all, 마지막 끝난 달) | 월말 활성 계약 | `monthly_contract.mrr_eom`, `monthly_contract.contracts_eom` | 플랜 구성(베이직·프로) 변화 |
-| P11 | 계약 월 해지율 | 공간 | 파트너 플랜 | % | 월초 활성 계약 중 그 달 해지된 비율(Logo churn) | Σ churned_contracts ÷ Σ contracts_bom (끝난 달) | 월초 활성 계약 | `monthly_contract.churned_contracts`, `monthly_contract.contracts_bom` | 파트너 유지 — 건강 기준 월 2% 안쪽 |
+| P11 | 계약 월 해지율 | 공간 | 파트너 플랜 | % | 월초 활성 계약 중 그 달 해지된 비율(Logo churn) | Σ churned_contracts ÷ Σ contracts_bom (끝난 달) | 월초 활성 계약 | `monthly_contract.churned_contracts`, `monthly_contract.contracts_bom` | 파트너 유지. 건강 기준 월 2% 안쪽 |
 | P12 | 매출 해지율 | 공간 | 파트너 플랜 | % | 월초 플랜 MRR 중 해지·다운그레이드로 잃은 비율(Revenue churn) | Σ (mrr_churn + mrr_contraction) ÷ Σ mrr_bom (끝난 달) | 월초 MRR | `monthly_contract.mrr_churn`, `monthly_contract.mrr_contraction`, `monthly_contract.mrr_bom` | 계약 수보다 금액 기준으로 본 이탈 |
-| P13 | GRR | 공간 | 파트너 플랜 | % | 월초 플랜 MRR 중 해지·다운그레이드 후 남은 비율(Gross revenue retention) | Σ (mrr_bom − mrr_churn − mrr_contraction) ÷ Σ mrr_bom (끝난 달) | 월초 MRR | `monthly_contract.mrr_bom`, `monthly_contract.mrr_churn`, `monthly_contract.mrr_contraction` | 기존 파트너 매출의 방어력 — 100% 가 상한 |
+| P13 | GRR | 공간 | 파트너 플랜 | % | 월초 플랜 MRR 중 해지·다운그레이드 후 남은 비율(Gross revenue retention) | Σ (mrr_bom − mrr_churn − mrr_contraction) ÷ Σ mrr_bom (끝난 달) | 월초 MRR | `monthly_contract.mrr_bom`, `monthly_contract.mrr_churn`, `monthly_contract.mrr_contraction` | 기존 파트너 매출의 방어력. 100% 가 상한 |
 | P14 | NRR | 공간 | 파트너 플랜 | % | GRR 에 업그레이드 증가분을 더한 비율(Net revenue retention) | Σ (mrr_bom − mrr_churn − mrr_contraction + mrr_expansion) ÷ Σ mrr_bom (끝난 달) | 월초 MRR | `monthly_contract.mrr_expansion`, `monthly_contract.upgrades`, `monthly_contract.downgrades` | 기존 파트너만으로 매출이 느는가 |
 | P15 | 계약 코호트 유지율 | 공간 | 파트너 플랜 | % | 계약 시작 월 코호트 중 n개월 뒤 월말에 활성인 비율(건·MRR) | retained ÷ cohort_size · mrr_retained ÷ mrr_retained(0개월) | 코호트 크기 · 0개월 MRR | `contract_cohort.retained`, `contract_cohort.cohort_size`, `contract_cohort.mrr_retained` | 해지가 계약 초기에 몰리는지 |
-| P16 | 파트너 부담률 | 공간 | 파트너 플랜 | % | 파트너 공간이 플랫폼에서 판 거래액 대비 플랫폼에 낸 비용(수수료 + 플랜 요금) | (Σ net_amount (ticket, fee_tier ∈ basic, pro) + Σ net_amount (partner_plan)) ÷ Σ gmv_amount (fee_tier ∈ basic, pro) | 파트너 거래액 | `daily_revenue.net_amount`, `daily_revenue.gmv_amount`, `daily_revenue.fee_tier` | 공급 측이 버틸 수 있는 가격인가 — 건강 기준 15% 안쪽 |
+| P16 | 파트너 부담률 | 공간 | 파트너 플랜 | % | 파트너 공간이 플랫폼에서 판 거래액 대비 플랫폼에 낸 비용(수수료 + 플랜 요금) | (Σ net_amount (ticket, fee_tier ∈ basic, pro) + Σ net_amount (partner_plan)) ÷ Σ gmv_amount (fee_tier ∈ basic, pro) | 파트너 거래액 | `daily_revenue.net_amount`, `daily_revenue.gmv_amount`, `daily_revenue.fee_tier` | 공급 측이 버틸 수 있는 가격인가. 건강 기준 15% 안쪽 |
 
 ## 검색
 

@@ -37,7 +37,7 @@ npm run capture -- --all   # + 보기 전환·1일·1년·다크·폰 폭
 src/
   App.tsx              탭·보기 정의, 필터 바 조립
   About.tsx            프로젝트 개요 (?page=about)
-  DataPage.tsx         데이터 페이지 (?page=data, catalog.json + 마트 미리보기)
+  DataPage.tsx         데이터 카탈로그 (?page=data, catalog.json + 마트 미리보기)
   lib/state.ts         URL 쿼리 ↔ 필터 상태
   lib/source.ts        index.json 로드, 지연 표 useTable(key)(메모리 캐시·동시 요청 병합), person_day.bin 디코드
   lib/persons.ts       person_day 비트 배치·기간 고유 사람 수

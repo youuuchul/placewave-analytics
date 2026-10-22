@@ -309,7 +309,7 @@ const AXES: { title: string; color: string; formula: string; metrics: [string, s
   {
     title: '거래 수수료',
     color: 'var(--s1)',
-    formula: '티켓 정가 × 공간 등급별 수수료율 — 비파트너 10% · 베이직 5% · 프로 3%',
+    formula: '티켓 정가 × 공간 등급별 수수료율(비파트너 10% · 베이직 5% · 프로 3%)',
     metrics: [
       ['M09', '거래액'],
       ['M11', '실효 수수료율'],
@@ -319,7 +319,7 @@ const AXES: { title: string; color: string; formula: string; metrics: [string, s
   {
     title: '멤버십',
     color: 'var(--s2)',
-    formula: '활성 구독자 × 월 9,900원 — 파트너 공간 이벤트 15% 할인은 플랫폼이 부담',
+    formula: '활성 구독자 × 월 9,900원. 파트너 공간 이벤트 15% 할인은 플랫폼이 부담',
     metrics: [
       ['S01', '활성 구독자'],
       ['S05', '구독 월 해지율'],
@@ -329,7 +329,7 @@ const AXES: { title: string; color: string; formula: string; metrics: [string, s
   {
     title: '파트너 플랜',
     color: 'var(--s3)',
-    formula: '활성 계약 × 월 요금 — 베이직 4.9만 · 프로 14.9만원, 수수료 우대 · 상단 노출',
+    formula: '활성 계약 × 월 요금(베이직 4.9만 · 프로 14.9만원). 혜택은 수수료 우대 · 상단 노출',
     metrics: [
       ['P05', '파트너 플랜 MRR'],
       ['P11', '계약 월 해지율'],
@@ -469,13 +469,60 @@ function MoneyTall() {
 }
 
 const DOCS: { label: string; sub: string; href: string; internal?: 'data' | 'metrics' }[] = [
-  { label: '데이터 페이지', sub: '층별 표·컬럼·마트 미리보기', href: '', internal: 'data' },
+  { label: '데이터 카탈로그', sub: '층별 표·컬럼·마트 미리보기', href: '', internal: 'data' },
   { label: '지표 가이드', sub: '탭별 질문·지표 정의·산식', href: '', internal: 'metrics' },
   { label: 'SQL 카탈로그', sub: '표 목록·계보·실행 순서', href: `${REPO}/blob/main/bigquery/README.md` },
   { label: '데이터 아키텍처', sub: '층·표·그레인·파이프라인', href: `${REPO}/blob/main/docs/architecture.md` },
   { label: '대시보드 설계', sub: '탭·필터·데이터 계약', href: `${REPO}/blob/main/docs/dashboard.md` },
   { label: '저장소', sub: '생성기·SQL·대시보드 코드', href: REPO },
 ]
+
+/** 수수료·파트너 플랜·멤버십 구조를 비교한 공개 서비스(2026-10-19 확인). */
+const REFS: { group: string; kr: string; global: string }[] = [
+  { group: '공연 예매', kr: 'NOL 티켓 · 예스24 티켓 · 멜론티켓 · 티켓링크', global: 'Ticketmaster · DICE · Resident Advisor' },
+  { group: '이벤트·모임 호스팅', kr: '프립 · 문토 · 소모임', global: 'Eventbrite · Luma · Meetup · Partiful' },
+  { group: '공간·식당 예약', kr: '캐치테이블 · 네이버 예약 · 스페이스클라우드', global: 'OpenTable · Resy' },
+  { group: '정률 중개', kr: '배달의민족 · 쿠팡이츠 · 야놀자 · 여기어때', global: 'Airbnb' },
+  { group: '소비자 멤버십', kr: '쿠팡 와우 · 네이버플러스 멤버십 · 배민클럽', global: 'ClassPass · Fever' },
+]
+
+function References() {
+  return (
+    <section aria-labelledby="refs-title" className="card mt-1 flex max-w-[760px] flex-col gap-3 px-4 py-3.5 sm:px-5">
+      <div className="flex flex-col gap-0.5">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+          <h3 id="refs-title" className="text-[13px] font-semibold text-ink">
+            참고한 서비스
+          </h3>
+          <span className="tnum text-xs text-muted">공식 요금 페이지·기사 기준, 2026-10-19 확인</span>
+        </div>
+        <p className="text-[13px] leading-relaxed text-ink2">
+          수수료·파트너 플랜·멤버십 구조는 공개된 요금 체계를 참고해 정하고, 아래 서비스와 비교해 검증했습니다.
+        </p>
+      </div>
+      <div className="grid gap-x-4 gap-y-2.5 text-[13px] leading-snug sm:grid-cols-[136px_minmax(0,1fr)_minmax(0,0.85fr)] sm:gap-y-2">
+        <div className="hidden text-[11px] font-medium text-muted sm:contents">
+          <span>분류</span>
+          <span>국내</span>
+          <span>해외</span>
+        </div>
+        {REFS.map((r) => (
+          <div key={r.group} className="flex flex-col gap-0.5 sm:contents">
+            <span className="font-medium text-ink">{r.group}</span>
+            <span className="text-ink2">
+              <span className="mr-1.5 text-[11px] text-muted sm:hidden">국내</span>
+              {r.kr}
+            </span>
+            <span className="text-ink2">
+              <span className="mr-1.5 text-[11px] text-muted sm:hidden">해외</span>
+              {r.global}
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
 
 function Section({ n, title, children, id }: { n: number; title: string; children: ReactNode; id?: string }) {
   return (
@@ -564,13 +611,14 @@ export default function About({
             : ''}
           . 상권 이름과 위치는 공개 지리 정보이고 상호는 모두 가상입니다.
         </p>
+        <References />
       </div>
 
       <nav aria-label="세 묶음" className="grid gap-3 md:grid-cols-3">
         <a href={`#${BIZ_ID}`} onClick={jump(BIZ_ID)} className={tile}>
           <span className="text-xs font-medium text-muted">1 · 비즈니스 시나리오</span>
           <span className="text-[15px] font-semibold text-ink">수수료 · 멤버십 · 파트너 플랜 세 축의 가상 플랫폼</span>
-          <span className="text-[13px] leading-relaxed text-ink2">1년차 거래액 13.3억, 플랫폼 매출 2.65억 — 서비스와 돈의 흐름</span>
+          <span className="text-[13px] leading-relaxed text-ink2">서비스와 돈의 흐름. 1년차 거래액 13.3억, 플랫폼 매출 2.65억</span>
           <span className="mt-auto text-xs font-medium text-accent">비즈니스 모델 ↓</span>
         </a>
         <a href={hrefs['']} onClick={open('')} className={tile}>
@@ -595,19 +643,19 @@ export default function About({
 
       <Section n={1} title="프로덕트">
         <p className="max-w-[720px] text-[14px] leading-relaxed text-ink2">
-          Placewave는 도심의 공간 — 카페·바·라운지·라이브홀·루프탑·팝업 — 과 그곳에서 열리는 이벤트를 찾아보고, 신청하고,
+          Placewave는 카페·바·라운지·라이브홀·루프탑·팝업 같은 도심 공간과 그곳에서 열리는 이벤트를 찾아보고, 신청하고,
           결제하는 서비스입니다. 탐색은 누구나 할 수 있고 신청부터 로그인합니다. iOS·Android 앱과 웹으로 들어오고, 일부 방문은 SNS 광고
-          캠페인에서 옵니다. 분석의 질문은 두 가지입니다 — 어느 단계에서 사람이 빠지는가, 어떤 유입이 결제까지 이어지는가.
+          캠페인에서 옵니다. 분석할 질문은 어느 단계에서 사람이 빠지는지, 어떤 유입이 결제까지 이어지는지 두 가지입니다.
         </p>
         <p className="max-w-[720px] text-[14px] leading-relaxed text-ink2">
           공간은 두 층입니다. 서울 주요 상권의 공간 1,800곳이 목록에 등록돼 있고, 그중 약 10%는 파트너 플랜(베이직 월 4.9만·프로
           14.9만 원)에 가입해 수수료 우대와 상단 노출을 받습니다. 2025년 12월부터 회원은 월 9,900원 멤버십으로 파트너 공간
-          이벤트를 15% 할인받습니다. 질문이 하나 더 붙습니다 — 파트너 플랜과 멤버십이 거래를 늘리고 오래 유지되는가.
+          이벤트를 15% 할인받습니다. 여기서 파트너 플랜과 멤버십이 거래를 늘리고 오래 유지되는지가 세 번째 질문입니다.
         </p>
         <p className="max-w-[720px] text-[14px] leading-relaxed text-ink2">
           검색은 장르·상권·행사 유형·공간명으로 들어오는 또 하나의 입구입니다. 2026년 4월부터 검색 결과의 관련성을 사람이 평가하는
-          프로그램을 운영했고, 그 라벨로 만든 새 랭킹을 7월에 기존 랭킹과 기기 단위 무작위 50:50으로 비교한 뒤 전체에 적용했습니다. 마지막 질문 — 검색은
-          어디서 실패하고, 평가와 랭킹 개선이 그 실패를 줄였는가.
+          프로그램을 운영했고, 그 라벨로 만든 새 랭킹을 7월에 기존 랭킹과 기기 단위 무작위 50:50으로 비교한 뒤 전체에 적용했습니다. 마지막 질문은 검색이
+          어디서 실패하고, 평가와 랭킹 개선이 그 실패를 줄였는지입니다.
         </p>
       </Section>
 

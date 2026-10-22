@@ -6,7 +6,7 @@
     "**세그먼트.** `channel1`(첫 유입 paid/non_paid)·`device_platform`(첫 방문 기기 ios/android/web)·`member_seg`(member/guest) 는 사람당 1개라 조합 합이 전체다. `member_seg` 는 일·시간 마트에서 그날 0시 기준이며 가입 당일은 `guest` 다. 예외: `daily_channel` 의 `channel1~3` 은 세션 라스트클릭 채널이다.",
     "**사람 수 합산.** 사람 열은 같은 날(주·월) 안에서 세그먼트끼리만 더할 수 있다. 여러 날을 더하면 같은 사람이 중복된다. 화면의 기간 고유 사람 수는 `person_day` 비트로 다시 세고, 주·월 고유는 `weekly_activity`·`monthly_summary` 를 쓴다.",
     "**로그 vs 원장.** 결제·신청·취소의 건수·금액은 원장이 기준이다(`daily_event`·`daily_venue`·`daily_revenue`·`monthly_summary`). `daily_metrics`·`hourly_metrics`·`daily_channel`·`daily_ad` 의 `applies`·`pay_count`·`pay_amount`·`cancels` 는 로그 이벤트 기준이며 원장과의 일치는 검사 C1·C2·C9 가 확인한다.",
-    "**매출 세 갈래.** 플랫폼 매출 = 거래 수수료(티켓 정가 × 공간 등급별 율 — 비파트너 10%·베이직 5%·프로 3%) + 멤버십(소비자 월 9,900원) + 파트너 플랜(공간 월 49,000·149,000원). 거래액(GMV)·티켓 결제액은 규모 지표이고 매출이 아니다. 멤버 할인 15%는 플랫폼 부담이라 수수료는 정가 기준으로 계산하고 할인은 멤버십 비용으로 본다. 매출은 세그먼트 축이 없으므로 세그먼트 필터를 걸면 매출 타일·카드는 화면에서 빠진다.",
+    "**매출 세 갈래.** 플랫폼 매출 = 거래 수수료(티켓 정가 × 공간 등급별 율: 비파트너 10%·베이직 5%·프로 3%) + 멤버십(소비자 월 9,900원) + 파트너 플랜(공간 월 49,000·149,000원). 거래액(GMV)·티켓 결제액은 규모 지표이고 매출이 아니다. 멤버 할인 15%는 플랫폼 부담이라 수수료는 정가 기준으로 계산하고 할인은 멤버십 비용으로 본다. 매출은 세그먼트 축이 없으므로 세그먼트 필터를 걸면 매출 타일·카드는 화면에서 빠진다.",
     "**비율.** 마트는 분자·분모 열만 두고 화면이 필터 적용 후 각각 합산한 뒤 나눈다. 비율의 증감은 %p, 건수·금액의 증감은 %."
   ],
   "groups": [
@@ -80,7 +80,7 @@
     ],
     "venue": [
       "`daily_venue_registry` 의 `*_total`·`mrr_*` 은 그날 값이라 기간으로 더하지 않고 기간 마지막 날 값을 쓴다. `new_*`·`churned_*` 만 기간 합.",
-      "`venue_registry` 는 기준일(`as_of_date`) 스냅샷이다. 파트너 판정은 `is_partner` 로만 한다 — 활성 계약이 없는 공간도 `plan`·계약일 열에 가장 최근 계약 값이 남는다. `status = closed` 공간은 지도·파트너 공간 표에서 뺀다. 상권별 표의 등록 수는 등록 공간 타일(`registered_total`, 폐업 포함 누적)과 맞추려고 폐업 공간을 포함한다.",
+      "`venue_registry` 는 기준일(`as_of_date`) 스냅샷이다. 파트너 판정은 `is_partner` 로만 한다. 활성 계약이 없는 공간도 `plan`·계약일 열에 가장 최근 계약 값이 남는다. `status = closed` 공간은 지도·파트너 공간 표에서 뺀다. 상권별 표의 등록 수는 등록 공간 타일(`registered_total`, 폐업 포함 누적)과 맞추려고 폐업 공간을 포함한다.",
       "`daily_venue_registry` 의 축은 상권(`region`) 하나라 공간 탭 스코어보드·추이는 상권 선택만 받는다. 장르·파트너 여부는 기준일 스냅샷 `venue_registry` 를 쓰는 지도 카드 안에서만 고른다.",
       "계약 월 지표(P10~P14·P16)는 `monthly_contract` 의 끝난 달(말일 ≤ 기준일)만 쓴다. 기간과 겹치는 끝난 달의 분자·분모를 각각 더해 나눈 월 평균이고, 겹치는 달이 없으면 기간 끝 이전의 마지막 끝난 달 하나를 쓴다. 월초 = 그 달 1일 직전 날의 활성 계약, 업·다운그레이드 MRR 은 변경 전 플랜 행에 귀속한다. `monthly_contract` 는 상권 축이 없어 상권을 고르면 계약 월 구획이 빠진다."
     ],
@@ -495,7 +495,7 @@
       "name": "취소율",
       "tab": "events",
       "group": "convert",
-      "definition": "기간 안에 일어난 취소 건을 기간 안 신청 건으로 나눈 값(취소일 기준 — 분자의 취소가 기간 이전 신청분일 수 있다)",
+      "definition": "기간 안에 일어난 취소 건을 기간 안 신청 건으로 나눈 값(취소일 기준이라 분자의 취소가 기간 이전 신청분일 수 있다)",
       "formula": "Σ cancels ÷ Σ applies",
       "unit": "건",
       "denominator": "신청",
@@ -776,7 +776,7 @@
       "tab": "overview",
       "group": "revenue",
       "definition": "거래 수수료 + 멤버십 + 파트너 플랜. 티켓 결제액은 포함하지 않는다",
-      "formula": "Σ net_amount (kind 전체 — ticket 행의 net 은 수수료)",
+      "formula": "Σ net_amount (kind 전체, ticket 행의 net 은 수수료)",
       "unit": "원",
       "denominator": "—",
       "mart_columns": [
@@ -815,7 +815,7 @@
         "daily_revenue.net_amount",
         "daily_revenue.kind"
       ],
-      "why": "반복 매출 — 수익 3축 중 멤버십",
+      "why": "수익 3축 중 멤버십의 반복 매출",
       "axis": "subscription"
     },
     {
@@ -831,7 +831,7 @@
         "daily_revenue.net_amount",
         "daily_revenue.kind"
       ],
-      "why": "공급 측 반복 매출 — 거래액과 무관하게 발생",
+      "why": "거래액과 무관하게 발생하는 공급 측 반복 매출",
       "axis": "b2b"
     },
     {
@@ -879,7 +879,7 @@
       "mart_columns": [
         "daily_revenue.discount_amount"
       ],
-      "why": "멤버십 혜택의 비용 — 멤버십 순기여 = 멤버십 매출 − 할인액",
+      "why": "멤버십 혜택의 비용. 멤버십 순기여 = 멤버십 매출 − 할인액",
       "axis": "subscription"
     },
     {
@@ -910,7 +910,7 @@
       "mart_columns": [
         "daily_revenue.gmv_amount"
       ],
-      "why": "마켓플레이스 규모 — 수수료의 기반",
+      "why": "수수료의 기반이 되는 마켓플레이스 규모",
       "axis": "marketplace"
     },
     {
@@ -942,7 +942,7 @@
         "daily_revenue.net_amount",
         "daily_revenue.gmv_amount"
       ],
-      "why": "등급 구성 변화의 결과 — 건강 기준 5~7%",
+      "why": "등급 구성 변화의 결과. 건강 기준 5~7%",
       "axis": "marketplace"
     },
     {
@@ -959,7 +959,7 @@
         "daily_revenue.pay_count",
         "daily_revenue.refund_amount"
       ],
-      "why": "거래 품질 — 건강 기준 10% 안쪽",
+      "why": "거래 품질. 건강 기준 10% 안쪽",
       "axis": "marketplace",
       "direction": "down"
     },
@@ -1037,7 +1037,7 @@
         "daily_subscription.churned_subscribers",
         "daily_subscription.active_subscribers"
       ],
-      "why": "멤버십 유지력 — 건강 기준 월 6% 안쪽",
+      "why": "멤버십 유지력. 건강 기준 월 6% 안쪽",
       "axis": "subscription",
       "direction": "down"
     },
@@ -1087,7 +1087,7 @@
         "daily_subscription.discount_amount",
         "daily_subscription.churned_subscribers"
       ],
-      "why": "할인을 뺀 멤버십의 장기 가치 — 획득 비용의 상한",
+      "why": "할인을 뺀 멤버십의 장기 가치. 획득 비용의 상한이 된다",
       "axis": "subscription"
     },
     {
@@ -1135,7 +1135,7 @@
         "daily_subscription.discount_amount",
         "daily_revenue.net_amount(membership)"
       ],
-      "why": "혜택 비용이 멤버십 매출을 잠식하는지 — 건강 기준 30% 이하",
+      "why": "혜택 비용이 멤버십 매출을 잠식하는지. 건강 기준 30% 이하",
       "axis": "subscription",
       "direction": "down"
     },
@@ -1241,7 +1241,7 @@
       "mart_columns": [
         "venue_registry.detail_viewers_28d"
       ],
-      "why": "공간별 수요의 크기 — 지도 점 크기"
+      "why": "공간별 수요의 크기. 지도 점 크기로 쓴다"
     },
     {
       "id": "P08",
@@ -1300,7 +1300,7 @@
         "monthly_contract.churned_contracts",
         "monthly_contract.contracts_bom"
       ],
-      "why": "파트너 유지 — 건강 기준 월 2% 안쪽",
+      "why": "파트너 유지. 건강 기준 월 2% 안쪽",
       "axis": "b2b",
       "direction": "down"
     },
@@ -1336,7 +1336,7 @@
         "monthly_contract.mrr_churn",
         "monthly_contract.mrr_contraction"
       ],
-      "why": "기존 파트너 매출의 방어력 — 100% 가 상한",
+      "why": "기존 파트너 매출의 방어력. 100% 가 상한",
       "axis": "b2b"
     },
     {
@@ -1387,7 +1387,7 @@
         "daily_revenue.gmv_amount",
         "daily_revenue.fee_tier"
       ],
-      "why": "공급 측이 버틸 수 있는 가격인가 — 건강 기준 15% 안쪽",
+      "why": "공급 측이 버틸 수 있는 가격인가. 건강 기준 15% 안쪽",
       "axis": "b2b",
       "direction": "down"
     },

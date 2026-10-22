@@ -50,10 +50,10 @@ function PageLink({
 
 const NAV: { page: Page; label: string; short: string }[] = [
   { page: '', label: '대시보드', short: '대시보드' },
-  { page: 'reports', label: '보고서', short: '보고서' },
   { page: 'about', label: '프로젝트 개요', short: '개요' },
+  { page: 'data', label: '데이터 카탈로그', short: '데이터' },
   { page: 'metrics', label: '지표 가이드', short: '지표' },
-  { page: 'data', label: '데이터', short: '데이터' },
+  { page: 'reports', label: '보고서', short: '보고서' },
 ]
 
 export default function Header({

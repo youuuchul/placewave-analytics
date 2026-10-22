@@ -5,21 +5,33 @@
 **이 저장소의 수치는 전부 가상 서비스 시나리오와 분포 규칙으로 생성한 데이터다.** 실제 서비스·회사의 데이터, 코드, 식별자는 들어 있지 않다. 설계는 업무 경험에서 온 일반적인 패턴을 새로 작성한 것이다.
 
 - 대시보드: `https://placewave-analytics.vercel.app`
-- 프로젝트 개요: `https://placewave-analytics.vercel.app/?page=about` · 보고서: `https://placewave-analytics.vercel.app/?page=reports` · 데이터 페이지(스키마·미리보기): `https://placewave-analytics.vercel.app/?page=data`
+- 프로젝트 개요: `https://placewave-analytics.vercel.app/?page=about` · 데이터 카탈로그(스키마·미리보기): `https://placewave-analytics.vercel.app/?page=data` · 지표 가이드: `https://placewave-analytics.vercel.app/?page=metrics` · 보고서: `https://placewave-analytics.vercel.app/?page=reports`
+
+## 참고한 서비스
+
+수수료·파트너 플랜·멤버십 구조는 공개된 요금 체계를 참고해 정하고, 아래 국내외 서비스와 비교해 검증했다(공식 요금 페이지·기사 기준, 2026-10-19 확인). 처음 정할 때 쓴 출처는 [docs/business_model.md](docs/business_model.md#출처)에 있다.
+
+| 분류 | 국내 | 해외 |
+|---|---|---|
+| 공연 예매 | NOL 티켓 · 예스24 티켓 · 멜론티켓 · 티켓링크 | Ticketmaster · DICE · Resident Advisor |
+| 이벤트·모임 호스팅 | 프립 · 문토 · 소모임 | Eventbrite · Luma · Meetup · Partiful |
+| 공간·식당 예약 | 캐치테이블 · 네이버 예약 · 스페이스클라우드 | OpenTable · Resy |
+| 정률 중개 | 배달의민족 · 쿠팡이츠 · 야놀자 · 여기어때 | Airbnb |
+| 소비자 멤버십 | 쿠팡 와우 · 네이버플러스 멤버십 · 배민클럽 | ClassPass · Fever |
 
 ## 화면
 
 | 개요 | 퍼널 |
 |---|---|
-| ![개요 탭 — 방문자·신규·가입·결제·매출·구독 스코어보드와 KPI별 추이 카드](docs/img/overview.png) | ![퍼널 탭 — 단계 전환율 추이, 세그먼트별 퍼널, 오디언스별 퍼널, 경로 생키](docs/img/funnel.png) |
+| ![개요 탭: 방문자·신규·가입·결제·매출·구독 스코어보드와 KPI별 추이 카드](docs/img/overview.png) | ![퍼널 탭: 단계 전환율 추이, 세그먼트별 퍼널, 오디언스별 퍼널, 경로 생키](docs/img/funnel.png) |
 | **검색** | **평가 운영** |
-| ![검색 탭 — 결과 0건 비율·클릭률 추이, 의도 유형별, 실패 검색어와 평가 편입일](docs/img/search.png) | ![평가 운영 탭 — 진척·생산성·품질 스코어보드, 배치 진척, 품질 추이, 평가자 산점도, 지침 버전 비교](docs/img/evalops.png) |
-| **주간 코호트** | **소개** |
-| ![주간 탭 — WAU·재방문 비중, 주간 방문자, 코호트 리텐션 히트맵, 주간 브리핑](docs/img/weekly_cohort.png) | ![프로젝트 개요 — 가상 프로덕트, 핵심 퍼널 5화면, 데이터 흐름](docs/img/about.png) |
-| **데이터** | **공간** |
-| ![데이터 페이지 — 층별 표 목록, 스키마·컬럼 설명, 마트 미리보기](docs/img/data.png) | ![공간 탭 — 등록·파트너 공간, 서울 상권 분포 지도, 파트너 공간 표](docs/img/venues.png) |
+| ![검색 탭: 결과 0건 비율·클릭률 추이, 의도 유형별, 실패 검색어와 평가 편입일](docs/img/search.png) | ![평가 운영 탭: 진척·생산성·품질 스코어보드, 배치 진척, 품질 추이, 평가자 산점도, 지침 버전 비교](docs/img/evalops.png) |
+| **주간 코호트** | **프로젝트 개요** |
+| ![주간 탭: WAU·재방문 비중, 주간 방문자, 코호트 리텐션 히트맵, 주간 브리핑](docs/img/weekly_cohort.png) | ![프로젝트 개요: 가상 프로덕트, 핵심 퍼널 5화면, 데이터 흐름](docs/img/about.png) |
+| **데이터 카탈로그** | **공간** |
+| ![데이터 카탈로그: 층별 표 목록, 스키마·컬럼 설명, 마트 미리보기](docs/img/data.png) | ![공간 탭: 등록·파트너 공간, 서울 상권 분포 지도, 파트너 공간 표](docs/img/venues.png) |
 
-탭 9개(개요 / 퍼널 / 검색 / 행사·결제 / 회원 / 공간 / 유입·광고 / 평가 운영 / 주간·월간)의 모니터링 대시보드, 실험·개선·이슈를 한 건씩 읽는 보고서 페이지(실험 E1 랭킹 A/B 테스트 · 개선 X1 평가 지침 개정 · 이슈 I1 9/1 재색인 회귀), 프로젝트 개요·지표 가이드·데이터 페이지. 필터(기간·채널·플랫폼·회원)는 마트에 그 축이 있는 카드에만 붙이고, 상태는 전부 URL에 남는다. 탭별 구성과 산식은 [docs/dashboard.md](docs/dashboard.md).
+탭 9개(개요 / 퍼널 / 검색 / 행사·결제 / 회원 / 공간 / 유입·광고 / 평가 운영 / 주간·월간)의 모니터링 대시보드, 프로젝트 개요, 데이터 카탈로그, 지표 가이드, 실험·개선·이슈를 한 건씩 읽는 보고서 페이지(실험 E1 랭킹 A/B 테스트 · 개선 X1 평가 지침 개정 · 이슈 I1 9/1 재색인 회귀). 필터(기간·채널·플랫폼·회원)는 마트에 그 축이 있는 카드에만 붙이고, 상태는 전부 URL에 남는다. 탭별 구성과 산식은 [docs/dashboard.md](docs/dashboard.md).
 
 ## 비즈니스 모델
 
@@ -57,7 +69,7 @@ bigquery/    자체 SQL: raw 적재 → staging → marts → ops, 검사, 1회 
 dashboard/   마트 → data.json 추출 → Vite + React 정적 웹, 헤드리스 캡처
 docs/        아키텍처 · 지표 정의 · 파이프라인 · 대시보드 설계 · 백로그
 data/        생성물 (gitignore, MANIFEST.txt 만 커밋)
-scripts/     bq.sh — 개인 GCP 전용 래퍼 (설정 폴더·프로젝트·리전 고정)
+scripts/     bq.sh: 개인 GCP 전용 래퍼 (설정 폴더·프로젝트·리전 고정)
 ```
 
 `generator/seed/` 의 CSV는 이벤트 비중·전이 확률·요일×시간 패턴·채널 구성·리텐션 곡선 같은 **비율·분위수**뿐이다. 절대값·식별자·실명은 없다.
@@ -67,18 +79,18 @@ scripts/     bq.sh — 개인 GCP 전용 래퍼 (설정 폴더·프로젝트·�
 생성 → 적재 → 추출 → 빌드. 모두 저장소 루트에서 실행한다(대시보드 빌드만 `dashboard/`).
 
 ```bash
-# 1. 생성 — 합성 로그·원장·광고 리포트를 data/ 에 쓴다 (같은 시드면 같은 결과)
+# 1. 생성: 합성 로그·원장·광고 리포트를 data/ 에 쓴다 (같은 시드면 같은 결과)
 uv run generator/generate.py --seed 20260923 --weeks 52 --persons 210000 --end-date 2026-09-20 --out data/
 uv run generator/validate.py --data data/ --weeks 52 --end-date 2026-09-20
 
-# 2. 적재 — raw 적재 → staging → marts → ops 검사·기록 (개인 GCP 프로젝트)
+# 2. 적재: raw 적재 → staging → marts → ops 검사·기록 (개인 GCP 프로젝트)
 scripts/bq.sh login            # 최초 1회
 bigquery/load_all.sh
 
-# 3. 추출 — marts 를 dashboard/public/data/ 로 분할 추출(index.json + 표별 지연 파일)
+# 3. 추출: marts 를 dashboard/public/data/ 로 분할 추출(index.json + 표별 지연 파일)
 uv run dashboard/scripts/extract.py
 
-# 4. 빌드 — 정적 웹 (dist/ 를 어느 정적 호스트에든 올린다)
+# 4. 빌드: 정적 웹 (dist/ 를 어느 정적 호스트에든 올린다)
 cd dashboard && npm ci && npm run build
 npm run capture -- --all       # 선택: 탭별·다크·폰 폭 캡처
 ```
@@ -89,11 +101,11 @@ BigQuery 없이 화면만 보려면 1~3 대신 `uv run dashboard/scripts/make_sa
 
 | 문서 | 내용 |
 |---|---|
-| [docs/scenario_v2.md](docs/scenario_v2.md) | 시나리오 2.0 설계 — 공간 등록·파트너 계약·구독·B2B, 서울 상권 |
-| [docs/scenario_v3_search_eval.md](docs/scenario_v3_search_eval.md) | 시나리오 3.0 설계 — 검색 서버 로그·관련성 평가 운영·랭킹 실험 |
+| [docs/scenario_v2.md](docs/scenario_v2.md) | 시나리오 2.0 설계: 공간 등록·파트너 계약·구독·B2B, 서울 상권 |
+| [docs/scenario_v3_search_eval.md](docs/scenario_v3_search_eval.md) | 시나리오 3.0 설계: 검색 서버 로그·관련성 평가 운영·랭킹 실험 |
 | [docs/architecture.md](docs/architecture.md) | 원천·층·표·그레인·신원 규칙 |
-| [docs/metrics.md](docs/metrics.md) | 지표 정의 — 단위·분자·분모·제외 규칙, 마트 열 기준 |
-| [docs/dashboard.md](docs/dashboard.md) | 탭·필터 원칙, 화면 산식, `data.json` 데이터 계약, 개요·데이터 페이지 |
+| [docs/metrics.md](docs/metrics.md) | 지표 정의: 단위·분자·분모·제외 규칙, 마트 열 기준 |
+| [docs/dashboard.md](docs/dashboard.md) | 탭·필터 원칙, 화면 산식, `data.json` 데이터 계약, 개요·데이터 카탈로그·지표 가이드·보고서 페이지 |
 | [docs/pipeline.md](docs/pipeline.md) | 실행·재실행·실패 조치 |
 | [docs/backlog.md](docs/backlog.md) | 결정된 작업 순서와 이후 후보 |
 | [bigquery/README.md](bigquery/README.md) | 표 카탈로그·계보 도식·검사 목록 (SQL 머리 주석에서 생성) |

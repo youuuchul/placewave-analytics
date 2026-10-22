@@ -314,12 +314,12 @@ export default function DataPage({
   }
 
   return (
-    <main className="mx-auto flex max-w-[1280px] flex-col gap-4 px-4 pb-20 pt-4 sm:px-6">
-      <div className="flex items-baseline justify-between gap-4">
-        <h2 className="text-[15px] font-semibold text-ink">
-          표 <span className="tnum font-normal text-muted">{cat.tables.length}개</span>
-        </h2>
-        <span className="tnum text-xs text-muted">카탈로그 {cat.built_at.slice(0, 10)}</span>
+    <main className="mx-auto flex max-w-[1280px] flex-col gap-4 px-4 pb-20 pt-8 sm:px-6">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h2 className="text-[26px] font-semibold leading-tight tracking-tight text-ink">데이터 카탈로그</h2>
+        <span className="tnum text-sm text-muted">
+          표 {cat.tables.length} · {cat.built_at.slice(0, 10)} 갱신
+        </span>
       </div>
       <label className="flex items-center gap-2 lg:hidden">
         <span className="shrink-0 text-xs text-muted">표</span>

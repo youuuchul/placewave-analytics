@@ -39,7 +39,7 @@ function List(p: Omit<Props, 'data'>) {
   return (
     <main className="mx-auto flex max-w-[1280px] flex-col gap-8 break-keep px-4 pb-20 pt-8 sm:px-6">
       <div className="flex flex-col gap-2">
-        <h2 className="text-[26px] font-semibold leading-tight tracking-tight text-ink sm:text-[32px]">보고서</h2>
+        <h2 className="text-[26px] font-semibold leading-tight tracking-tight text-ink">보고서</h2>
         <p className="text-[13px] text-muted">{SYNTHETIC_NOTE}</p>
       </div>
       <div className="grid gap-6 lg:grid-cols-3">
@@ -88,7 +88,7 @@ export default function Reports({ data, s, set }: Props) {
       </div>
       {data ? <Body meta={meta} data={data} /> : <Pending wait="loading" h={320} />}
       <div className="flex justify-end border-t border-line pt-4">
-        <ReportLink s={s} set={set} id={next.id} label={`다음 보고서 · ${next.code} ${next.title.split(' — ')[0]}`} className="text-[13px] text-accent hover:underline" />
+        <ReportLink s={s} set={set} id={next.id} label={`다음 보고서 · ${next.code} ${next.title.split(': ')[0]}`} className="text-[13px] text-accent hover:underline" />
       </div>
     </main>
   )
