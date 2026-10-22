@@ -630,13 +630,9 @@ export default function About({
         <a href={hrefs.reports} onClick={open('reports')} className={tile}>
           <span className="text-xs font-medium text-muted">3 · 보고서</span>
           <span className="text-[15px] font-semibold text-ink">실험 1 · 개선 1 · 이슈 1</span>
-          <ul className="flex flex-col gap-1 text-[13px] leading-snug text-ink2">
-            {REPORTS.map((r) => (
-              <li key={r.id}>
-                <span className="text-muted">{r.code}</span> {r.conclusion}
-              </li>
-            ))}
-          </ul>
+          <span className="text-[13px] leading-relaxed text-ink2">
+            {REPORTS.map((r) => r.title.split(': ')[0]).join(' · ')}
+          </span>
           <span className="mt-auto text-xs font-medium text-accent">보고서 목록 →</span>
         </a>
       </nav>
