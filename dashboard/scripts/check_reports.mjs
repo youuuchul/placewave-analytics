@@ -112,11 +112,62 @@ const x1 = Object.fromEntries(
 )
 
 // I1 — 회귀 전·중·후 결과 0건 비율
+const KC = [...K, 'clicked_searches']
 const phase = [['2026-08-29', '2026-08-31'], ['2026-09-01', '2026-09-04'], ['2026-09-05', '2026-09-08']].map(([f, t]) => {
   const rows = search.filter((r) => r.kst_date >= f && r.kst_date <= t)
-  const all = add(rows, K), reg = add(rows.filter((r) => r.query_intent === 'region'), K), rest = add(rows.filter((r) => r.query_intent !== 'region'), K)
-  return [n0(all.searches), pct(all.zero_result_searches / all.searches), pct(reg.zero_result_searches / reg.searches), pct(rest.zero_result_searches / rest.searches)]
+  const all = add(rows, KC), reg = add(rows.filter((r) => r.query_intent === 'region'), KC), rest = add(rows.filter((r) => r.query_intent !== 'region'), KC)
+  return [
+    n0(all.searches),
+    pct(all.zero_result_searches / all.searches),
+    pct(reg.zero_result_searches / reg.searches),
+    pct(rest.zero_result_searches / rest.searches),
+    pct(all.clicked_searches / all.searches),
+    pct(reg.clicked_searches / reg.searches),
+  ]
 })
+
+// E1 설계서 — 기준선 6/22~7/5(전부 v1): 기기·요청·세션, 지표별 기준선, 최소 검출 효과 = 2 × 2.801585 × √(기준선 분산)
+const BASE_SPAN = ['2026-06-22', '2026-07-05']
+const baseRows = exp.filter((r) => r.kst_date >= BASE_SPAN[0] && r.kst_date <= BASE_SPAN[1])
+const baseDev = new Set(baseRows.map((r) => r.client_id)).size
+const baseEst = Object.fromEntries(Object.entries(MET).map(([id, m]) => [id, est(baseRows, m)]))
+const mdeTxt = (id, d = 1) => `±${(2 * 2.801585 * Math.sqrt(baseEst[id].v) * 100).toFixed(d)}%p`
+const qOf = (rows) => {
+  const xs = rows.map((r) => r.latency_ms).sort((x, y) => x - y)
+  const h = (xs.length - 1) * 0.95
+  const lo = Math.floor(h)
+  return `${(xs[lo] + (xs[Math.min(lo + 1, xs.length - 1)] - xs[lo]) * (h - lo)).toFixed(0)}ms`
+}
+const design = {
+  base: { 검색: MET.success.f(baseEst.success.R), '결과 0건': MET.zero.f(baseEst.zero.R), '평균 첫': MET.pos.f(baseEst.pos.R), '상위 3위': MET.top3.f(baseEst.top3.R), 재검색률: MET.reform.f(baseEst.reform.R), '결과 클릭률': MET.ctr.f(baseEst.ctr.R), '검색 세션 신청 전환': MET.apply.f(baseEst.apply.R), '응답 시간 p95': qOf(baseRows) },
+  sample: [
+    ['검색한 기기', `${n0(baseDev)}대 (2주 실험이면 집단당 약 ${n0(Math.round(baseDev / 2))}대)`],
+    ['검색 요청 · 검색 세션', `${n0(baseRows.length)}건 · ${n0(baseRows.filter((r) => r.is_session_first).length)}세션`],
+    ['검색 성공률 기준선', MET.success.f(baseEst.success.R)],
+    ['최소 검출 효과 · 검색 성공률', mdeTxt('success')],
+    ['최소 검출 효과 · 결과 클릭률', mdeTxt('ctr')],
+    ['최소 검출 효과 · 검색 세션 신청 전환', mdeTxt('apply', 2)],
+  ],
+}
+
+// E1 진행 점검 — 첫 주 7/13~7/19 배정(기기 수·카이제곱 p), 실험 전 6/29~7/12 A/A, 첫 주 가드레일(비율 2개)
+const inS = (f, t) => exp.filter((r) => r.kst_date >= f && r.kst_date <= t)
+const wk1 = inS('2026-07-13', '2026-07-19')
+const pre = inS('2026-06-29', '2026-07-12')
+const devOf = (rows, arm) => new Set(rows.filter((r) => r.arm === arm).map((r) => r.client_id)).size
+const nc = devOf(wk1, 'control'), nt = devOf(wk1, 'treatment')
+const cmp = (rows, m) => {
+  const c = est(rows.filter((r) => r.arm === 'control'), m)
+  const t = est(rows.filter((r) => r.arm === 'treatment'), m)
+  const d = t.R - c.R
+  const se = Math.sqrt(c.v + t.v)
+  return [m.f(c.R), m.f(t.R), `${m.d(d)} (${m.bd(d - 1.96 * se)} ~ ${m.bd(d + 1.96 * se)})`, pText(pOf(d / se))]
+}
+const check = {
+  assign: [n0(nc), n0(nt), pText(pOf(Math.sqrt((nc - nt) ** 2 / (nc + nt))))],
+  aa: { '검색 성공률': cmp(pre, MET.success), '결과 0건 비율': cmp(pre, MET.zero), '평균 첫 클릭 순위': cmp(pre, MET.pos), '결과 클릭률': cmp(pre, MET.ctr), '검색 세션 신청 전환': cmp(pre, MET.apply) },
+  guard: { '결과 클릭률': cmp(wk1, MET.ctr).slice(0, 3), '검색 세션 신청 전환': cmp(wk1, MET.apply).slice(0, 3) },
+}
 
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
@@ -198,7 +249,33 @@ const i1rows = await page.$$eval('main table', (ts) => {
 })
 phase.forEach((col, j) => col.forEach((w, i) => eq(`I1 구간${j + 1}[${i}]`, i1rows[i]?.[j + 1] ?? '', w)))
 
+const rowsOf = async () =>
+  (await page.$$eval('main table tbody tr', (trs) => trs.map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent.trim())))).map((r) =>
+    r.map((x) => x.replace(/−/g, '-')),
+  )
+const find = (rows, head, col = 0) => rows.find((r) => r[col]?.startsWith(head)) ?? []
+
+await read('page=reports&r=ab-ranker-design')
+const dRows = await rowsOf()
+for (const [head, want] of Object.entries(design.base)) eq(`설계서 기준선 ${head}`, find(dRows, head, 1)[3] ?? '', want)
+for (const [head, want] of design.sample) eq(`설계서 표본 ${head}`, find(dRows, head)[1] ?? '', want)
+
+await read('page=reports&r=ab-ranker-check')
+const cRows = await rowsOf()
+const dev = find(cRows, '검색한 기기')
+eq('진행 점검 대조군 기기', dev[1] ?? '', check.assign[0])
+eq('진행 점검 실험군 기기', dev[2] ?? '', check.assign[1])
+eq('진행 점검 SRM p', (dev[3] ?? '').match(/p ([<\d. ]+?) →/)?.[1] ?? '', check.assign[2])
+for (const [head, want] of Object.entries(check.aa)) {
+  const r = cRows.find((x) => x[0] === head && x.length === 5) ?? []
+  want.forEach((w, i) => eq(`진행 점검 A/A ${head}[${i}]`, r[i + 1] ?? '', w))
+}
+for (const [head, want] of Object.entries(check.guard)) {
+  const r = cRows.find((x) => x[0] === head && x.length === 6) ?? []
+  want.forEach((w, i) => eq(`진행 점검 가드레일 ${head}[${i}]`, r[i + 1] ?? '', w))
+}
+
 await browser.close()
-console.log(`E1 기간 ${RUN[0]} ~ ${RUN[1]} · 비교 값 ${n}개 · 불일치 ${fails.length}개`)
+console.log(`보고서 D1 · E1 설계서 · 진행 점검 · 결과 보고 · X1 · I1 · 비교 값 ${n}개 · 불일치 ${fails.length}개`)
 for (const f of fails) console.log('  ', f)
 process.exit(fails.length ? 1 : 0)

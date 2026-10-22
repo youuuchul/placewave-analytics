@@ -46,7 +46,7 @@ export default function ExpCheck({ rows, search }: { rows: ExpRankerRequest[]; s
       <Block title="점검 범위">
         <Para>
           실험 첫 주({md(AB.firstWeek[0])}~{md(AB.firstWeek[1])})가 지난 시점의 점검이다. 설계서대로 배정이 제대로 됐는지, 두 집단이 실험 전부터 달랐던 건
-          아닌지, 가드레일이 허용 폭 안인지만 본다. 주 지표·보조 지표의 효과는 이 시점에 열어 보지 않는다.
+          아닌지, 가드레일이 기준을 넘지 않는지만 본다. 주 지표·보조 지표의 효과는 이 시점에 열어 보지 않는다.
         </Para>
       </Block>
 

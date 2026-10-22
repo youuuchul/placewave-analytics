@@ -154,7 +154,7 @@ export default function X1({ data }: { data: Data }) {
       <Block title="해석">
         <Bullets
           items={[
-            `품질 지표 넷 중 ${better}개가 개정 후 쪽이 좋다. 정답셋 정확도 ${pct(acc(a))} → ${pct(acc(b))}, 일치율 ${pct(agree(a))} → ${pct(agree(b))}, 카파 ${dec(kappa(a), 2)} → ${dec(kappa(b), 2)}(우연 일치를 뺀 일치도가 ${band(kappa(a))} → ${band(kappa(b))} 수준), 재작업률 ${pct(rework(a))} → ${pct(rework(b))}.`,
+            `품질 지표 넷${better === 4 ? '이 모두' : ` 중 ${better}개가`} 개정 후 쪽이 좋다. 정답셋 정확도 ${pct(acc(a))} → ${pct(acc(b))}, 일치율 ${pct(agree(a))} → ${pct(agree(b))}, 카파 ${dec(kappa(a), 2)} → ${dec(kappa(b), 2)}(우연 일치를 뺀 일치도가 ${band(kappa(a))} → ${band(kappa(b))} 수준), 재작업률 ${pct(rework(a))} → ${pct(rework(b))}.`,
             `비용은 개정 직후 3주에 몰렸다. 건당 처리 시간이 개정 전 주 ${secTxt(prevWk)}초에서 ${after3.map(secTxt).join(' · ')}초로 늘었다가 4주째 ${secTxt(wk4)}초로 돌아왔고, 누적 평균은 ${dec(perLabel(a), 1)}초 → ${dec(perLabel(b), 1)}초다.`,
             rising
               ? '주별 품질 추이를 보면 개정 전 마지막 주들에도 정확도가 오르는 중이었다. 그래서 표의 차이 전부를 지침 덕으로 볼 수 없다.'
@@ -167,7 +167,9 @@ export default function X1({ data }: { data: Data }) {
         <Bullets
           items={[
             '대조군이 없다. 같은 기간 평가자 숙련(입사 후 적응)과 구성 변화(5월 확대, 7~8월 외부 평가자 교체)가 함께 움직여 개정 효과만 떼어 낼 수 없다.',
-            `개정 주에 옛 지침 배치의 잔여 라벨이 ${num(leftover)}건뿐이라 같은 주 안의 두 지침 비교도 할 수 없다.`,
+            leftover === 0
+              ? '개정 주에는 옛 지침 배치의 라벨이 없어 같은 주 안에서 두 지침을 비교할 수 없다.'
+              : `개정 주에 옛 지침 배치의 잔여 라벨이 ${num(leftover)}건뿐이라 같은 주 안의 두 지침 비교도 할 수 없다.`,
             '정답셋 정확도는 정답셋 과제(과제의 약 10%)에서만 잰다. 일치율·카파는 같은 과제를 함께 본 평가자 쌍에서 잰다.',
           ]}
         />

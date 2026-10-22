@@ -172,7 +172,7 @@ export default function I1({ data, search, queries }: { data: Data; search: Dail
           items={[
             `0건 증가는 상권 검색어에 몰렸다. 상권 검색어의 결과 0건 비율이 ${pct(zeroRate(before.reg))} → ${pct(zeroRate(during.reg))}로 오르는 동안 상권 외는 ${pct(zeroRate(before.rest))} → ${pct(zeroRate(during.rest))}였다. 캠페인 유입 변화였다면 의도와 상관없이 함께 움직였을 것이다.`,
             `일 결과 0건 비율은 회귀 전 ${range(PHASES[0].from, PHASES[0].to)}, 회귀 중 ${range(PHASES[1].from, PHASES[1].to)}, 핫픽스 후 ${range(PHASES[2].from, PHASES[2].to)}였다. 같은 구간 상권 검색어의 검색 성공률은 ${pct(success(before.reg))} → ${pct(success(during.reg))} → ${pct(success(after.reg))}로 0건 비율과 반대로 움직였다.`,
-            `그 주 실패 검색어 ${failed.length}개 중 ${failedRegion}개가 상권 검색어이고, ${failedIn.length}개가 ${evalDays.join(' · ') || '—'} 평가 배치에 들어갔다. 감지에서 평가까지 흐름이 이어졌다.`,
+            `그 주 실패 검색어 ${failed.length}개는 ${failedRegion === failed.length ? '모두' : `${failedRegion}개가`} 상권 검색어이고, ${failedIn.length === failed.length ? '모두' : `${failedIn.length}개가`} ${evalDays.join(' · ') || '—'} 평가 배치에 들어갔다. 감지에서 평가까지 흐름이 이어졌다.`,
             `비용: 회귀 검증 배치가 우선순위 1로 대기열 앞에 서면서 같은 주 마감 위험 배치가 ${atRisk.length}개 나왔다. 학습 데이터 지연보다 사용자에게 보이는 회귀 확인을 먼저 뒀다.`,
           ]}
         />
