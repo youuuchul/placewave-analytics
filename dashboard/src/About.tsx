@@ -618,7 +618,7 @@ export default function About({
         <a href={`#${BIZ_ID}`} onClick={jump(BIZ_ID)} className={tile}>
           <span className="text-xs font-medium text-muted">1 · 비즈니스 시나리오</span>
           <span className="text-[15px] font-semibold text-ink">수수료 · 멤버십 · 파트너 플랜 세 축의 가상 플랫폼</span>
-          <span className="text-[13px] leading-relaxed text-ink2">서비스와 돈의 흐름. 1년차 거래액 13.3억, 플랫폼 매출 2.65억</span>
+          <span className="text-[13px] leading-relaxed text-ink2">서비스와 돈의 흐름. 1년차 거래액 12.8억, 플랫폼 매출 2.57억</span>
           <span className="mt-auto text-xs font-medium text-accent">비즈니스 모델 ↓</span>
         </a>
         <a href={hrefs['']} onClick={open('')} className={tile}>

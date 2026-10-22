@@ -36,6 +36,11 @@ def render(spec: dict) -> str:
     tab_name = {t["id"]: t["name"] for t in spec["tabs"]}
     metric_name = {m["id"]: m["name"] for m in spec["metrics"]}
     axis_name = {a["id"]: a["name"] for a in spec.get("axes", [])}
+    star = (spec.get("north_star") or {}).get("metric")
+
+    def name(m: dict) -> str:
+        return f"**{cell(m['name'])}**" if m["id"] == star else cell(m["name"])
+
     lines = [
         "# 지표 정의",
         "",
@@ -55,6 +60,25 @@ def render(spec: dict) -> str:
         + ". 축은 지표가 어느 수익 갈래(마켓플레이스 거래 · 소비자 구독 · 공간 B2B)의 건강을 재는지를 뜻하며,"
         " 공통은 플랫폼 매출 전체다.",
         "",
+    ]
+    ns = spec.get("north_star")
+    if ns:
+        lines += [
+            "## 북극성 지표",
+            "",
+            f"**{ns['metric']} {metric_name[ns['metric']]}**. {ns['definition']}"
+            " 근거·고르지 않은 후보·한계·출처는"
+            " [business_model.md §0](business_model.md#0-북극성-지표--티켓-결제-건수).",
+            "",
+            "| 축 | 입력 지표 | 가드레일 |",
+            "|---|---|---|",
+        ]
+        for a in ns["axes"]:
+            ins = " · ".join(f"{k} {metric_name[k]}" for k in a["inputs"])
+            gs = " · ".join(f"{g['id']} {metric_name[g['id']]} {g['rule']}" for g in a["guardrails"])
+            lines.append(f"| {a['axis']} | {ins} | {gs} |")
+        lines.append("")
+    lines += [
         "## 탭이 답하는 질문",
         "",
         "| 탭 | 질문 | 주 사용자 | 핵심 지표 |",
@@ -79,7 +103,7 @@ def render(spec: dict) -> str:
         for m in ms:
             cols = ", ".join(f"`{c}`" for c in m["mart_columns"])
             lines.append(
-                f"| {m['id']} | {cell(m['name'])} | {tab_name.get(m['tab'], m['tab'])} | "
+                f"| {m['id']} | {name(m)} | {tab_name.get(m['tab'], m['tab'])} | "
                 f"{axis_name.get(m.get('axis', ''), '—')} | {m['unit']} | "
                 f"{cell(m['definition'])} | {cell(m['formula'])} | {cell(m['denominator'])} | {cols} | "
                 f"{cell(m['why'])} |"

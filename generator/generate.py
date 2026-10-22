@@ -1048,7 +1048,8 @@ class Generator:
         활성 구독자가 기준 곡선을 따르도록 날마다 부족분을 그날 방문하는 비구독 회원 중에서 뽑는다.
         해지 확률은 결제 회차마다 SUB_HAZARD x 이용 배수(그 회차 계획 방문일 수: 0일 · 1~2일 · 3일 이상)다.
         해지는 그 회차 안의 첫 방문에서 일어나고, 회차 안에 방문이 없으면 회차가 끝나기 전에 해지만 하는
-        짧은 로그인 세션(cancel_days)을 만든다.
+        짧은 로그인 세션(cancel_days)을 만든다. 관측 끝에 걸친 회차는 종료일 뒤 방문이 없어 이용을 잴 수 없으므로
+        직전 회차의 방문일 수로 배수를 정하고, 관측된 몫(일수 비)만큼만 해지 확률을 준다.
         """
         rng = self.rng
         n_days = self.n_days
@@ -1093,8 +1094,18 @@ class Generator:
                     if w0 >= n_days:
                         break
                     used = [v for v in self.visit_days[pid] if w0 <= v < w1]
-                    mult = SUB_USE_MULT[0 if not used else 1 if len(used) <= 2 else 2]
-                    if rng.random() < SUB_HAZARD * mult:
+                    share = 1.0
+                    if w1 > n_days:
+                        # 관측 끝에 걸친 회차: 종료일 뒤 방문은 만들지 않으므로 이 회차의 방문 수로 이용을 판정하면
+                        # 모두 '방문 0일'이 된다. 직전 회차 이용으로 배수를 정하고, 관측된 몫만큼만 해지 확률을 준다
+                        share = (n_days - w0) / (w1 - w0)
+                        p0 = max((_add_months(start, k - 2) - self.start_date).days, d + 1) if k > 1 else w0
+                        prev = [v for v in self.visit_days[pid] if p0 <= v < w0]
+                        n_use = len(prev) if k > 1 else 1
+                    else:
+                        n_use = len(used)
+                    mult = SUB_USE_MULT[0 if not n_use else 1 if n_use <= 2 else 2]
+                    if rng.random() < SUB_HAZARD * mult * share:
                         if used:
                             cancel = used[0]
                         elif w0 <= min(w1, n_days) - 1:

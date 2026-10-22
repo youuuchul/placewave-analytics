@@ -137,6 +137,7 @@ export default function E1({ rows }: { rows: ExpRankerRequest[] }) {
     return e ? mde(e, 1) : null
   })()
   const applyLine = guards.find((l) => l.key === 'apply')
+  const applyCmp = compareArms(run, EXP_METRICS.apply)
   const failed = guards.filter((l) => !l.pass).map((l) => l.label)
 
   const days = eachDay(AB.run[0], AB.run[1])
@@ -268,16 +269,27 @@ export default function E1({ rows }: { rows: ExpRankerRequest[] }) {
             `주 지표 검색 성공률은 ${primary.c} → ${primary.t}, 차이 ${primary.ci}로 구간 하한이 0보다 크다(p ${fmtP(primary.p)}).`,
             `보조 지표는 Holm 보정 뒤에도 ${lines.filter((l) => l.role === '보조 지표' && l.call === '개선').map((l) => l.label).join(' · ') || '없음'}이 개선이다. 결과 0건이 줄어 검색이 해석되고, 관련도 높은 결과가 위로 와서 첫 클릭 순위가 앞당겨졌다.`,
             `가드레일 3개는 ${guardsOk ? '모두 통과했다' : `${failed.join(' · ')}이 통과하지 못했다`}. ${guards.map((l) => `${l.label} ${l.ci}`).join(', ')}.`,
-            ...(applyLine && applyLine.pass && sc
+            ...(applyCmp && applyLine?.pass
               ? [
-                  `검색 세션 신청 전환 차이는 ${applyLine.ci}로 구간이 넓다. 설계서의 최소 검출 효과(±${((applyMde ?? 0) * 100).toFixed(2)}%p)보다 작은 변화는 2주로 가려내지 못하므로, 전체 적용 뒤 주 단위로 이어서 본다.`,
+                  applyCmp.ci.lo > 0
+                    ? `검색 세션 신청 전환도 ${applyLine.ci}로 올랐다. 가드레일이라 출시 판정에는 쓰지 않지만, 결과를 찾은 검색 세션이 신청까지 이어진다는 방향과 맞다. 구간이 넓어 크기는 전체 적용 뒤 주 단위로 이어서 본다.`
+                    : `검색 세션 신청 전환 차이는 ${applyLine.ci}로 구간이 넓다. 설계서의 최소 검출 효과(±${((applyMde ?? 0) * 100).toFixed(2)}%p)보다 작은 변화는 2주로 가려내지 못하므로, 전체 적용 뒤 주 단위로 이어서 본다.`,
+                ]
+              : []),
+            ...(preS && preS.ci.p < 0.05
+              ? [
+                  `실험 전 2주에도 두 집단의 검색 성공률이 ${ciText(preS)}로 달랐다(p ${fmtP(preS.ci.p)}). 배정은 기기 해시라 우연한 차이로 보고, ${
+                    preS.ci.d < 0 ? '실험군이 낮은 쪽이라 실험 기간 효과를 작게 잡는 방향이다' : '실험군이 높은 쪽이라 실험 기간 효과를 그만큼 덜어 읽어야 한다'
+                  }. 실험 기간 차이(${primary.ci.split(' ')[0]})에 비하면 작다.`,
                 ]
               : []),
             widthRatio >= 1.05
               ? `기기 단위 구간이 요청을 독립으로 본 구간보다 ${widthRatio.toFixed(2)}배 넓다. 한 기기의 검색끼리 성향이 비슷해 정보가 겹치기 때문이며, 판정은 기기 단위 구간으로 했다.`
               : `기기 단위 구간과 요청을 독립으로 본 구간의 폭이 거의 같다(${widthRatio.toFixed(2)}배). 기기당 검색이 2주에 평균 ${perDevice.toFixed(1)}건이라 기기 안 상관의 영향이 작다. 판정은 설계서대로 기기 단위 구간으로 했다.`,
             `주별로 나누면 검색 성공률 차이는 첫 주 ${ciText(w1)}, 둘째 주 ${ciText(w2)}다. ${
-              novel ? '둘째 주 효과가 첫 주보다 작아 신규성 효과가 섞였을 수 있다' : '둘째 주에도 효과가 이어져 첫 며칠에만 몰린 신규성 효과로 보이지 않는다'
+              novel
+                ? `둘째 주 효과가 첫 주보다 ${((w1!.ci.d - w2!.ci.d) * 100).toFixed(1)}%p 작아 신규성 효과가 섞였을 수 있다. 전체 적용 뒤 주별 성공률을 이어서 본다`
+                : '둘째 주에도 효과가 이어져 첫 며칠에만 몰린 신규성 효과로 보이지 않는다'
             }. 의도 유형·플랫폼별 차이는 탐색용이다.`,
           ]}
         />

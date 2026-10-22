@@ -4,22 +4,32 @@
 
 마트 열 기준 정의. 비율은 마트에 저장하지 않고 분자·분모 열을 화면에서 나눈다(예외: 화면 계약상 `monthly_summary.w1_retention`). 산식의 원본은 `bigquery/sql/` 의 마트 생성 SQL 이며, 이 문서는 그 열을 가리킨다. 대시보드의 `지표 가이드` 페이지와 타일 이름 옆 `?` 가 같은 원본을 보여준다.
 
-지표 111개 · 탭 9개.
+지표 112개 · 탭 8개.
 
 수익 축: 플랫폼 매출 2 · 거래 수수료 7 · 멤버십 13 · 파트너 플랜 11. 축은 지표가 어느 수익 갈래(마켓플레이스 거래 · 소비자 구독 · 공간 B2B)의 건강을 재는지를 뜻하며, 공통은 플랫폼 매출 전체다.
+
+## 북극성 지표
+
+**C12 결제**. 티켓 결제 건수(C12 결제, 로그 기준, 환불 포함). 결제 1건에 소비자가 찾은 경험과 공간의 판매가 같이 담기고, 멤버 할인과 파트너 플랜도 이 1건 단위에서 쓰인다. 거래액은 (결제 − 환불) × 객단가로 바로 아래에서 읽고, 플랫폼 매출은 결과 지표다. 근거·고르지 않은 후보·한계·출처는 [business_model.md §0](business_model.md#0-북극성-지표--티켓-결제-건수).
+
+| 축 | 입력 지표 | 가드레일 |
+|---|---|---|
+| 티켓 결제 | C15 전체 전환율 · C22 결제자 · M06 객단가 | M12 환불률 10% 안쪽 · M11 실효 수수료율 5~7% |
+| 멤버십 | S01 활성 구독자 · S05 구독 월 해지율 · S06 구독자 vs 비구독 회원 결제 | S11 멤버 할인 부담률 30% 안쪽 |
+| 공간 사업자 | P02 파트너 공간 · P11 계약 월 해지율 · M08 파트너 거래액 비중 | P16 파트너 부담률 15% 안쪽 |
 
 ## 탭이 답하는 질문
 
 | 탭 | 질문 | 주 사용자 | 핵심 지표 |
 |---|---|---|---|
-| 개요 | 서비스가 이번 기간 커지고 있는가, 플랫폼 매출은 어느 갈래에서 나오는가 | 경영진 · 전 직군 | V12 방문자 · M01 플랫폼 매출 · S01 활성 구독자 |
+| 개요 | 서비스가 이번 기간 커지고 있는가, 플랫폼 매출은 어느 갈래에서 나오는가 | 경영진 · 전 직군 | C12 결제 · V12 방문자 · M01 플랫폼 매출 |
 | 퍼널 | 방문한 사람이 결제까지 가는 길에서 어디서 가장 많이 빠지는가 | 프로덕트 · 데이터 분석 | C15 전체 전환율 · C16 최대 이탈 단계 · E01 탐색 도달률 |
-| 검색 | 검색이 어디서 실패하고, 랭킹 개선이 실패를 줄였는가 | 프로덕트 · 검색 · 데이터 분석 | Q03 결과 0건 비율 · Q05 평균 첫 클릭 순위 · Q06 상위 3위 클릭 비중 |
+| 검색 | 검색이 어디서 실패하고, 랭킹 개선이 실패를 줄였는가 | 프로덕트 · 검색 · 데이터 분석 | Q12 검색 성공률 · Q03 결과 0건 비율 · Q05 평균 첫 클릭 순위 |
 | 행사·결제 | 어떤 이벤트·공간이 거래를 만들고, 거래액 중 얼마가 수수료로 남으며 할인·환불은 어떻게 움직이는가 | 운영 · 파트너십 | M09 거래액 · M11 실효 수수료율 · M12 환불률 |
 | 회원 | 방문자가 회원·구독자로 바뀌고 멤버십이 유지되는가 | 프로덕트 · 마케팅 | C01 신규 방문자 대비 가입 · S05 구독 월 해지율 · S08 구독 LTV(추정) |
 | 공간 | 파트너 계약이 늘고 유지되며 플랜 매출로 이어지는가 | 파트너십 · 경영진 | P05 파트너 플랜 MRR · P11 계약 월 해지율 · P13 GRR |
 | 유입·광고 | 어떤 유입과 캠페인이 가입·결제로 이어지고 비용 대비 효율은 어떤가 | 마케팅 | A02 광고 세션 비중 · A05 가입당 비용(CAC) · A06 ROAS |
-| 평가 운영 | 이번 주 평가 목표를 품질 기준 안에서 채우고 있는가, 막힌 곳은 어디인가 | 검색 운영 · 평가 운영 | L02 목표 대비 진척률 · L07 정답셋 정확도 · L09 일치도 카파 |
+| 라벨링 운영 (보고서) | 이번 주 라벨링 목표를 품질 기준 안에서 채우고 있는가, 막힌 곳은 어디인가. 검색 품질 개선 보고서의 라벨링 운영 단계에서 본다 | 검색 운영 · 평가 운영 | L02 목표 대비 진척률 · L07 정답셋 정확도 · L09 일치도 카파 |
 | 주간·월간 | 주·월 단위로 활성 사용자와 재방문이 유지되는가 | 경영진 · 데이터 분석 | V03 주간 방문자(WAU) · V05 재방문 비중 · R03 월 리텐션 Mn |
 
 ## 공통 규칙
@@ -66,14 +76,15 @@
 
 | 코드 | 이름 | 탭 | 축 | 단위 | 정의 | 산식 | 분모 | 마트 열 | 의의 |
 |---|---|---|---|---|---|---|---|---|---|
+| C12 | **결제** | 개요 | — | 건 | 결제 완료 이벤트 수 | Σ pay_count | — | `daily_metrics.pay_count` | 거래의 양 |
 | C01 | 신규 방문자 대비 가입 | 회원 | — | 사람 | 신규 방문자 대비 가입한 사람 | Σ signups ÷ Σ new_persons | 신규 방문자 | `daily_metrics.signups`, `daily_metrics.new_persons` | 첫 방문을 회원으로 바꾸는 힘 |
 | C06 | 취소율 | 행사·결제 | — | 건 | 기간 안에 일어난 취소 건을 기간 안 신청 건으로 나눈 값(취소일 기준이라 분자의 취소가 기간 이전 신청분일 수 있다) | Σ cancels ÷ Σ applies | 신청 | `daily_metrics.cancels`, `daily_metrics.applies` | 노쇼·환불 위험 |
+| C22 | 결제자 | 행사·결제 | — | 명 | 기간 안에 티켓을 1건 이상 결제한 사람 수(기간 고유) | 고유(paid) | — | `person_day.flags(paid)` | 결제 건수가 소수의 반복 구매로 늘었는지, 결제하는 사람이 늘었는지 가른다 |
 | C07 | 결제자당 금액 | 행사·결제 | — | 원 | 기간 결제 금액을 기간 고유 결제자로 나눈 값 | Σ pay_amount ÷ 고유(paid) | 결제한 사람(기간 고유) | `daily_metrics.pay_amount`, `person_day.flags(paid)` | 사람당 지출 크기 |
 | C08 | 방문 퍼널 단계 | 퍼널 | — | 사람 | 랜딩 → 행사 상세 → 로그인·가입 → 신청 화면 → 결제, 같은 날 누적 조건 | 단계별 고유 사람 (person_day 비트 AND) | 이전 단계 | `funnel_daily.persons`, `person_day.flags` | 퍼널 탭의 뼈대 |
 | C09 | 오디언스별 퍼널 단계 | 퍼널 | — | 사람 × 주 | 그 주 그 오디언스 중 그 단계까지 도달한 사람 | Σ step_k ÷ Σ landing | 그 오디언스의 랜딩 | `weekly_audience_funnel.persons` | 누구에게 어느 단계가 막히는가 |
 | C10 | 가입 | 개요 | — | 명 | 그날 가입한 사람(사람당 1회) | Σ signups | — | `daily_metrics.signups` | 회원 기반 성장 |
 | C11 | 신청 | 행사·결제 | — | 건 | 행사 신청 이벤트 수 | Σ applies | — | `daily_metrics.applies` | 수요의 양 |
-| C12 | 결제 | 개요 | — | 건 | 결제 완료 이벤트 수 | Σ pay_count | — | `daily_metrics.pay_count` | 거래의 양 |
 | C13 | 결제 금액(로그) | 개요 | — | 원 | 로그 결제 이벤트 금액 합(할인 전). 원장 거래액(M09)과 원천만 다른 같은 돈 | Σ pay_amount | — | `daily_metrics.pay_amount` | 세그먼트로 쪼갤 수 있는 결제 규모. 원장과의 합계 비교는 검사 C9 |
 | C14 | 결제 퍼널 | 행사·결제 | — | 사람 | 행사 상세 → 신청 화면 → 결제, 같은 날 누적 조건의 기간 고유 사람 | 고유(event_detail ∧ apply_view ∧ paid) 등 비트 AND | 이전 단계 | `person_day.flags` | 행사 화면 이후 결제까지의 이탈 |
 | C15 | 전체 전환율 | 퍼널 | — | 사람 | 랜딩한 사람 중 같은 날 결제까지 간 사람 | n(payment) ÷ n(landing) | 랜딩(방문자) | `person_day.flags`, `funnel_daily.persons` | 퍼널 전체 효율 한 숫자 |
@@ -217,42 +228,42 @@
 | Q01 | 검색 이용자 | 검색 | — | 사람 | 기간 안에 검색을 1회 이상 한 고유 사람 | 고유(searched) | — | `person_day.flags(searched)` | 검색 기능이 쓰이는 규모 |
 | Q02 | 검색 수 | 검색 | — | 건 | 서버가 받은 검색 요청 건수 | Σ searches | — | `daily_search.searches` | 검색 품질 지표의 분모 |
 | Q03 | 결과 0건 비율 | 검색 | — | 건 | 결과가 하나도 없었던 검색의 비중 | Σ zero_result_searches ÷ Σ searches | 검색 수 | `daily_search.zero_result_searches`, `daily_search.searches` | 검색이 아무것도 못 보여준 실패 |
-| Q04 | 결과 클릭률 | 검색 | — | 건 | GA 와 매칭된 검색 중 결과가 있었던 검색에서 결과를 눌러 공간 상세로 간 비중 | Σ clicked_searches ÷ Σ matched_result_searches | 결과 있는 매칭 검색 | `daily_search.clicked_searches`, `daily_search.matched_result_searches` | 결과가 쓸모 있었는가 |
+| Q04 | 결과 클릭률 | 검색 | — | 건 | 결과가 1건 이상인 검색 중 결과를 1번 이상 클릭한 비중. 검색 성공률 = (1 − 결과 0건 비율) × 결과 클릭률 | Σ clicked_searches ÷ Σ result_searches | 결과 있는 검색 | `daily_search.clicked_searches`, `daily_search.result_searches` | 결과가 쓸모 있었는가 |
 | Q05 | 평균 첫 클릭 순위 | 검색 | — | 순위 | 클릭된 검색에서 처음 누른 결과의 노출 순위 평균(1이 맨 위) | Σ first_click_position_sum ÷ Σ clicked_searches | 클릭된 검색 | `daily_search.first_click_position_sum`, `daily_search.clicked_searches` | 원하는 결과가 위에 있는가 |
 | Q06 | 상위 3위 클릭 비중 | 검색 | — | 건 | 클릭된 검색 중 첫 클릭이 1~3위였던 비중 | Σ top3_clicks ÷ Σ clicked_searches | 클릭된 검색 | `daily_search.top3_clicks`, `daily_search.clicked_searches` | 랭킹 품질을 클릭으로 본 값 |
-| Q07 | 재검색률 | 검색 | — | 건 | GA 와 매칭된 검색 중 결과를 누르지 않고 바로 다시 검색한 비중 | Σ reformulated_searches ÷ Σ ga_matched_searches | 매칭 검색 | `daily_search.reformulated_searches`, `daily_search.ga_matched_searches` | 원하는 것을 못 찾아 고쳐 친 정도 |
-| Q08 | 검색 세션 신청 전환 | 검색 | — | 세션 | 검색이 있었던 방문 세션 중 같은 세션에서 행사 신청까지 간 비중. 세션은 첫 매칭 검색 행에 귀속 | Σ search_sessions_applied ÷ Σ search_sessions | 검색 세션 | `daily_search.search_sessions_applied`, `daily_search.search_sessions` | 검색이 거래로 이어지는 정도 |
+| Q07 | 재검색률 | 검색 | — | 건 | 검색 중 결과를 누르지 않고 같은 세션에서 다시 검색한 비중 | Σ reformulated_searches ÷ Σ searches | 검색 수 | `daily_search.reformulated_searches`, `daily_search.searches` | 원하는 것을 못 찾아 고쳐 친 정도 |
+| Q08 | 검색 세션 신청 전환 | 검색 | — | 세션 | 검색이 있었던 방문 세션 중 같은 세션에서 행사 신청까지 간 비중. 세션은 첫 검색 행에 귀속 | Σ search_sessions_applied ÷ Σ search_sessions | 검색 세션 | `daily_search.search_sessions_applied`, `daily_search.search_sessions` | 검색이 거래로 이어지는 정도 |
 | Q09 | 실패 검색어 | 검색 | — | 검색어 | 기간 안 검색 20건 이상이고 결과 0건 비율이 30% 이상인 검색어 | 검색어별 Σ zero_result_searches ÷ Σ searches ≥ 0.3, Σ searches ≥ 20 | — | `daily_query.searches`, `daily_query.zero_result_searches` | 평가 대상 검색어를 고르는 기준 |
 | Q10 | 실패 검색어 평가 편입률 | 검색 | — | 검색어 | 실패 검색어 중 기간 시작부터 기간 끝 7일 안까지 평가 배치에 편입된 비중. 검색팀 배치의 편입 출처(실패·상위 검색량·무작위)는 가리지 않고, 프로모션 추천 슬롯 배치는 뺀다. 실패가 반복된 검색어는 그 기간의 편입만 센다 | eval_dates 중 기간 시작 ≤ 편입일 ≤ 기간 끝 + 7일 이 있는 실패 검색어 ÷ 실패 검색어 | 실패 검색어 | `daily_query.eval_dates` | 실패가 개선 작업으로 넘어갔는가 |
-| Q11 | 로그 매칭률 | 검색 | — | 건 | 서버 검색 요청 중 GA 검색 이벤트와 매칭된 비중(기기 + 시각 ±3초) | Σ ga_matched_searches ÷ Σ searches | 검색 수 | `daily_search.ga_matched_searches`, `daily_search.searches` | 두 원천을 붙인 지표를 믿을 수 있는가 |
-| Q12 | 검색당 클릭 | 검색 | — | 건 | GA 와 매칭된 검색 중 결과를 눌러 공간 상세로 간 비중(결과 0건 검색 포함) | Σ clicked_searches ÷ Σ ga_matched_searches | 매칭 검색 | `daily_search.clicked_searches`, `daily_search.ga_matched_searches` | 결과 0건이 줄어 분모가 바뀌는 클릭률과 달리 검색 1건이 클릭으로 이어지는 정도 |
+| Q11 | GA 검색 이벤트 수집률 | 검색 | — | 건 | 서버 검색 요청 중 같은 search_id 의 GA search 이벤트가 수집된 비중. 수집 품질 확인용이며 검색 지표 계산에는 쓰지 않는다 | Σ ga_logged_searches ÷ Σ searches | 검색 수 | `daily_search.ga_logged_searches`, `daily_search.searches` | 두 원천을 붙인 지표를 믿을 수 있는가 |
+| Q12 | 검색 성공률 | 검색 | — | 건 | 검색 중 결과를 1번 이상 클릭한 비중(결과 0건 검색 포함). 검색 성공률 = (1 − 결과 0건 비율) × 결과 클릭률 | Σ clicked_searches ÷ Σ searches | 검색 수 | `daily_search.clicked_searches`, `daily_search.searches` | 결과 0건이 줄어 분모가 바뀌는 클릭률과 달리 검색 1건이 클릭으로 이어지는 정도 |
 
-검색 지표는 서버 검색 로그(`raw.search_log`)가 기준이다. 클릭·재검색·신청 같은 행동은 GA 로그에서 기기 + 시각 근접(±3초)으로 붙인다. 행동 비율의 분모는 매칭된 요청이다(Q11).
+검색 지표는 검색 서버의 요청 로그(`raw.search_log`)와 클릭 로그(`raw.search_click_log`)로 잰다. 클릭은 요청 ID 로, 세션은 요청에 실린 ga_session_id 로 붙인다. 모든 검색 비율의 기준은 서버 요청이다.
 
-결과 0건이 줄면 결과가 있는 검색이 늘어 클릭률(Q04)의 분모가 커진다. 랭킹 비교에는 검색당 클릭(Q12)·첫 클릭 순위(Q05)·상위 3위 비중(Q06)을 함께 본다.
+검색 성공률(Q12) = (1 − 결과 0건 비율(Q03)) × 결과 클릭률(Q04). 일 마트의 result_searches = searches − zero_result_searches 라 어느 축으로 더해도 정확히 성립한다(검사 I8).
 
-의도 유형은 정규화 검색어를 장르·상권(공간 원장)·행사 유형(행사 원장) 사전에 대어 분류하고, 어디에도 없으면 공간명이다.
+의도 유형은 검색어 분류기 결과다(장르·상권·행사 유형·공간명, 해석 못 한 검색어는 other).
 
-랭킹 A/B 테스트(대조군 기존 랭킹 v1 · 실험군 새 랭킹 v2, 기기 단위 무작위 50:50 배정)는 보고서 E1에 있다. 기간은 두 버전이 각각 그날 검색의 10% 이상인 날이고, 비율 차이의 95% 구간은 정규 근사, 평균 첫 클릭 순위는 웰치다.
+랭킹 버전은 세션 시작일 기준이다. 랭킹 A/B 테스트(설계서·진행 점검·결과 보고)는 검색 품질 개선 보고서에 있다.
 
 ## 평가 운영
 
 | 코드 | 이름 | 탭 | 축 | 단위 | 정의 | 산식 | 분모 | 마트 열 | 의의 |
 |---|---|---|---|---|---|---|---|---|---|
-| L01 | 라벨 수 | 평가 운영 | — | 건 | 그 주 제출된 라벨 건수(재작업 포함) | Σ labels | — | `weekly_eval_ops.labels` | 평가 처리량의 기본 단위 |
-| L02 | 목표 대비 진척률 | 평가 운영 | — | 과제 | 그 주 진행 중 배치의 완료 과제(서로 다른 평가자 라벨 수 충족)를 목표 과제로 나눈 값, 주말 시점 누적 | Σ done_tasks ÷ Σ target_tasks | 목표 과제 | `weekly_batch.done_tasks`, `weekly_batch.target_tasks` | 약속한 양을 채우고 있는가 |
-| L03 | 마감 위험 배치 | 평가 운영 | — | 배치 | 진행 배치를 배정 순서(우선순위 → 생성일)로 세웠을 때 앞 배치까지의 남은 과제 누적을 팀 처리량으로 나눈 예상 소요 일수가 마감까지 남은 일수보다 긴 배치, 또는 마감이 지난 배치 | Σ(앞 배치 포함) remaining_tasks ÷ (최근 2주 Σ tasks_completed ÷ 14) > days_to_due, 또는 days_to_due < 0 | — | `weekly_batch.remaining_tasks`, `weekly_batch.days_to_due`, `weekly_batch.priority`, `weekly_batch.created_date`, `weekly_eval_ops.tasks_completed` | 우선순위 조정·인력 재배치 신호 |
-| L04 | 활동 평가자 | 평가 운영 | — | 명 | 그 주 라벨을 1건 이상 제출한 평가자 | 고유 rater_id | — | `weekly_rater.rater_id` | 투입 인력 규모 |
-| L05 | 평가자당 라벨 수 | 평가 운영 | — | 건 | 라벨 수를 활동 평가자로 나눈 값 | Σ labels ÷ 활동 평가자 | 활동 평가자 | `weekly_eval_ops.labels`, `weekly_rater.rater_id` | 인당 생산성 |
-| L06 | 건당 처리 시간 | 평가 운영 | — | 초 | 라벨 1건 제출에 걸린 평균 시간 | Σ handle_seconds ÷ Σ labels | 라벨 수 | `weekly_eval_ops.handle_seconds`, `weekly_eval_ops.labels` | 지침·과제 난이도 변화가 생산성에 주는 영향 |
-| L07 | 정답셋 정확도 | 평가 운영 | — | 건 | 정답셋 과제에 단 첫 제출 라벨(검수 반려 전) 중 정답 등급과 같은 비중 | Σ gold_correct ÷ Σ gold_labels | 정답셋 라벨 | `weekly_eval_ops.gold_correct`, `weekly_eval_ops.gold_labels` | 라벨 품질의 절대 기준 |
-| L08 | 평가자 간 일치율 | 평가 운영 | — | 쌍 | 같은 과제의 최종 라벨 쌍 중 등급이 같은 쌍의 비중. 쌍은 늦게 낸 라벨에 귀속 | Σ agree_pairs ÷ Σ label_pairs | 라벨 쌍 | `weekly_eval_ops.agree_pairs`, `weekly_eval_ops.label_pairs` | 지침이 같은 판단을 만들고 있는가 |
-| L09 | 일치도 카파 | 평가 운영 | — | — | 우연 일치를 뺀 일치도. 관측 일치율 Po 와 등급 분포로 본 기대 일치율 Pe 로 계산 | (Po − Pe) ÷ (1 − Pe), Po = Σ agree_pairs ÷ Σ label_pairs, Pe = Σₖ (Σ labels_gₖ ÷ Σ final_labels)² | — | `weekly_eval_ops.agree_pairs`, `weekly_eval_ops.label_pairs`, `weekly_eval_ops.labels_g0`, `weekly_eval_ops.labels_g1`, `weekly_eval_ops.labels_g2`, `weekly_eval_ops.labels_g3`, `weekly_eval_ops.final_labels` | 등급 쏠림에 흔들리지 않는 일치도 |
-| L10 | 재작업률 | 평가 운영 | — | 건 | 검수에서 반려되어 다시 제출된 라벨의 비중 | Σ rework_labels ÷ Σ labels | 라벨 수 | `weekly_eval_ops.rework_labels`, `weekly_eval_ops.labels` | 검수 부담과 지침 모호성 |
-| L11 | 기준 미달 평가자 | 평가 운영 | — | 명 | 그 주 정답셋 라벨 10건 이상 중 정확도 80% 미만인 평가자 | 정확도 < 0.8 ∧ gold_labels ≥ 10 인 rater_id 수 | — | `weekly_rater.gold_correct`, `weekly_rater.gold_labels` | 재교육·배정 조정 대상 |
-| L12 | 완료 과제 | 평가 운영 | — | 과제 | 그 주 라벨 수가 과제당 필요 라벨 수에 도달한 과제 | Σ tasks_completed | — | `weekly_eval_ops.tasks_completed` | 주간 처리량을 과제 단위로 본 값 |
+| L01 | 라벨 수 | 라벨링 운영 (보고서) | — | 건 | 그 주 제출된 라벨 건수(재작업 포함) | Σ labels | — | `weekly_eval_ops.labels` | 평가 처리량의 기본 단위 |
+| L02 | 목표 대비 진척률 | 라벨링 운영 (보고서) | — | 과제 | 그 주 진행 중 배치의 완료 과제(서로 다른 평가자 라벨 수 충족)를 목표 과제로 나눈 값, 주말 시점 누적 | Σ done_tasks ÷ Σ target_tasks | 목표 과제 | `weekly_batch.done_tasks`, `weekly_batch.target_tasks` | 약속한 양을 채우고 있는가 |
+| L03 | 마감 위험 배치 | 라벨링 운영 (보고서) | — | 배치 | 진행 배치를 배정 순서(우선순위 → 생성일)로 세웠을 때 앞 배치까지의 남은 과제 누적을 팀 처리량으로 나눈 예상 소요 일수가 마감까지 남은 일수보다 긴 배치, 또는 마감이 지난 배치 | Σ(앞 배치 포함) remaining_tasks ÷ (최근 2주 Σ tasks_completed ÷ 14) > days_to_due, 또는 days_to_due < 0 | — | `weekly_batch.remaining_tasks`, `weekly_batch.days_to_due`, `weekly_batch.priority`, `weekly_batch.created_date`, `weekly_eval_ops.tasks_completed` | 우선순위 조정·인력 재배치 신호 |
+| L04 | 활동 평가자 | 라벨링 운영 (보고서) | — | 명 | 그 주 라벨을 1건 이상 제출한 평가자 | 고유 rater_id | — | `weekly_rater.rater_id` | 투입 인력 규모 |
+| L05 | 평가자당 라벨 수 | 라벨링 운영 (보고서) | — | 건 | 라벨 수를 활동 평가자로 나눈 값 | Σ labels ÷ 활동 평가자 | 활동 평가자 | `weekly_eval_ops.labels`, `weekly_rater.rater_id` | 인당 생산성 |
+| L06 | 건당 처리 시간 | 라벨링 운영 (보고서) | — | 초 | 라벨 1건 제출에 걸린 평균 시간 | Σ handle_seconds ÷ Σ labels | 라벨 수 | `weekly_eval_ops.handle_seconds`, `weekly_eval_ops.labels` | 지침·과제 난이도 변화가 생산성에 주는 영향 |
+| L07 | 정답셋 정확도 | 라벨링 운영 (보고서) | — | 건 | 정답셋 과제에 단 첫 제출 라벨(검수 반려 전) 중 정답 등급과 같은 비중 | Σ gold_correct ÷ Σ gold_labels | 정답셋 라벨 | `weekly_eval_ops.gold_correct`, `weekly_eval_ops.gold_labels` | 라벨 품질의 절대 기준 |
+| L08 | 평가자 간 일치율 | 라벨링 운영 (보고서) | — | 쌍 | 같은 과제의 최종 라벨 쌍 중 등급이 같은 쌍의 비중. 쌍은 늦게 낸 라벨에 귀속 | Σ agree_pairs ÷ Σ label_pairs | 라벨 쌍 | `weekly_eval_ops.agree_pairs`, `weekly_eval_ops.label_pairs` | 지침이 같은 판단을 만들고 있는가 |
+| L09 | 일치도 카파 | 라벨링 운영 (보고서) | — | — | 우연 일치를 뺀 일치도. 관측 일치율 Po 와 등급 분포로 본 기대 일치율 Pe 로 계산 | (Po − Pe) ÷ (1 − Pe), Po = Σ agree_pairs ÷ Σ label_pairs, Pe = Σₖ (Σ labels_gₖ ÷ Σ final_labels)² | — | `weekly_eval_ops.agree_pairs`, `weekly_eval_ops.label_pairs`, `weekly_eval_ops.labels_g0`, `weekly_eval_ops.labels_g1`, `weekly_eval_ops.labels_g2`, `weekly_eval_ops.labels_g3`, `weekly_eval_ops.final_labels` | 등급 쏠림에 흔들리지 않는 일치도 |
+| L10 | 재작업률 | 라벨링 운영 (보고서) | — | 건 | 검수에서 반려되어 다시 제출된 라벨의 비중 | Σ rework_labels ÷ Σ labels | 라벨 수 | `weekly_eval_ops.rework_labels`, `weekly_eval_ops.labels` | 검수 부담과 지침 모호성 |
+| L11 | 기준 미달 평가자 | 라벨링 운영 (보고서) | — | 명 | 그 주 정답셋 라벨 10건 이상 중 정확도 80% 미만인 평가자 | 정확도 < 0.8 ∧ gold_labels ≥ 10 인 rater_id 수 | — | `weekly_rater.gold_correct`, `weekly_rater.gold_labels` | 재교육·배정 조정 대상 |
+| L12 | 완료 과제 | 라벨링 운영 (보고서) | — | 과제 | 그 주 라벨 수가 과제당 필요 라벨 수에 도달한 과제 | Σ tasks_completed | — | `weekly_eval_ops.tasks_completed` | 주간 처리량을 과제 단위로 본 값 |
 
-평가 운영 지표는 주(월요일 시작) 단위다. 화면은 기간 프리셋 대신 주차 선택기, 세그먼트 대신 요청 부서(검색 · 추천 슬롯)를 쓴다.
+라벨링 운영 지표는 주(월요일 시작) 단위다. 보고서의 운영 대시보드는 기간 프리셋 대신 주차 선택기, 세그먼트 대신 요청 부서(검색 · 추천 슬롯)를 쓴다.
 
 카파는 마트에 저장하지 않고 성분(쌍 수·일치 쌍 수·등급별 최종 라벨 수)을 필터 적용 후 합산해 계산한다.
 

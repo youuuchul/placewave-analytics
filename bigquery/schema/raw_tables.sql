@@ -20,14 +20,14 @@
 -- 키: venue_id
 -- 파티션·클러스터: 없음 / 없음
 -- 원천: data/raw/db_venues.csv (생성기 출력). 상권·구·좌표·등록일·상태 포함
--- 소비: staging.dim_event·dim_venue·int_search, ops.reconciliation
+-- 소비: staging.dim_event·dim_venue, ops.reconciliation
 
 -- 표: raw.db_events — 서비스 RDB 행사 스냅샷 (합성)
 -- 1행: 행사 1건
 -- 키: event_id
 -- 파티션·클러스터: 없음 / 없음
 -- 원천: data/raw/db_events.csv (생성기 출력). 정원·가격대·가격·개최 시점 파트너 여부 포함
--- 소비: staging.dim_event·dim_venue·fct_order·int_search
+-- 소비: staging.dim_event·dim_venue·fct_order, ops.reconciliation
 
 -- 표: raw.db_applications — 서비스 RDB 신청 원장 스냅샷 (합성)
 -- 1행: 신청 1건
@@ -48,7 +48,8 @@
 -- 키: contract_id
 -- 파티션·클러스터: 없음 / 없음
 -- 원천: data/raw/db_venue_contracts.csv (생성기 출력). ended_at NULL = 진행 중
--- 소비: staging.dim_contract
+-- 소비: staging.dim_contract, ops.reconciliation
+-- 검사: R14
 
 -- 표: raw.db_venue_contract_changes — 서비스 RDB 파트너 계약 요금제 변경 스냅샷 (합성)
 -- 1행: 요금제 변경 1건
@@ -63,6 +64,7 @@
 -- 파티션·클러스터: 없음 / 없음
 -- 원천: data/raw/db_subscriptions.csv (생성기 출력). ended_at NULL = 진행 중
 -- 소비: staging.dim_subscription, ops.reconciliation
+-- 검사: R13
 
 -- 표: raw.ads_spend — 광고 플랫폼 일별 집행 리포트 (합성)
 -- 1행: 캠페인 × 일

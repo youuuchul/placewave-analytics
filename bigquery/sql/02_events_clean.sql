@@ -28,7 +28,7 @@ CREATE OR REPLACE TABLE staging.events_clean (
   amount INT64 OPTIONS(description='금액 파라미터 value (원). 결제=결제액, 취소=환불액'),
   price_tier STRING OPTIONS(description='가격대 파라미터 free / standard / premium'),
   search_term STRING OPTIONS(description='검색어 파라미터'),
-  search_id STRING OPTIONS(description='검색 요청 ID 파라미터 (search·select_search_result). raw.search_log.request_id 와 같은 키'),
+  search_id STRING OPTIONS(description='검색 요청 ID 파라미터 (search·select_search_result). 서버 검색 요청 로그의 request_id 와 같은 키'),
   promotion_id STRING OPTIONS(description='배너 ID 파라미터'),
   method STRING OPTIONS(description='가입·로그인·공유 방법 파라미터'),
   payment_method STRING OPTIONS(description='결제 수단 파라미터'),
