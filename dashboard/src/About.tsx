@@ -623,8 +623,8 @@ export default function About({
         </a>
         <a href={hrefs['']} onClick={open('')} className={tile}>
           <span className="text-xs font-medium text-muted">2 · 모니터링 대시보드</span>
-          <span className="text-[15px] font-semibold text-ink">질문에서 출발한 탭 9개</span>
-          <span className="text-[13px] leading-relaxed text-ink2">어느 단계에서 빠지나 · 파트너·멤버십이 거래를 늘리나 · 검색은 어디서 실패하나</span>
+          <span className="text-[15px] font-semibold text-ink">질문에서 출발한 탭 8개</span>
+          <span className="text-[13px] leading-relaxed text-ink2">방문자가 결제까지 가나 · 구독자가 계속 남나 · 파트너 계약이 유지되나</span>
           <span className="mt-auto text-xs font-medium text-accent">대시보드 →</span>
         </a>
         <a href={hrefs.reports} onClick={open('reports')} className={tile}>
@@ -641,23 +641,24 @@ export default function About({
         <p className="max-w-[720px] text-[14px] leading-relaxed text-ink2">
           Placewave는 카페·바·라운지·라이브홀·루프탑·팝업 같은 도심 공간과 그곳에서 열리는 이벤트를 찾아보고, 신청하고,
           결제하는 서비스입니다. 탐색은 누구나 할 수 있고 신청부터 로그인합니다. iOS·Android 앱과 웹으로 들어오고, 일부 방문은 SNS 광고
-          캠페인에서 옵니다. 분석할 질문은 어느 단계에서 사람이 빠지는지, 어떤 유입이 결제까지 이어지는지 두 가지입니다.
+          캠페인에서 옵니다. 첫 질문은 방문자가 결제까지 가는지, 어느 단계와 어떤 유입에서 빠지는지입니다.
         </p>
         <p className="max-w-[720px] text-[14px] leading-relaxed text-ink2">
           공간은 두 층입니다. 서울 주요 상권의 공간 1,800곳이 목록에 등록돼 있고, 그중 약 10%는 파트너 플랜(베이직 월 4.9만·프로
           14.9만 원)에 가입해 수수료 우대와 상단 노출을 받습니다. 2025년 12월부터 회원은 월 9,900원 멤버십으로 파트너 공간
-          이벤트를 15% 할인받습니다. 여기서 파트너 플랜과 멤버십이 거래를 늘리고 오래 유지되는지가 세 번째 질문입니다.
+          이벤트를 15% 할인받습니다. 여기서 구독자가 계속 남는지, 파트너 계약이 유지되는지가 다음 두 질문입니다.
         </p>
         <p className="max-w-[720px] text-[14px] leading-relaxed text-ink2">
           검색은 장르·상권·행사 유형·공간명으로 들어오는 또 하나의 입구입니다. 2026년 4월부터 검색 결과의 관련성을 사람이 평가하는
-          프로그램을 운영했고, 그 라벨로 만든 새 랭킹을 7월에 기존 랭킹과 기기 단위 무작위 50:50으로 비교한 뒤 전체에 적용했습니다. 마지막 질문은 검색이
-          어디서 실패하고, 평가와 랭킹 개선이 그 실패를 줄였는지입니다.
+          프로그램을 운영했고, 그 라벨로 만든 새 랭킹을 7월에 기존 랭킹과 기기 단위 무작위 50:50으로 비교한 뒤 전체에 적용했습니다. 검색 실패를
+          찾아 평가·랭킹 개선을 거쳐 결제까지 이어지는지 본 과정은 보고서 한 묶음으로 남겼습니다.
         </p>
       </Section>
 
       <Section n={2} title="비즈니스 모델" id={BIZ_ID}>
         <p className="max-w-[720px] text-[14px] leading-relaxed text-ink2">
-          플랫폼 매출은 수수료 · 멤버십 · 파트너 플랜 세 갈래이고, 티켓 거래액은 그 규모를 재는 지표입니다.
+          플랫폼 매출은 수수료 · 멤버십 · 파트너 플랜 세 갈래이고, 티켓 거래액은 그 규모를 재는 지표입니다. 북극성 지표는 티켓 결제
+          건수입니다. 결제 1건에 소비자가 찾은 경험과 공간의 판매가 함께 담기고, 멤버 할인과 파트너 플랜도 이 1건 단위에서 쓰입니다.
         </p>
         <div className="card p-4 sm:p-6">
           <MoneyWide />

@@ -9,7 +9,7 @@
     "name": "requested_at",
     "type": "TIMESTAMP",
     "mode": "REQUIRED",
-    "description": "서버 수신 시각 (UTC). GA search 이벤트보다 수백 ms 늦다"
+    "description": "서버 수신 시각 (UTC). GA search 이벤트(결과 화면 표시)보다 응답 시간만큼 앞선다"
   },
   {
     "name": "user_pseudo_id",
@@ -18,22 +18,34 @@
     "description": "기기 식별자 (GA user_pseudo_id 와 같은 체계)"
   },
   {
+    "name": "ga_session_id",
+    "type": "INTEGER",
+    "mode": "REQUIRED",
+    "description": "요청을 보낸 앱·웹 세션 ID (GA ga_session_id 와 같은 값, 클라이언트가 헤더로 전달)"
+  },
+  {
     "name": "query_raw",
     "type": "STRING",
     "mode": "REQUIRED",
-    "description": "입력 검색어 (GA search_term 과 같음)"
+    "description": "사용자가 입력한 검색어 그대로 (GA search_term 과 같음)"
+  },
+  {
+    "name": "query_intent",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "검색어 분류기 결과 genre / region / event_type / venue_name / other (랭킹 버전과 별개)"
   },
   {
     "name": "ranker_version",
     "type": "STRING",
     "mode": "REQUIRED",
-    "description": "랭킹 버전 v1 / v2. 2026-07-13~07-26 은 기기 해시 50% 노출"
+    "description": "랭킹 버전 v1 / v2. 세션 시작일 기준: 2026-07-13~07-26 시작 세션은 기기 해시 50:50, 07-27 부터 v2"
   },
   {
     "name": "results_count",
     "type": "INTEGER",
     "mode": "REQUIRED",
-    "description": "일치 결과 수. 0 = 결과 없음"
+    "description": "검색 결과 수. 0 = 결과 없음 (검색어를 해석하지 못함)"
   },
   {
     "name": "results",

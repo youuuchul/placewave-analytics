@@ -2,12 +2,12 @@
 -- 1행: 실행 1회 × 검사 항목
 -- 키: (run_id, check_id)
 -- 파티션·클러스터: DATE(checked_at) / 없음
--- 원천: raw.db_payments·db_applications·db_subscriptions·db_venues,
+-- 원천: raw.db_payments·db_applications·db_subscriptions·db_venues·db_events·db_venue_contracts,
 --       staging.events_clean·int_session·int_person_day·fct_order·ad_spend·dim_contract,
 --       marts.daily_metrics·weekly_cohort·daily_channel·weekly_activity·weekly_audience_funnel·weekly_path·person_day,
 --       marts.daily_revenue·daily_subscription·daily_venue_registry·daily_event·venue_registry·monthly_contract,
---       raw.search_log·eval_queries·eval_labels·eval_tasks·eval_batches, staging.int_search·int_label,
---       marts.daily_search·weekly_eval_ops·weekly_batch
+--       raw.search_log·search_click_log·eval_queries·eval_labels·eval_tasks·eval_batches, staging.int_search·int_label,
+--       marts.daily_search·exp_ranker_request·weekly_eval_ops·weekly_batch
 -- 소비: load_all.sh 8단계. passed = FALSE 가 하나라도 있으면 파이프라인이 exit 1
 --
 -- 표 정의는 sql/00_ops_tables.sql.
@@ -413,13 +413,37 @@ c16 AS (
 srch AS (
   SELECT
     COUNT(*) AS n,
-    COUNTIF(ga_matched) AS matched,
-    COUNTIF(is_clicked AND (is_zero_result OR first_click_position NOT BETWEEN 1 AND 10 OR NOT ga_matched)) AS bad_click,
+    COUNTIF(ga_logged) AS ga_logged,
+    COUNTIF(is_clicked) AS clicked,
+    COUNTIF(is_clicked AND (is_zero_result OR first_click_position NOT BETWEEN 1 AND 10)) AS bad_click,
     COUNTIF(channel1 IS NULL OR device_platform IS NULL OR member_seg IS NULL) AS no_seg,
     COUNTIF(is_session_first) AS first_rows,
-    COUNT(DISTINCT IF(ga_matched, FORMAT('%s|%d', client_id, session_id), NULL)) AS matched_sessions
+    COUNT(DISTINCT FORMAT('%s|%d', client_id, session_id)) AS search_sessions
   FROM staging.int_search
   WHERE kst_date BETWEEN DATE '2000-01-01' AND DATE '2099-12-31'
+),
+-- C21 클릭: 서버 클릭 로그의 클릭 요청 수 = 중간 표 클릭 수, 서버 요청 로그에 없는 클릭 요청 0
+clk AS (
+  SELECT
+    COUNT(DISTINCT c.request_id) AS click_requests,
+    COUNT(DISTINCT IF(r.request_id IS NULL, c.request_id, NULL)) AS orphan
+  FROM raw.search_click_log AS c
+  LEFT JOIN raw.search_log AS r USING (request_id)
+),
+-- I8 검색 지표 관계식: 행마다 result_searches = searches − zero_result_searches, clicked ≤ result_searches
+--    (그러면 성공률 = (1 − 0건 비율) × 결과 클릭률 이 어느 축으로 더해도 정확히 성립)
+ident AS (
+  SELECT COUNTIF(result_searches != searches - zero_result_searches OR clicked_searches > result_searches) AS bad
+  FROM marts.daily_search
+  WHERE kst_date BETWEEN DATE '2000-01-01' AND DATE '2099-12-31'
+),
+-- I9 랭킹 배정·기간 경계 (세션 시작일 기준): 7/13 전 v2, 7/27 부터 v1, A/B 기간 배정과 다른 버전 = 0
+assign AS (
+  SELECT
+    (SELECT COUNTIF((kst_date < DATE '2026-07-13' AND ranker_version = 'v2') OR (kst_date >= DATE '2026-07-27' AND ranker_version = 'v1'))
+       FROM staging.int_search WHERE kst_date BETWEEN DATE '2000-01-01' AND DATE '2099-12-31')
+    + (SELECT COUNTIF(ranker_version != IF(arm = 'treatment', 'v2', 'v1'))
+       FROM marts.exp_ranker_request WHERE kst_date BETWEEN DATE '2026-07-13' AND DATE '2026-07-26') AS bad
 ),
 -- C18·C19 라벨 수·정답셋 성분: 주간 마트 합 vs 원천 재집계
 lab AS (
@@ -458,6 +482,75 @@ failed_src AS (
     GROUP BY 1, 2
   ) AS w USING (batch_id, query_norm)
   WHERE q.source = 'failed'
+),
+-- R13 구독 회차 해지율: 직전 회차에 파트너 티켓을 멤버 할인으로 결제한 구독 ÷ 안 한 구독 (validate.py 와 같은 규칙)
+--     회차 k(2 이상) = [시작 + k−1 개월, 시작 + k 개월), 직전 회차 = [시작 + k−2 개월, 시작 + k−1 개월). 관측 끝을 넘는 회차는 그 안에 해지했을 때만 센다
+sub_cyc AS (
+  SELECT
+    s.subscription_id, s.member_id,
+    DATE(s.ended_at, 'Asia/Seoul') AS ended,
+    DATE_ADD(DATE(s.started_at, 'Asia/Seoul'), INTERVAL k - 2 MONTH) AS p0,
+    DATE_ADD(DATE(s.started_at, 'Asia/Seoul'), INTERVAL k - 1 MONTH) AS w0,
+    DATE_ADD(DATE(s.started_at, 'Asia/Seoul'), INTERVAL k MONTH) AS w1,
+    s.snapshot_date AS end_date
+  FROM raw.db_subscriptions AS s, UNNEST(GENERATE_ARRAY(2, 14)) AS k
+),
+sub_risk AS (
+  SELECT
+    c.subscription_id, c.w0,
+    ANY_VALUE(c.ended IS NOT NULL AND c.ended >= c.w0 AND c.ended < c.w1) AS canceled,
+    COUNT(x.d) > 0 AS used
+  FROM sub_cyc AS c
+  LEFT JOIN (
+    SELECT member_id, DATE(paid_at, 'Asia/Seoul') AS d FROM raw.db_payments WHERE kind = 'ticket' AND discount_amount > 0
+  ) AS x
+    ON x.member_id = c.member_id AND x.d >= c.p0 AND x.d < c.w0
+  WHERE (c.ended IS NULL OR c.ended >= c.w0)
+    AND c.w0 <= c.end_date
+    AND (c.w1 <= DATE_ADD(c.end_date, INTERVAL 1 DAY) OR (c.ended IS NOT NULL AND c.ended < c.w1))
+  GROUP BY 1, 2
+),
+sub_churn AS (
+  SELECT
+    SAFE_DIVIDE(COUNTIF(used AND canceled), COUNTIF(used)) AS r_used,
+    SAFE_DIVIDE(COUNTIF(NOT used AND canceled), COUNTIF(NOT used)) AS r_none
+  FROM sub_risk
+),
+-- R14 계약 월 해지율: 직전 3개월(계약 3개월 미만이면 있는 달) 월평균 파트너 거래액 하위 1/3 ÷ 상위 1/3 (validate.py 와 같은 규칙)
+pay_month AS (
+  SELECT e.venue_id, DATE_TRUNC(DATE(p.paid_at, 'Asia/Seoul'), MONTH) AS m, SUM(p.amount + p.discount_amount) AS gmv
+  FROM raw.db_payments AS p
+  JOIN raw.db_events AS e USING (event_id)
+  WHERE p.kind = 'ticket' AND p.status = 'paid'
+  GROUP BY 1, 2
+),
+con_month AS (
+  SELECT m, c.contract_id, c.venue_id, DATE(c.started_at, 'Asia/Seoul') AS st, DATE(c.ended_at, 'Asia/Seoul') AS en
+  FROM UNNEST(GENERATE_DATE_ARRAY(DATE '2025-10-01', DATE '2026-08-01', INTERVAL 1 MONTH)) AS m
+  JOIN raw.db_venue_contracts AS c
+    ON DATE(c.started_at, 'Asia/Seoul') < m AND (c.ended_at IS NULL OR DATE(c.ended_at, 'Asia/Seoul') >= m)
+),
+con_hist AS (
+  SELECT cm.m, cm.contract_id, ANY_VALUE(cm.en) AS en, AVG(COALESCE(pm.gmv, 0)) AS avg_gmv
+  FROM con_month AS cm
+  CROSS JOIN UNNEST([1, 2, 3]) AS k
+  LEFT JOIN pay_month AS pm
+    ON pm.venue_id = cm.venue_id AND pm.m = DATE_SUB(cm.m, INTERVAL k MONTH)
+  WHERE DATE_ADD(DATE_SUB(cm.m, INTERVAL k MONTH), INTERVAL 1 MONTH) > cm.st
+  GROUP BY 1, 2
+),
+con_rank AS (
+  SELECT
+    en IS NOT NULL AND en < DATE_ADD(m, INTERVAL 1 MONTH) AS churned,
+    ROW_NUMBER() OVER (PARTITION BY m ORDER BY avg_gmv, contract_id) AS rn,
+    COUNT(*) OVER (PARTITION BY m) AS n
+  FROM con_hist
+),
+con_churn AS (
+  SELECT
+    SAFE_DIVIDE(COUNTIF(rn <= DIV(n, 3) AND churned), COUNTIF(rn <= DIV(n, 3))) AS r_low,
+    SAFE_DIVIDE(COUNTIF(rn > n - DIV(n, 3) AND churned), COUNTIF(rn > n - DIV(n, 3))) AS r_high
+  FROM con_rank
 ),
 checks AS (
   SELECT 'C1a' AS check_id, 'reconcile' AS category, '결제 건수: 로그 vs 원장' AS check_name,
@@ -625,19 +718,42 @@ checks AS (
          ABS(raw_n - mart_v) + ABS(stg_v - mart_v) + bad_days, 0, 0, NULL
   FROM c16
   UNION ALL
-  SELECT 'C17', 'reconcile', '세션 대표 행: 대표 검색 행 수 vs 검색이 있었던 매칭 세션 수',
-         'is_session_first 행', first_rows, '매칭 세션 고유 수', matched_sessions,
-         ABS(first_rows - matched_sessions), 0, 0, NULL
+  SELECT 'C17', 'reconcile', '세션 대표 행: 대표 검색 행 수 vs 검색이 있었던 세션 수',
+         'is_session_first 행', first_rows, '검색 세션 고유 수', search_sessions,
+         ABS(first_rows - search_sessions), 0, 0, NULL
   FROM srch
   UNION ALL
-  SELECT 'R12', 'range', 'GA 매칭률 (서버 요청 중 GA search 와 근접 매칭)',
-         'GA 매칭 요청', matched, '서버 요청', n,
-         SAFE_DIVIDE(matched, n), 0.98, 1, NULL
+  SELECT 'R12', 'range', 'GA search 이벤트 수집률 (서버 요청 중 같은 search_id 의 GA 이벤트가 있는 비중)',
+         'GA 수집 요청', ga_logged, '서버 요청', n,
+         SAFE_DIVIDE(ga_logged, n), 0.97, 0.995, NULL
   FROM srch
   UNION ALL
-  SELECT 'I5', 'integrity', '클릭 판정: 0건·매칭 없음·순위 1~10 밖인데 클릭', '위반 요청', bad_click, NULL, NULL,
+  SELECT 'I5', 'integrity', '클릭 판정: 결과 0건이거나 순위 1~10 밖인데 클릭', '위반 요청', bad_click, NULL, NULL,
          bad_click, 0, 0, NULL
   FROM srch
+  UNION ALL
+  SELECT 'C21', 'reconcile', '검색 클릭: 서버 클릭 로그 클릭 요청 vs 중간 표 클릭 (+ 요청 로그에 없는 클릭)',
+         'search_click_log 클릭 요청', click_requests, 'int_search is_clicked', clicked,
+         ABS(click_requests - clicked) + orphan, 0, 0, NULL
+  FROM clk, srch
+  UNION ALL
+  SELECT 'I8', 'integrity', '검색 지표 관계식: result = searches − zero, clicked ≤ result (일 마트 행마다)', '위반 행', bad, NULL, NULL,
+         bad, 0, 0, NULL
+  FROM ident
+  UNION ALL
+  SELECT 'I9', 'integrity', '랭킹 배정·기간 경계: 7/13 전 v2·7/27 이후 v1·A/B 기간 배정과 다른 버전', '위반 요청', bad, NULL, NULL,
+         bad, 0, 0, NULL
+  FROM assign
+  UNION ALL
+  SELECT 'R13', 'range', '구독 회차 해지율: 직전 회차 파트너 티켓 할인 결제 있음 ÷ 없음',
+         '있음 해지율', r_used, '없음 해지율', r_none,
+         SAFE_DIVIDE(r_used, r_none), 0, 0.7, NULL
+  FROM sub_churn
+  UNION ALL
+  SELECT 'R14', 'range', '계약 월 해지율: 직전 3개월 파트너 거래액 하위 1/3 ÷ 상위 1/3',
+         '하위 1/3 해지율', r_low, '상위 1/3 해지율', r_high,
+         SAFE_DIVIDE(r_low, r_high), 1.5, 100, NULL
+  FROM con_churn
   UNION ALL
   SELECT 'I6', 'integrity', '검색 요청 세그먼트 누락', '세그먼트 NULL 요청', no_seg, NULL, NULL,
          no_seg, 0, 0, NULL

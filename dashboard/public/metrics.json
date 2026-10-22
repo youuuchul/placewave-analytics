@@ -90,13 +90,13 @@
       "채널 규칙(`channel1` paid/non_paid, `channel2` 유입 유형, `channel3` 소스)의 원본은 `bigquery/sql/01_map_channel.sql` 하나다."
     ],
     "search": [
-      "검색 지표는 서버 검색 로그(`raw.search_log`)가 기준이다. 클릭·재검색·신청 같은 행동은 GA 로그에서 기기 + 시각 근접(±3초)으로 붙인다. 행동 비율의 분모는 매칭된 요청이다(Q11).",
-      "결과 0건이 줄면 결과가 있는 검색이 늘어 클릭률(Q04)의 분모가 커진다. 랭킹 비교에는 검색당 클릭(Q12)·첫 클릭 순위(Q05)·상위 3위 비중(Q06)을 함께 본다.",
-      "의도 유형은 정규화 검색어를 장르·상권(공간 원장)·행사 유형(행사 원장) 사전에 대어 분류하고, 어디에도 없으면 공간명이다.",
-      "랭킹 A/B 테스트(대조군 기존 랭킹 v1 · 실험군 새 랭킹 v2, 기기 단위 무작위 50:50 배정)는 보고서 E1에 있다. 기간은 두 버전이 각각 그날 검색의 10% 이상인 날이고, 비율 차이의 95% 구간은 정규 근사, 평균 첫 클릭 순위는 웰치다."
+      "검색 지표는 검색 서버의 요청 로그(`raw.search_log`)와 클릭 로그(`raw.search_click_log`)로 잰다. 클릭은 요청 ID 로, 세션은 요청에 실린 ga_session_id 로 붙인다. 모든 검색 비율의 기준은 서버 요청이다.",
+      "검색 성공률(Q12) = (1 − 결과 0건 비율(Q03)) × 결과 클릭률(Q04). 일 마트의 result_searches = searches − zero_result_searches 라 어느 축으로 더해도 정확히 성립한다(검사 I8).",
+      "의도 유형은 검색어 분류기 결과다(장르·상권·행사 유형·공간명, 해석 못 한 검색어는 other).",
+      "랭킹 버전은 세션 시작일 기준이다. 랭킹 A/B 테스트(설계서·진행 점검·결과 보고)는 검색 품질 개선 보고서에 있다."
     ],
     "eval": [
-      "평가 운영 지표는 주(월요일 시작) 단위다. 화면은 기간 프리셋 대신 주차 선택기, 세그먼트 대신 요청 부서(검색 · 추천 슬롯)를 쓴다.",
+      "라벨링 운영 지표는 주(월요일 시작) 단위다. 보고서의 운영 대시보드는 기간 프리셋 대신 주차 선택기, 세그먼트 대신 요청 부서(검색 · 추천 슬롯)를 쓴다.",
       "카파는 마트에 저장하지 않고 성분(쌍 수·일치 쌍 수·등급별 최종 라벨 수)을 필터 적용 후 합산해 계산한다.",
       "과제 완료 = 서로 다른 평가자의 첫 제출 라벨 수가 배치의 `labels_per_task` 에 도달. 정답셋 과제는 평가자에게 일반 과제와 구분되지 않는다.",
       "기준 미달 평가자 = 그 주 정답셋 라벨 10건 이상이고 정확도 80% 미만."
@@ -112,9 +112,9 @@
         "전 직군"
       ],
       "key_metrics": [
+        "C12",
         "V12",
-        "M01",
-        "S01"
+        "M01"
       ]
     },
     {
@@ -141,9 +141,9 @@
         "데이터 분석"
       ],
       "key_metrics": [
+        "Q12",
         "Q03",
-        "Q05",
-        "Q06"
+        "Q05"
       ]
     },
     {
@@ -203,8 +203,8 @@
     },
     {
       "id": "evalops",
-      "name": "평가 운영",
-      "question": "이번 주 평가 목표를 품질 기준 안에서 채우고 있는가, 막힌 곳은 어디인가",
+      "name": "라벨링 운영 (보고서)",
+      "question": "이번 주 라벨링 목표를 품질 기준 안에서 채우고 있는가, 막힌 곳은 어디인가. 검색 품질 개선 보고서의 라벨링 운영 단계에서 본다",
       "users": [
         "검색 운영",
         "평가 운영"
@@ -231,6 +231,20 @@
     }
   ],
   "metrics": [
+    {
+      "id": "C12",
+      "name": "결제",
+      "tab": "overview",
+      "group": "convert",
+      "definition": "결제 완료 이벤트 수",
+      "formula": "Σ pay_count",
+      "unit": "건",
+      "denominator": "—",
+      "mart_columns": [
+        "daily_metrics.pay_count"
+      ],
+      "why": "거래의 양"
+    },
     {
       "id": "V02",
       "name": "신규 방문자",
@@ -577,20 +591,6 @@
         "daily_metrics.applies"
       ],
       "why": "수요의 양"
-    },
-    {
-      "id": "C12",
-      "name": "결제",
-      "tab": "overview",
-      "group": "convert",
-      "definition": "결제 완료 이벤트 수",
-      "formula": "Σ pay_count",
-      "unit": "건",
-      "denominator": "—",
-      "mart_columns": [
-        "daily_metrics.pay_count"
-      ],
-      "why": "거래의 양"
     },
     {
       "id": "C13",
@@ -1604,13 +1604,13 @@
       "name": "결과 클릭률",
       "tab": "search",
       "group": "search",
-      "definition": "GA 와 매칭된 검색 중 결과가 있었던 검색에서 결과를 눌러 공간 상세로 간 비중",
-      "formula": "Σ clicked_searches ÷ Σ matched_result_searches",
+      "definition": "결과가 1건 이상인 검색 중 결과를 1번 이상 클릭한 비중. 검색 성공률 = (1 − 결과 0건 비율) × 결과 클릭률",
+      "formula": "Σ clicked_searches ÷ Σ result_searches",
       "unit": "건",
-      "denominator": "결과 있는 매칭 검색",
+      "denominator": "결과 있는 검색",
       "mart_columns": [
         "daily_search.clicked_searches",
-        "daily_search.matched_result_searches"
+        "daily_search.result_searches"
       ],
       "why": "결과가 쓸모 있었는가"
     },
@@ -1650,13 +1650,13 @@
       "name": "재검색률",
       "tab": "search",
       "group": "search",
-      "definition": "GA 와 매칭된 검색 중 결과를 누르지 않고 바로 다시 검색한 비중",
-      "formula": "Σ reformulated_searches ÷ Σ ga_matched_searches",
+      "definition": "검색 중 결과를 누르지 않고 같은 세션에서 다시 검색한 비중",
+      "formula": "Σ reformulated_searches ÷ Σ searches",
       "unit": "건",
-      "denominator": "매칭 검색",
+      "denominator": "검색 수",
       "mart_columns": [
         "daily_search.reformulated_searches",
-        "daily_search.ga_matched_searches"
+        "daily_search.searches"
       ],
       "why": "원하는 것을 못 찾아 고쳐 친 정도",
       "direction": "down"
@@ -1666,7 +1666,7 @@
       "name": "검색 세션 신청 전환",
       "tab": "search",
       "group": "search",
-      "definition": "검색이 있었던 방문 세션 중 같은 세션에서 행사 신청까지 간 비중. 세션은 첫 매칭 검색 행에 귀속",
+      "definition": "검색이 있었던 방문 세션 중 같은 세션에서 행사 신청까지 간 비중. 세션은 첫 검색 행에 귀속",
       "formula": "Σ search_sessions_applied ÷ Σ search_sessions",
       "unit": "세션",
       "denominator": "검색 세션",
@@ -1708,31 +1708,31 @@
     },
     {
       "id": "Q11",
-      "name": "로그 매칭률",
+      "name": "GA 검색 이벤트 수집률",
       "tab": "search",
       "group": "search",
-      "definition": "서버 검색 요청 중 GA 검색 이벤트와 매칭된 비중(기기 + 시각 ±3초)",
-      "formula": "Σ ga_matched_searches ÷ Σ searches",
+      "definition": "서버 검색 요청 중 같은 search_id 의 GA search 이벤트가 수집된 비중. 수집 품질 확인용이며 검색 지표 계산에는 쓰지 않는다",
+      "formula": "Σ ga_logged_searches ÷ Σ searches",
       "unit": "건",
       "denominator": "검색 수",
       "mart_columns": [
-        "daily_search.ga_matched_searches",
+        "daily_search.ga_logged_searches",
         "daily_search.searches"
       ],
       "why": "두 원천을 붙인 지표를 믿을 수 있는가"
     },
     {
       "id": "Q12",
-      "name": "검색당 클릭",
+      "name": "검색 성공률",
       "tab": "search",
       "group": "search",
-      "definition": "GA 와 매칭된 검색 중 결과를 눌러 공간 상세로 간 비중(결과 0건 검색 포함)",
-      "formula": "Σ clicked_searches ÷ Σ ga_matched_searches",
+      "definition": "검색 중 결과를 1번 이상 클릭한 비중(결과 0건 검색 포함). 검색 성공률 = (1 − 결과 0건 비율) × 결과 클릭률",
+      "formula": "Σ clicked_searches ÷ Σ searches",
       "unit": "건",
-      "denominator": "매칭 검색",
+      "denominator": "검색 수",
       "mart_columns": [
         "daily_search.clicked_searches",
-        "daily_search.ga_matched_searches"
+        "daily_search.searches"
       ],
       "why": "결과 0건이 줄어 분모가 바뀌는 클릭률과 달리 검색 1건이 클릭으로 이어지는 정도"
     },

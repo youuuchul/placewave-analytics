@@ -7,7 +7,7 @@ import { GMV_COLOR, REVENUE_KINDS } from '../lib/labels'
 import { type DayRevenue, revenueByDay } from '../lib/revenue'
 import type { DailyRevenue } from '../lib/types'
 import MetricHelp from './MetricHelp'
-import { type Bucket, DeltaMark, GRAIN_LABEL, MiniSeg, autoGrain, buckets, change } from './TrendCard'
+import { type Bucket, DeltaMark, GRAIN_LABEL, MiniSeg, autoGrain, axisStep, axisWidth, buckets, change } from './TrendCard'
 
 type Grain = 'auto' | 'day' | 'week' | 'month'
 
@@ -31,6 +31,7 @@ export default function RevenueCard({
   onDrill,
   tiles: withTiles = true,
   title = '매출 구성',
+  gmv: withGmv = true,
 }: {
   rows?: DailyRevenue[]
   range: Range
@@ -39,6 +40,8 @@ export default function RevenueCard({
   onDrill: (p: { p: '1'; d: string } | { p: 'custom'; from: string; to: string }) => void
   tiles?: boolean
   title?: string
+  /** false 면 거래액 선·오른쪽 축·타일 없이 플랫폼 매출 구성만 그린다(개요). */
+  gmv?: boolean
 }) {
   const [pick, setPick] = useState<Grain>('auto')
   const hoverIdx = useRef<number | null>(null)
@@ -95,7 +98,7 @@ export default function RevenueCard({
       line: false,
       id: k.metricId,
     })),
-    { label: '거래액', cur: cur.gmv, prev: prev ? prev.gmv : null, color: GMV_COLOR, line: true, id: 'M09' },
+    ...(withGmv ? [{ label: '거래액', cur: cur.gmv, prev: prev ? prev.gmv : null, color: GMV_COLOR, line: true, id: 'M09' }] : []),
   ]
 
   const spanOf = (a: string, b: string) =>
@@ -155,10 +158,12 @@ export default function RevenueCard({
                     {k.label}
                   </span>
                 ))}
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="inline-block h-0.5 w-3.5 rounded-full" style={{ background: GMV_COLOR }} />
-                  거래액 · 오른쪽 축
-                </span>
+                {withGmv && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="inline-block h-0.5 w-3.5 rounded-full" style={{ background: GMV_COLOR }} />
+                    거래액 · 오른쪽 축
+                  </span>
+                )}
                 {hasPrev && (
                   <span className="inline-flex items-center gap-1.5">
                     <svg width="14" height="2" aria-hidden>
@@ -191,8 +196,7 @@ export default function RevenueCard({
                       tick={{ fill: 'var(--muted)', fontSize: 11 }}
                       tickLine={false}
                       axisLine={{ stroke: 'var(--axis)' }}
-                      minTickGap={18}
-                      interval="preserveStartEnd"
+                      interval={axisStep(series.points.length)}
                     />
                     <YAxis
                       yAxisId="l"
@@ -200,16 +204,17 @@ export default function RevenueCard({
                       tick={{ fill: 'var(--muted)', fontSize: 11 }}
                       tickLine={false}
                       axisLine={false}
-                      width={44}
+                      width={axisWidth(Math.max(0, ...series.points.map((p) => Math.max(p.total, p.prev ?? 0))), compact)}
                     />
                     <YAxis
                       yAxisId="r"
+                      hide={!withGmv}
                       orientation="right"
                       tickFormatter={compact}
                       tick={{ fill: 'var(--muted)', fontSize: 11 }}
                       tickLine={false}
                       axisLine={false}
-                      width={44}
+                      width={axisWidth(Math.max(0, ...series.points.map((p) => p.gmv)), compact)}
                     />
                     <Tooltip
                       cursor={{ fill: 'var(--wash)' }}
@@ -236,13 +241,15 @@ export default function RevenueCard({
                               <span className="text-ink2">플랫폼 매출</span>
                               <span className="tnum font-medium text-ink">{won(p.total)}</span>
                             </div>
-                            <div className="flex items-center justify-between gap-4 py-0.5">
-                              <span className="inline-flex items-center gap-1.5 text-ink2">
-                                <span className="inline-block h-0.5 w-2.5 rounded-full" style={{ background: GMV_COLOR }} />
-                                거래액
-                              </span>
-                              <span className="tnum font-medium text-ink">{won(p.gmv)}</span>
-                            </div>
+                            {withGmv && (
+                              <div className="flex items-center justify-between gap-4 py-0.5">
+                                <span className="inline-flex items-center gap-1.5 text-ink2">
+                                  <span className="inline-block h-0.5 w-2.5 rounded-full" style={{ background: GMV_COLOR }} />
+                                  거래액
+                                </span>
+                                <span className="tnum font-medium text-ink">{won(p.gmv)}</span>
+                              </div>
+                            )}
                             {hasPrev && (
                               <>
                                 <div className="py-0.5">
@@ -273,6 +280,7 @@ export default function RevenueCard({
                     ))}
                     <Line
                       yAxisId="r"
+                      hide={!withGmv}
                       dataKey="gmv"
                       stroke={GMV_COLOR}
                       strokeWidth={2}

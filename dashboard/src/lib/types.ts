@@ -268,8 +268,7 @@ export interface DailySearch extends Seg {
   ranker_version: string
   searches: number
   zero_result_searches: number
-  ga_matched_searches: number
-  matched_result_searches: number
+  result_searches: number
   clicked_searches: number
   first_click_position_sum: number
   first_click_position_sq_sum: number
@@ -277,6 +276,8 @@ export interface DailySearch extends Seg {
   reformulated_searches: number
   search_sessions: number
   search_sessions_applied: number
+  latency_ms_sum: number
+  ga_logged_searches: number
 }
 
 export interface DailyQuery extends Seg {
@@ -285,11 +286,29 @@ export interface DailyQuery extends Seg {
   query_intent: string
   searches: number
   zero_result_searches: number
-  ga_matched_searches: number
+  result_searches: number
   clicked_searches: number
   reformulated_searches: number
   /** 검색팀 배치(실패·상위·무작위 출처)에 편입된 날 전부, 쉼표 구분 오름차순 */
   eval_dates: string | null
+}
+
+/** 랭킹 A/B 실험 요청 단위 마트 (세션 시작일 2026-06-22 ~ 07-26). 배정은 기기 해시 규칙을 실험 전 기간에도 붙인 값 */
+export interface ExpRankerRequest extends Seg {
+  kst_date: string
+  request_id: string
+  client_id: string
+  person_id: string | null
+  arm: 'control' | 'treatment'
+  ranker_version: string
+  query_intent: string
+  is_zero_result: boolean
+  is_clicked: boolean
+  first_click_position: number | null
+  is_reformulated: boolean
+  latency_ms: number
+  is_session_first: boolean
+  session_applied: boolean
 }
 
 export interface WeeklyEvalOps {
@@ -383,6 +402,7 @@ export interface LazyTables {
   weekly_path: WeeklyPath[]
   daily_search: DailySearch[]
   daily_query: DailyQuery[]
+  exp_ranker_request: ExpRankerRequest[]
   person_day: PersonDay
 }
 

@@ -71,11 +71,18 @@
 -- 원천: data/raw/ads_spend.csv (생성기 출력). date 는 KST
 -- 소비: staging.ad_spend
 
--- 표: raw.search_log — 검색 서버 로그 (합성)
+-- 표: raw.search_log — 검색 서버 요청 로그 (합성)
 -- 1행: 검색 요청 1건
 -- 키: request_id
 -- 파티션·클러스터: requested_at / 없음
--- 원천: data/raw/search_log.ndjson.gz (generator/search_eval.py 출력, 기존 GA 로그를 읽어 만든 부속 원천). GA 와 공유 키 없음
+-- 원천: data/raw/search_log.ndjson.gz (generator/generate.py 세션 시뮬레이션 출력). GA search 이벤트의 search_id 파라미터와 같은 키, ga_session_id 로 세션 연결
+-- 소비: staging.int_search, ops.reconciliation
+
+-- 표: raw.search_click_log — 검색 서버 클릭 로그 (합성)
+-- 1행: 검색 결과 클릭 1건
+-- 키: (request_id, clicked_at)
+-- 파티션·클러스터: clicked_at / 없음
+-- 원천: data/raw/search_click_log.csv (generator/generate.py 세션 시뮬레이션 출력). 클릭 추적 엔드포인트 기록
 -- 소비: staging.int_search, ops.reconciliation
 
 -- 표: raw.eval_raters — 평가 도구 평가자 스냅샷 (합성)

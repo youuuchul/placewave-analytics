@@ -7,7 +7,7 @@ import type { Data, WeeklyBatch, WeeklyEvalOps, WeeklyRater } from '../lib/types
 import { ScatterPlot, TimeChart } from '../components/charts'
 import { DataTable, type Col } from '../components/DataTable'
 import { Card, type Delta, Empty, Legend, Tile, TileRow } from '../components/ui'
-import type { TabProps } from './common'
+import type { State } from '../lib/state'
 
 export const OPS_KEYS = [
   'labels',
@@ -103,7 +103,8 @@ interface RaterRow {
   agree_pairs: number
 }
 
-export default function EvalOps({ data, s }: TabProps) {
+/** 라벨링 운영 대시보드. 대시보드 탭이 아니라 검색 품질 개선 보고서의 라벨링 운영 단계 안에서 쓴다. */
+export default function EvalOps({ data, s }: { data: Data; s: Pick<State, 'wk' | 'rq'> }) {
   const weeks = evalWeeks(data)
   const wk = weeks.includes(s.wk) ? s.wk : weeks[weeks.length - 1]
   const prevWk = addDays(wk, -7)
@@ -178,12 +179,6 @@ export default function EvalOps({ data, s }: TabProps) {
   }))
   const marks = trendWeeks.includes(GUIDELINE_V2) ? [{ x: GUIDELINE_V2, label: '평가 지침 개정' }] : []
 
-  const byGuide = groupSum(
-    ops.filter((r) => r.week_start <= wk),
-    (r) => r.guideline_version,
-    [...OPS_KEYS],
-  )
-  const guideRows = (['v1', 'v2'] as const).filter((g) => byGuide.has(g)).map((g) => ({ g, t: byGuide.get(g)! }))
 
   const bCols: Col<WeeklyBatch>[] = [
     { key: 'id', label: '배치', value: (b) => b.batch_id },
@@ -263,7 +258,7 @@ export default function EvalOps({ data, s }: TabProps) {
 
   if (!weeks.length)
     return (
-      <Card title="평가 운영">
+      <Card title="라벨링 운영">
         <Empty />
       </Card>
     )
@@ -407,40 +402,6 @@ export default function EvalOps({ data, s }: TabProps) {
         </Card>
       </div>
 
-      <Card
-        title="평가 지침 개정 전 · 후"
-        metricId="L09"
-        meta={`${md(wk)} 주까지 누적`}
-      >
-        <div className="-mx-4 overflow-x-auto px-4 sm:-mx-5 sm:px-5">
-          <table className="w-full min-w-[560px] border-collapse text-[13px]">
-            <thead>
-              <tr className="border-b border-axis text-muted">
-                <th className="py-2 text-left font-medium">지침</th>
-                <th className="py-2 pr-3 text-right font-medium">라벨</th>
-                <th className="py-2 pr-3 text-right font-medium">정답셋 정확도</th>
-                <th className="py-2 pr-3 text-right font-medium">일치율</th>
-                <th className="py-2 pr-3 text-right font-medium">카파</th>
-                <th className="py-2 pr-3 text-right font-medium">건당 처리 시간</th>
-                <th className="py-2 text-right font-medium">재작업률</th>
-              </tr>
-            </thead>
-            <tbody>
-              {guideRows.map(({ g, t }) => (
-                <tr key={g} className="border-b border-line">
-                  <td className="py-2 text-ink2">{g === 'v1' ? '개정 전 (v1)' : '개정 후 (v2)'}</td>
-                  <td className="tnum py-2 pr-3 text-right text-ink">{num(t.labels)}</td>
-                  <td className="tnum py-2 pr-3 text-right text-ink">{pct(acc(t))}</td>
-                  <td className="tnum py-2 pr-3 text-right text-ink">{pct(agree(t))}</td>
-                  <td className="tnum py-2 pr-3 text-right text-ink">{dec(kappa(t), 2)}</td>
-                  <td className="tnum py-2 pr-3 text-right text-ink">{dec(perLabel(t), 1)}초</td>
-                  <td className="tnum py-2 text-right text-ink">{pct(rework(t))}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
     </div>
   )
 }

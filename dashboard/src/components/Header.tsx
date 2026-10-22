@@ -117,7 +117,6 @@ export default function Header({
             <span className="tnum shrink-0 text-xs text-muted sm:hidden">기준일 {md(toDate)}</span>
           </>
         )}
-        <span className="shrink-0 text-xs text-muted">시나리오 생성 데이터</span>
         <button
           type="button"
           onClick={onTheme}

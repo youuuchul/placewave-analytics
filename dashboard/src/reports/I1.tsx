@@ -8,7 +8,7 @@ import type { Data, DailyQuery, DailySearch, WeeklyBatch } from '../lib/types'
 import { TimeChart } from '../components/charts'
 import { Card, Legend } from '../components/ui'
 import { riskIds, status, teamPace } from '../tabs/EvalOps'
-import { Block, Bullets, DashLinks, Dataset, Para, QA, SideTable, Spec, type Cell } from './Frame'
+import { Block, Bullets, DashLinks, Dataset, Para, SideTable, Spec, type Cell } from './Frame'
 
 const FROM = '2026-08-29'
 const TO = '2026-09-14'
@@ -173,21 +173,6 @@ export default function I1({ data, search, queries }: { data: Data; search: Dail
             '회귀는 시나리오가 넣은 사건이다. 실제라면 배포 기록과 색인 전후 비교로 원인을 확정해야 한다.',
             '회귀 검증 배치 라벨로 순위 품질이 회귀 전 수준으로 돌아왔는지는 수치로 비교하지 않았다.',
             '4일짜리 회귀라 28일 창에서는 상권 검색어의 0건 비율이 30%에 못 미쳐 실패 검색어가 0개로 보인다. 모니터링은 일·주 단위로 봐야 잡힌다.',
-          ]}
-        />
-      </Block>
-
-      <Block title="예상 질문">
-        <QA
-          items={[
-            ['어떻게 감지했나?', '검색 탭의 일별 결과 0건 비율이 9/1에 평소 범위를 크게 벗어났고, 그 주 실패 검색어 표에 상권 검색어 9개가 한꺼번에 올라왔다. 의도 유형별로 나눠 상권 검색어에 몰린 것을 확인했다.'],
-            [
-              '실제 서비스라면 무엇을 더 했겠나?',
-              '재색인 전후 0건 비율 자동 비교를 배포 게이트로 두고, 구분자·대소문자 정규화 회귀 테스트 세트, 0건 비율 일별 경보(전주 평균 + 3σ), 장애 기록(타임라인·영향 검색 수)을 붙인다.',
-            ],
-            ['핫픽스로 0건이 돌아왔는데 왜 회귀 검증 배치를 돌렸나?', '0건 비율이 돌아온 것만으로는 순위 품질이 같은지 모른다. 실패했던 검색어와 상위 검색어에 다시 라벨을 붙여 회귀가 남았는지 확인한다.'],
-            ['정기 배치를 왜 미뤘나?', '정기 배치의 지연은 다음 학습이 며칠 늦어지는 비용이고, 회귀는 사용자가 지금 보는 결과다. 그래서 긴급 배치를 앞세우고 정기 배치의 마감 위험을 감수했다.'],
-            ['28일 화면에서는 왜 안 보이나?', '실패 검색어 판정은 기간 합으로 하므로 4일짜리 급증이 28일에 희석된다. 일별 추이와 주 단위 실패 검색어를 같이 봐야 한다.'],
           ]}
         />
       </Block>

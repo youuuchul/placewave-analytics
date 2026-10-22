@@ -1,8 +1,8 @@
 import { useMemo } from 'react'
 import { bucketed, groupSum, inRange, segFilter, sum, uniqueByMasks } from '../lib/agg'
-import { md, mondayOf } from '../lib/date'
+import { md } from '../lib/date'
 import { dec, num, pct, ratio } from '../lib/format'
-import { applyRate, avgPos, ctr, FAILED_MIN, queryStats, rankerSpan, reform, SEARCH_KEYS, zeroRate } from '../lib/experiments'
+import { applyRate, avgPos, ctr, FAILED_MIN, queryStats, reform, SEARCH_KEYS, success, zeroRate } from '../lib/experiments'
 import { QUERY_INTENT, S } from '../lib/labels'
 import { F } from '../lib/persons'
 import { ready, useTable, waitOf } from '../lib/source'
@@ -28,29 +28,17 @@ function Quality({ data, s, range, rows }: TabProps & { rows: DailySearch[] }) {
   const pCur = useMemo(() => searchers(range.from, range.to), [pd, range.from, range.to, s.ch, s.pf, s.ms])
   const pPrev = useMemo(() => searchers(range.prevFrom, range.prevTo), [pd, range.prevFrom, range.prevTo, s.ch, s.pf, s.ms])
 
-  const span = rankerSpan(rows)
   const b = bucketed(segRows, [...KEYS], range)
-  const trend = b.rows.map((r) => ({ date: r.date, zero: zeroRate(r), ctr: ctr(r) }))
-  // 주 단위에서는 A/B 시작과 전체 적용이 2주 차이라 이름이 겹친다. 표식 하나로 합친다
-  const marks = span
-    ? (b.weekly
-        ? [{ x: span.from, label: '새 랭킹 A/B → 전체 적용' }]
-        : [
-            { x: span.from, label: 'A/B 테스트 시작' },
-            { x: span.v2All!, label: '새 랭킹 전체 적용' },
-          ]
-      )
-        .map((m) => ({ ...m, x: b.weekly ? mondayOf(m.x) : m.x }))
-        .filter((m) => trend.some((t) => t.date === m.x))
-    : []
+  const trend = b.rows.map((r) => ({ date: r.date, zero: zeroRate(r), success: success(r) }))
 
   const intents = groupSum(inRange(segRows, range.from, range.to), (r) => r.query_intent, [...KEYS])
   const intentRows = [...intents.entries()].map(([k, v]) => ({ key: k, ...v }))
   const intentCols: Col<(typeof intentRows)[number]>[] = [
     { key: 'name', label: '의도 유형', value: (r) => QUERY_INTENT[r.key] ?? r.key },
     { key: 'searches', label: '검색 수', value: (r) => r.searches, render: (r) => num(r.searches), num: true },
+    { key: 'success', label: '성공률', value: (r) => success(r), render: (r) => pct(success(r)), num: true },
     { key: 'zero', label: '결과 0건', value: (r) => zeroRate(r), render: (r) => pct(zeroRate(r)), num: true },
-    { key: 'ctr', label: '클릭률', value: (r) => ctr(r), render: (r) => pct(ctr(r)), num: true },
+    { key: 'ctr', label: '결과 클릭률', value: (r) => ctr(r), render: (r) => pct(ctr(r)), num: true },
     { key: 'pos', label: '첫 클릭 순위', value: (r) => avgPos(r), render: (r) => dec(avgPos(r), 2), num: true },
     { key: 'reform', label: '재검색률', value: (r) => reform(r), render: (r) => pct(reform(r)), num: true },
   ]
@@ -103,8 +91,8 @@ function Quality({ data, s, range, rows }: TabProps & { rows: DailySearch[] }) {
       ),
       num: true,
     },
-    { key: 'ctr', label: '클릭률', value: (r) => ratio(r.clicked, r.matched), render: (r) => pct(ratio(r.clicked, r.matched)), num: true },
-    { key: 'reform', label: '재검색률', value: (r) => ratio(r.reform, r.matched), render: (r) => pct(ratio(r.reform, r.matched)), num: true },
+    { key: 'success', label: '성공률', value: (r) => ratio(r.clicked, r.searches), render: (r) => pct(ratio(r.clicked, r.searches)), num: true },
+    { key: 'reform', label: '재검색률', value: (r) => ratio(r.reform, r.searches), render: (r) => pct(ratio(r.reform, r.searches)), num: true },
     { key: 'eval', label: '평가 편입일', value: (r) => r.evalDate, render: (r) => (r.evalDate ? md(r.evalDate) : '—'), num: true },
   ]
 
@@ -113,18 +101,18 @@ function Quality({ data, s, range, rows }: TabProps & { rows: DailySearch[] }) {
       <TileRow title={`검색 · ${vsLabel(data, range)}`}>
         <Tile metricId="Q01" label="검색 이용자" value={num(pCur)} unit="명" wait={pw} delta={delta(data, range, pCur, pPrev)} />
         <Tile
+          metricId="Q12"
+          label="검색 성공률"
+          value={pct(success(cur))}
+          sub={`결과 클릭률 ${pct(ctr(cur))}`}
+          delta={ptDelta(data, range, success(cur), success(prev))}
+        />
+        <Tile
           metricId="Q03"
           label="결과 0건 비율"
           value={pct(zeroRate(cur))}
           sub={`검색 ${num(cur.searches)}건 중`}
           delta={ptDelta(data, range, zeroRate(cur), zeroRate(prev))}
-        />
-        <Tile
-          metricId="Q04"
-          label="결과 클릭률"
-          value={pct(ctr(cur))}
-          sub={`로그 매칭 ${pct(ratio(cur.ga_matched_searches, cur.searches))}`}
-          delta={ptDelta(data, range, ctr(cur), ctr(prev))}
         />
         <Tile
           metricId="Q05"
@@ -144,13 +132,13 @@ function Quality({ data, s, range, rows }: TabProps & { rows: DailySearch[] }) {
       </TileRow>
 
       <Card
-        title="결과 0건 비율 · 결과 클릭률"
+        title="검색 성공률 · 결과 0건 비율"
         meta={grain(b.weekly)}
         right={
           <Legend
             items={[
+              { label: '검색 성공률', color: S(1), kind: 'line' },
               { label: '결과 0건', color: S(4), kind: 'line' },
-              { label: '클릭률', color: S(1), kind: 'line' },
             ]}
           />
         }
@@ -162,13 +150,12 @@ function Quality({ data, s, range, rows }: TabProps & { rows: DailySearch[] }) {
             data={trend}
             kind="line"
             series={[
+              { key: 'success', label: '검색 성공률', color: S(1) },
               { key: 'zero', label: '결과 0건', color: S(4) },
-              { key: 'ctr', label: '클릭률', color: S(1) },
             ]}
             yFormat={(v) => pct(v, 0)}
             valueFormat={(v) => pct(v)}
             tipTitle={weekTip(b.weekly)}
-            marks={marks}
             decimals
           />
         )}

@@ -83,6 +83,12 @@ export function autoGrain(range: Range): Exclude<Grain, 'auto'> {
   return 'month'
 }
 
+/** x축 라벨 간격: 8개 안팎을 고정 간격으로 (마지막 라벨을 억지로 넣지 않는다). */
+export const axisStep = (n: number) => Math.max(0, Math.ceil(n / 8) - 1)
+
+/** y축 폭: 가장 긴 눈금 글자에 맞춘다. */
+export const axisWidth = (max: number, fmt: (v: number) => string) => Math.max(36, Math.ceil(fmt(max).length * 7 + 10))
+
 export function buckets(range: Range, g: 'day' | 'week' | 'month'): Bucket[] {
   const shift = (d: string) => addDays(d, -range.days)
   if (g === 'day')
@@ -113,7 +119,9 @@ export function buckets(range: Range, g: 'day' | 'week' | 'month'): Bucket[] {
     const days = diffDays(a, b) + 1
     const partial = a !== start || b !== end
     const title = partial ? `${m} · ${md(a)}~${md(b)} (${days}일)` : m
-    out.push({ from: a, to: b, label: ym(m), title, prevTitle: spanTitle(shift(a), shift(b)), days, partial })
+    // 기준일에서 끊긴 마지막 달은 축 이름에 끝난 날을 붙인다
+    const label = b === range.to && b !== end ? `${ym(m)} (${md(b)}까지)` : ym(m)
+    out.push({ from: a, to: b, label, title, prevTitle: spanTitle(shift(a), shift(b)), days, partial })
   }
   return out
 }
@@ -476,8 +484,7 @@ export default function TrendCard<D extends Partial<Seg> & { kst_date: string },
                     tick={{ fill: 'var(--muted)', fontSize: 11 }}
                     tickLine={false}
                     axisLine={{ stroke: 'var(--axis)' }}
-                    minTickGap={18}
-                    interval="preserveStartEnd"
+                    interval={axisStep(series.points.length)}
                   />
                   <YAxis
                     domain={[0, 'auto']}
@@ -485,7 +492,7 @@ export default function TrendCard<D extends Partial<Seg> & { kst_date: string },
                     tick={{ fill: 'var(--muted)', fontSize: 11 }}
                     tickLine={false}
                     axisLine={false}
-                    width={44}
+                    width={axisWidth(series.points.reduce((m, p) => Math.max(m, Number(p.cur ?? 0), Number(p.prev ?? 0)), 0), compact)}
                   />
                   <Tooltip
                     cursor={{ stroke: 'var(--axis)', strokeWidth: 1 }}

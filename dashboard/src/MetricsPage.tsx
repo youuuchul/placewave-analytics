@@ -16,6 +16,20 @@ function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; chi
   )
 }
 
+/** 지표 코드 칩. 누르면 아래 지표 목록이 그 코드로 검색된다. */
+function MetricChip({ id, name, onClick }: { id: string; name?: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex h-6 items-center gap-1 rounded-md bg-wash px-2 text-xs text-ink2 hover:text-ink"
+    >
+      <span className="tnum text-[11px] text-muted">{id}</span>
+      {name}
+    </button>
+  )
+}
+
 function hit(m: MetricDef, q: string): boolean {
   if (!q) return true
   const s = q.toLowerCase()
@@ -37,6 +51,7 @@ export default function MetricsPage() {
     return <main className="mx-auto max-w-[1280px] px-4 pt-8 text-sm text-muted sm:px-6">지표 정의를 불러오지 못했습니다</main>
 
   const byId = new Map(spec.metrics.map((m) => [m.id, m]))
+  const ns = spec.north_star
   const axisName = new Map((spec.axes ?? []).map((a) => [a.id, a.name]))
   const groupName = new Map(spec.groups.map((g) => [g.id, g.name]))
   const count = (id: string) => spec.metrics.filter((m) => m.tab === id).length
@@ -54,6 +69,79 @@ export default function MetricsPage() {
           지표 {spec.metrics.length} · 탭 {spec.tabs.length}
         </span>
       </div>
+
+      {ns && (
+        <section className="flex flex-col gap-3" id="north-star">
+          <h3 className="text-[15px] font-semibold text-ink">북극성 지표</h3>
+          <p className="max-w-[860px] text-[14px] leading-relaxed text-ink">{ns.definition}</p>
+          <div className="card overflow-hidden">
+            <div className="hidden grid-cols-[112px_minmax(0,1.4fr)_minmax(0,1fr)] gap-4 border-b border-axis px-4 py-2 text-xs font-medium text-muted lg:grid">
+              <span>축</span>
+              <span>입력 지표</span>
+              <span>가드레일</span>
+            </div>
+            {ns.axes.map((a) => (
+              <div
+                key={a.axis}
+                className="grid gap-x-4 gap-y-1.5 border-b border-line px-4 py-3 last:border-b-0 lg:grid-cols-[112px_minmax(0,1.4fr)_minmax(0,1fr)] lg:items-center"
+              >
+                <span className="text-[14px] font-semibold text-ink">{a.axis}</span>
+                <span className="flex flex-wrap gap-1">
+                  {a.inputs.map((k) => (
+                    <MetricChip key={k} id={k} name={byId.get(k)?.name} onClick={() => jump(k)} />
+                  ))}
+                </span>
+                <span className="flex flex-wrap gap-1">
+                  {a.guardrails.map((g) => (
+                    <MetricChip key={g.id} id={g.id} name={`${byId.get(g.id)?.name ?? ''} ${g.rule}`} onClick={() => jump(g.id)} />
+                  ))}
+                </span>
+              </div>
+            ))}
+          </div>
+          <details className="group max-w-[960px] rounded-xl border border-line px-4 py-3">
+            <summary className="cursor-pointer list-none text-[13px] font-medium text-ink2 marker:hidden">
+              <span className="mr-1 text-muted group-open:hidden">+</span>
+              <span className="mr-1 hidden text-muted group-open:inline">−</span>
+              근거 더 보기
+            </summary>
+            <div className="flex flex-col gap-4 pt-3 text-[13px] leading-relaxed text-ink2">
+              <ul className="flex flex-col gap-1.5">
+                {ns.reasons.map((r) => (
+                  <li key={r.head}>
+                    <span className="font-medium text-ink">{r.head}</span> {r.body}
+                  </li>
+                ))}
+              </ul>
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-muted">고르지 않은 후보</span>
+                <ul className="flex flex-col gap-1">
+                  {ns.rejected.map((r) => (
+                    <li key={r.name}>
+                      <span className="text-ink">{r.name}</span> · {r.reason}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-muted">한계</span>
+                <ul className="flex flex-col gap-1">
+                  {ns.limits.map((x) => (
+                    <li key={x}>{x}</li>
+                  ))}
+                </ul>
+              </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                {ns.sources.map((x) => (
+                  <a key={x.url} href={x.url} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+                    {x.label} ↗
+                  </a>
+                ))}
+              </div>
+            </div>
+          </details>
+        </section>
+      )}
 
       <section className="flex flex-col gap-3">
         <h3 className="text-[15px] font-semibold text-ink">탭별 질문</h3>
@@ -74,15 +162,7 @@ export default function MetricsPage() {
               <span className="text-xs text-muted lg:text-[13px] lg:text-ink2">{t.users.join(' · ')}</span>
               <span className="flex flex-wrap gap-1">
                 {t.key_metrics.map((k) => (
-                  <button
-                    key={k}
-                    type="button"
-                    onClick={() => jump(k)}
-                    className="inline-flex h-6 items-center gap-1 rounded-md bg-wash px-2 text-xs text-ink2 hover:text-ink"
-                  >
-                    <span className="tnum text-[11px] text-muted">{k}</span>
-                    {byId.get(k)?.name}
-                  </button>
+                  <MetricChip key={k} id={k} name={byId.get(k)?.name} onClick={() => jump(k)} />
                 ))}
               </span>
             </div>
@@ -129,7 +209,7 @@ export default function MetricsPage() {
               className="grid gap-x-4 gap-y-2 border-b border-line px-4 py-3 text-[13px] last:border-b-0 lg:grid-cols-[minmax(0,200px)_minmax(0,1.3fr)_minmax(0,1.2fr)_72px_minmax(0,1fr)]"
             >
               <div className="flex min-w-0 flex-col gap-0.5">
-                <span className="font-semibold text-ink">{m.name}</span>
+                <span className={`font-semibold text-ink ${m.id === ns?.metric ? 'text-[15px]' : ''}`}>{m.name}</span>
                 <span className="tnum text-xs text-muted">
                   {m.id} · {groupName.get(m.group) ?? m.group}
                   {m.axis && axisName.has(m.axis) ? ` · ${axisName.get(m.axis)}` : ''}

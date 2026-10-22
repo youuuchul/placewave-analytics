@@ -1,0 +1,38 @@
+[
+  {
+    "name": "request_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "클릭한 결과가 속한 검색 요청 ID (raw.search_log.request_id)"
+  },
+  {
+    "name": "clicked_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "서버 클릭 기록 시각 (UTC)"
+  },
+  {
+    "name": "position",
+    "type": "INTEGER",
+    "mode": "REQUIRED",
+    "description": "클릭한 결과의 노출 순위 (1 = 맨 위)"
+  },
+  {
+    "name": "item_type",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "venue / event"
+  },
+  {
+    "name": "item_id",
+    "type": "INTEGER",
+    "mode": "REQUIRED",
+    "description": "공간 ID 또는 행사 ID"
+  },
+  {
+    "name": "snapshot_date",
+    "type": "DATE",
+    "mode": "REQUIRED",
+    "description": "스냅샷 기준일 (생성 종료일, KST)"
+  }
+]

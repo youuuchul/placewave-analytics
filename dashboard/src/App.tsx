@@ -9,7 +9,6 @@ import { Segmented, Select } from './components/ui'
 import Overview from './tabs/Overview'
 import FunnelTab from './tabs/FunnelTab'
 import Search from './tabs/Search'
-import EvalOps, { evalWeeks } from './tabs/EvalOps'
 import About from './About'
 import DataPage from './DataPage'
 import MetricsPage from './MetricsPage'
@@ -21,7 +20,7 @@ import Events from './tabs/Events'
 import Members from './tabs/Members'
 import Acquisition from './tabs/Acquisition'
 import Periodic, { completeWeeks, defaultMonth, summaryMonths } from './tabs/Periodic'
-import { PRICE_TIER, REQUESTER } from './lib/labels'
+import { PRICE_TIER } from './lib/labels'
 import type { TabProps } from './tabs/common'
 
 interface TabDef {
@@ -69,7 +68,6 @@ const TABS: TabDef[] = [
       { value: 'campaign', label: '캠페인' },
     ],
   },
-  { id: 'evalops', label: '평가 운영', el: EvalOps },
   {
     id: 'periodic',
     label: '주간·월간',
@@ -149,11 +147,13 @@ export default function App() {
   const st: State = { ...s, tab: tab.id, view, p }
   const range = useMemo(() => (data ? resolveRange(st, data) : null), [data, st.p, st.d, st.from, st.to, st.camp])
 
-  // 옛 랭킹 실험 보기 주소(덱 링크)는 실험 보고서로 넘긴다.
+  // 옛 랭킹 실험 보기 주소(덱 링크)는 실험 결과 보고서로, 옛 평가 운영 탭은 라벨링 운영 보고서로 넘긴다(주차 유지).
   const legacyRanker = s.page === '' && s.tab === 'search' && s.view === 'ranker'
+  const legacyEval = s.page === '' && (s.tab as string) === 'evalops'
   useEffect(() => {
     if (legacyRanker) set({ page: 'reports', r: 'ab-ranker-v2', tab: 'overview', view: '', p: '', from: '', to: '' })
-  }, [legacyRanker])
+    else if (legacyEval) set({ page: 'reports', r: 'labeling-ops', tab: 'overview' })
+  }, [legacyRanker, legacyEval])
   const venues = ready(useTable(data, 'daily_venue', tab.id === 'events' && view === 'venue')) ?? []
   const events = ready(useTable(data, 'daily_event', tab.id === 'events' && view === 'event')) ?? []
 
@@ -220,24 +220,7 @@ export default function App() {
   let periodLine
   let segLine
   const views = tab.views
-  if (tab.id === 'evalops') {
-    const weeks = evalWeeks(data)
-    const wk = weeks.includes(st.wk) ? st.wk : weeks[weeks.length - 1]
-    periodLine = <WeekLine weeks={weeks} value={wk} onChange={(w) => set({ wk: w })} />
-    segLine = (
-      <SegmentLine>
-        <Segmented
-          label="요청 부서"
-          value={st.rq}
-          onChange={(rq) => set({ rq })}
-          options={[
-            { value: 'all', label: '전체' },
-            ...Object.entries(REQUESTER).map(([value, label]) => ({ value: value as 'search' | 'promotion', label })),
-          ]}
-        />
-      </SegmentLine>
-    )
-  } else if (tab.id === 'periodic') {
+  if (tab.id === 'periodic') {
     if (view === 'month') {
       const months = summaryMonths(data)
       const mo = months.includes(st.mo) ? st.mo : defaultMonth(data)

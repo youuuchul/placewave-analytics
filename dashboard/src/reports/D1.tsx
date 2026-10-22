@@ -7,7 +7,7 @@ import { QUERY_INTENT, S } from '../lib/labels'
 import type { DailyQuery } from '../lib/types'
 import { TimeChart } from '../components/charts'
 import { Card } from '../components/ui'
-import { Block, Bullets, DashLinks, Dataset, Para, QA, SideTable, Spec, type Cell } from './Frame'
+import { Block, Bullets, DashLinks, Dataset, Para, SideTable, Spec, type Cell } from './Frame'
 
 const FROM = '2026-03-04'
 const TO = '2026-03-31'
@@ -135,19 +135,6 @@ export default function D1({ queries }: { queries: DailyQuery[] }) {
           items={[
             '결과 0건만 실패로 본다. 결과는 있지만 엉뚱한 결과는 이 기준으로 잡히지 않는다. 그래서 사람이 결과의 관련성을 평가하는 단계(단계 2)가 필요했다.',
             '20건 · 30% 기준은 검색량에 맞춰 정한 값이다. 기준을 바꾸면 실패 검색어 수가 달라진다.',
-          ]}
-        />
-      </Block>
-
-      <Block title="예상 질문">
-        <QA
-          items={[
-            [
-              '왜 검색 20건 · 결과 0건 30%인가?',
-              '한 달 검색 7,535건 규모에서 검색어 하나가 20건이면 하루 한 번꼴 이상이다. 그보다 적으면 0건 비율이 몇 건에 크게 흔들린다. 30%는 전체 0건 비율(21.8%)보다 확실히 높은 검색어만 고르려는 값이다.',
-            ],
-            ['왜 랭킹부터 고치지 않고 평가를 먼저 했나?', '0건을 없애는 것만 목표로 하면 관련 없는 결과로 채워도 지표가 좋아진다. 무엇이 맞는 결과인지 라벨이 있어야 랭킹을 학습시키고 채점할 수 있다.'],
-            ['0건 비율 말고 다른 실패 신호는?', '재검색(같은 세션에서 검색어를 바꿔 다시 찾음)과 결과 클릭 없음. 재검색률은 랭킹 A/B 테스트의 가드레일로 썼다(단계 3).'],
           ]}
         />
       </Block>

@@ -18,49 +18,80 @@ const s2 = (v) => sign(v.toFixed(2))
 const n0 = (v) => v.toLocaleString('en-US')
 const add = (rows, keys) => Object.fromEntries(keys.map((k) => [k, rows.reduce((a, r) => a + r[k], 0)]))
 
-// E1 — 랭킹 A/B
-const byDay = new Map()
-for (const r of search) {
-  const z = byDay.get(r.kst_date) ?? { v1: 0, v2: 0 }
-  z[r.ranker_version] += r.searches
-  byDay.set(r.kst_date, z)
-}
-const days = [...byDay].filter(([, z]) => Math.min(z.v1, z.v2) >= 0.1 * (z.v1 + z.v2)).map(([d]) => d).sort()
-const span = [days[0], days[days.length - 1]]
-const K = ['searches', 'zero_result_searches', 'ga_matched_searches', 'matched_result_searches', 'clicked_searches', 'first_click_position_sum', 'first_click_position_sq_sum', 'top3_clicks', 'reformulated_searches', 'search_sessions', 'search_sessions_applied']
-const win = search.filter((r) => r.kst_date >= span[0] && r.kst_date <= span[1])
-const a = add(win.filter((r) => r.ranker_version === 'v1'), K)
-const b = add(win.filter((r) => r.ranker_version === 'v2'), K)
 // 양측 p = erfc(|z|/√2). 화면(A–S 7.1.26)과 다른 근사(Numerical Recipes erfcc, 체비쇼프)로 다시 센다
 const erfc = (x) => {
   const t = 1 / (1 + 0.5 * Math.abs(x))
   const r = t * Math.exp(-x * x - 1.26551223 + t * (1.00002368 + t * (0.37409196 + t * (0.09678418 + t * (-0.18628806 + t * (0.27886807 + t * (-1.13520398 + t * (1.48851587 + t * (-0.82215223 + t * 0.17087277)))))))))
   return x >= 0 ? r : 2 - r
 }
-const pText = (z) => {
-  const p = erfc(Math.abs(z) / Math.SQRT2)
-  return p < 0.001 ? '< 0.001' : p.toFixed(3)
+const pOf = (z) => erfc(Math.abs(z) / Math.SQRT2)
+const pText = (p) => (p < 0.001 ? '< 0.001' : p.toFixed(3))
+const K = ['searches', 'zero_result_searches']
+
+// E1 — 랭킹 A/B 결과 보고. 요청 단위 실험 마트 → 기기별 분자·분모 합 → 델타 방법 분산(화면 lib/experiments.ts 와 따로 구현)
+const exp = JSON.parse(readFileSync(`${DATA}${index.files.exp_ranker_request}`, 'utf8'))
+const RUN = ['2026-07-13', '2026-07-26']
+const run = exp.filter((r) => r.kst_date >= RUN[0] && r.kst_date <= RUN[1])
+const b01 = (v) => (v ? 1 : 0)
+const pct2 = (v) => `${(v * 100).toFixed(2)}%`
+const MET = {
+  success: { num: (r) => b01(r.is_clicked), den: () => 1, f: pct, d: pp, bd: ppb },
+  zero: { num: (r) => b01(r.is_zero_result), den: () => 1, f: pct, d: pp, bd: ppb },
+  pos: { num: (r) => (r.is_clicked ? r.first_click_position : 0), den: (r) => b01(r.is_clicked), f: (v) => v.toFixed(2), d: s2, bd: s2 },
+  top3: { num: (r) => b01(r.is_clicked && r.first_click_position <= 3), den: (r) => b01(r.is_clicked), f: pct, d: pp, bd: ppb },
+  reform: { num: (r) => b01(r.is_reformulated), den: () => 1, f: pct, d: pp, bd: ppb },
+  ctr: { num: (r) => b01(r.is_clicked), den: (r) => b01(!r.is_zero_result), f: pct, d: pp, bd: ppb },
+  apply: {
+    num: (r) => b01(r.session_applied),
+    den: (r) => b01(r.is_session_first),
+    f: pct2,
+    d: (v) => `${sign((v * 100).toFixed(2))}%p`,
+    bd: (v) => sign((v * 100).toFixed(2)),
+  },
 }
-const prop = (x1, n1, x2, n2) => {
-  const p1 = x1 / n1, p2 = x2 / n2, se = Math.sqrt((p1 * (1 - p1)) / n1 + (p2 * (1 - p2)) / n2)
-  return [p1, p2, p2 - p1, p2 - p1 - 1.96 * se, p2 - p1 + 1.96 * se, (p2 - p1) / se]
+const est = (rows, m) => {
+  const dev = {}
+  for (const r of rows) {
+    const n = m.den(r)
+    if (!n) continue
+    dev[r.client_id] = dev[r.client_id] ?? [0, 0]
+    dev[r.client_id][0] += m.num(r)
+    dev[r.client_id][1] += n
+  }
+  const pairs = Object.values(dev)
+  const k = pairs.length
+  const Y = pairs.reduce((a, x) => a + x[0], 0)
+  const N = pairs.reduce((a, x) => a + x[1], 0)
+  const R = Y / N
+  const ybar = Y / k
+  const nbar = N / k
+  const cov = (f, g) => pairs.reduce((a, x) => a + (f(x) - (f === fy ? ybar : nbar)) * (g(x) - (g === fy ? ybar : nbar)), 0) / (k - 1)
+  const fy = (x) => x[0]
+  const fn = (x) => x[1]
+  return { R, v: (cov(fy, fy) - 2 * R * cov(fy, fn) + R * R * cov(fn, fn)) / (k * nbar * nbar) }
 }
-const mean = (s1, q1, c1, s2_, q2, c2) => {
-  const m1 = s1 / c1, m2 = s2_ / c2
-  const se = Math.sqrt((q1 - c1 * m1 * m1) / (c1 - 1) / c1 + (q2 - c2 * m2 * m2) / (c2 - 1) / c2)
-  return [m1, m2, m2 - m1, m2 - m1 - 1.96 * se, m2 - m1 + 1.96 * se, (m2 - m1) / se]
+const e1 = {}
+for (const [id, m] of Object.entries(MET)) {
+  const c = est(run.filter((r) => r.arm === 'control'), m)
+  const t = est(run.filter((r) => r.arm === 'treatment'), m)
+  const d = t.R - c.R
+  const se = Math.sqrt(c.v + t.v)
+  e1[id] = { cells: [m.f(c.R), m.f(t.R), `${m.d(d)} (${m.bd(d - 1.96 * se)} ~ ${m.bd(d + 1.96 * se)})`], p: pOf(d / se) }
 }
-const row = ([p1, p2, d, lo, hi, z], f, g, gb = g) => [f(p1), f(p2), `${g(d)} (${gb(lo)} ~ ${gb(hi)})`, pText(z)]
-const e1 = {
-  Q02: [n0(a.searches), n0(b.searches), '—', '—'],
-  Q03: row(prop(a.zero_result_searches, a.searches, b.zero_result_searches, b.searches), pct, pp, ppb),
-  Q05: row(mean(a.first_click_position_sum, a.first_click_position_sq_sum, a.clicked_searches, b.first_click_position_sum, b.first_click_position_sq_sum, b.clicked_searches), (v) => v.toFixed(2), s2),
-  Q06: row(prop(a.top3_clicks, a.clicked_searches, b.top3_clicks, b.clicked_searches), pct, pp, ppb),
-  Q04: row(prop(a.clicked_searches, a.matched_result_searches, b.clicked_searches, b.matched_result_searches), pct, pp, ppb),
-  Q12: row(prop(a.clicked_searches, a.ga_matched_searches, b.clicked_searches, b.ga_matched_searches), pct, pp, ppb),
-  Q07: row(prop(a.reformulated_searches, a.ga_matched_searches, b.reformulated_searches, b.ga_matched_searches), pct, pp, ppb),
-  Q08: row(prop(a.search_sessions_applied, a.search_sessions, b.search_sessions_applied, b.search_sessions), pct, pp, ppb),
+const SEC = ['zero', 'pos', 'top3', 'reform']
+const order = SEC.map((k) => [e1[k].p, k]).sort((x, y) => x[0] - y[0])
+let acc = 0
+order.forEach(([p0, k], rank) => {
+  acc = Math.max(acc, Math.min(1, p0 * (SEC.length - rank)))
+  e1[k].holm = acc
+})
+const q95 = (arm) => {
+  const xs = run.filter((r) => r.arm === arm).map((r) => r.latency_ms).sort((x, y) => x - y)
+  const h = (xs.length - 1) * 0.95
+  const lo = Math.floor(h)
+  return `${(xs[lo] + (xs[Math.min(lo + 1, xs.length - 1)] - xs[lo]) * (h - lo)).toFixed(0)}ms`
 }
+e1.p95 = { cells: [q95('control'), q95('treatment')] }
 
 // X1 — 지침 개정 전·후(마지막 완료 주까지)
 const toDate = index.meta.to_date
@@ -145,8 +176,12 @@ qfail.forEach(([q, z], i) => {
 
 await read('page=reports&r=ab-ranker-v2')
 for (const [id, want] of Object.entries(e1)) {
-  const cells = await page.$$eval(`table[data-report="ab-ranker-v2"] tr[data-metric="${id}"] td`, (tds) => tds.map((td) => td.textContent.trim()))
-  want.forEach((w, i) => eq(`E1 ${id}[${i}]`, (cells[i + 1] ?? '').replace(/−/g, '-'), w))
+  const cells = (await page.$$eval(`table[data-report="ab-ranker-v2"] tr[data-metric="${id}"] td`, (tds) => tds.map((td) => td.textContent.trim()))).map((x) =>
+    x.replace(/−/g, '-'),
+  )
+  want.cells.forEach((w, i) => eq(`E1 ${id}[${i}]`, cells[i + 2] ?? '', w))
+  if (want.p != null) eq(`E1 ${id} p`, cells[5] ?? '', pText(want.p))
+  if (want.holm != null) eq(`E1 ${id} Holm`, cells[6] ?? '', pText(want.holm))
 }
 
 await read('page=reports&r=guide-v2')
@@ -164,6 +199,6 @@ const i1rows = await page.$$eval('main table', (ts) => {
 phase.forEach((col, j) => col.forEach((w, i) => eq(`I1 구간${j + 1}[${i}]`, i1rows[i]?.[j + 1] ?? '', w)))
 
 await browser.close()
-console.log(`E1 기간 ${span[0]} ~ ${span[1]} · 비교 값 ${n}개 · 불일치 ${fails.length}개`)
+console.log(`E1 기간 ${RUN[0]} ~ ${RUN[1]} · 비교 값 ${n}개 · 불일치 ${fails.length}개`)
 for (const f of fails) console.log('  ', f)
 process.exit(fails.length ? 1 : 0)

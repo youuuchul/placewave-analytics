@@ -85,6 +85,27 @@ export function TimeChart({
   const fx = xFormat ?? ((v: string | number) => (typeof v === 'string' ? md(v) : String(v)))
   const ft = tipTitle ?? ((v: string | number) => (typeof v === 'string' ? v : String(v)))
   const bars = kind === 'bar' || kind === 'stack'
+  // x축: 라벨 8개 안팎을 고정 간격으로 (마지막 라벨을 억지로 넣지 않는다)
+  const xStep = Math.max(0, Math.ceil(data.length / 8) - 1)
+  // y축: 가장 긴 눈금 글자에 맞춰 폭을 잡는다
+  const yMax = data.reduce((m, r) => {
+    const v = kind === 'stack' ? series.reduce((a, s) => a + Number(r[s.key] ?? 0), 0) : Math.max(...series.map((s) => Number(r[s.key] ?? 0)))
+    return Math.max(m, Number.isFinite(v) ? v : 0)
+  }, 0)
+  const yWidth = Math.max(36, Math.ceil(yFormat(yDomain?.[1] ?? yMax).length * 7 + 10))
+  // 사건 표식: 가까운 표식끼리는 이름을 위아래로 엇갈린다
+  const xs = data.map((r) => String(r[xKey]))
+  const near = Math.max(2, Math.round(data.length * 0.12))
+  let last = -Infinity
+  let lane = 0
+  const placed = [...marks]
+    .map((m) => ({ ...m, i: xs.indexOf(m.x) }))
+    .sort((a, b) => a.i - b.i)
+    .map((m) => {
+      lane = m.i - last < near ? (lane + 1) % 2 : 0
+      last = m.i
+      return { ...m, dy: lane * 14 }
+    })
   return (
     <div style={{ height }} className="-ml-2">
       <ResponsiveContainer width="100%" height="100%">
@@ -96,15 +117,14 @@ export function TimeChart({
             tick={{ fill: 'var(--muted)', fontSize: 11 }}
             tickLine={false}
             axisLine={{ stroke: 'var(--axis)' }}
-            minTickGap={18}
-            interval="preserveStartEnd"
+            interval={xStep}
           />
           <YAxis
             tickFormatter={yFormat}
             tick={{ fill: 'var(--muted)', fontSize: 11 }}
             tickLine={false}
             axisLine={false}
-            width={44}
+            width={yWidth}
             allowDecimals={decimals}
             domain={yDomain ?? [0, 'auto']}
           />
@@ -124,13 +144,13 @@ export function TimeChart({
               return <TipBox title={ft(label as string)} rows={[...rows].reverse()} total={total} />
             }}
           />
-          {marks.map((m) => (
+          {placed.map((m) => (
             <ReferenceLine
               key={m.x}
               x={m.x}
               stroke="var(--axis)"
               strokeDasharray="3 3"
-              label={{ value: m.label, position: 'insideTopLeft', fill: 'var(--muted)', fontSize: 11 }}
+              label={{ value: m.label, position: 'insideTopLeft', fill: 'var(--muted)', fontSize: 11, dy: m.dy }}
             />
           ))}
           {series.map((s, i) => {

@@ -158,8 +158,20 @@ load_raw() {
       raw.search_log "$f" "$SCHEMA/search_log.json" 2>&1)"; then
     fail 1 raw.search_log "$started" "$out"
   fi
-  "$BQ" update --quiet --description "검색 서버 로그 (합성). 1행 = 검색 요청 1건. 키 request_id. requested_at(UTC) 일 파티션. GA 와 공유 키 없음" raw.search_log >/dev/null 2>&1
+  "$BQ" update --quiet --description "검색 서버 요청 로그 (합성). 1행 = 검색 요청 1건. 키 request_id. requested_at(UTC) 일 파티션. GA search 이벤트의 search_id 와 같은 키" raw.search_log >/dev/null 2>&1
   loaded+=(raw.search_log)
+  fi
+
+  if hit raw.search_click_log; then
+  f="$(pick search_click_log.csv)"
+  [ -n "$f" ] || fail 1 raw.search_click_log "$started" "data/raw 에 search_click_log.csv 없음"
+  if ! out="$("$BQ" load --quiet --replace --source_format=CSV --skip_leading_rows=1 \
+      --time_partitioning_type=DAY --time_partitioning_field=clicked_at \
+      raw.search_click_log "$f" "$SCHEMA/search_click_log.json" 2>&1)"; then
+    fail 1 raw.search_click_log "$started" "$out"
+  fi
+  "$BQ" update --quiet --description "검색 서버 클릭 로그 (합성). 1행 = 검색 결과 클릭 1건. 키 (request_id, clicked_at). clicked_at(UTC) 일 파티션" raw.search_click_log >/dev/null 2>&1
+  loaded+=(raw.search_click_log)
   fi
 
   if hit raw.ads_spend; then
@@ -217,7 +229,7 @@ if want 7; then
            daily_revenue daily_subscription daily_venue_registry venue_registry monthly_summary \
            monthly_contract contract_cohort subscription_cohort \
            weekly_audience_funnel weekly_path person_day \
-           daily_search daily_query weekly_eval_ops weekly_rater weekly_batch; do
+           daily_search daily_query exp_ranker_request weekly_eval_ops weekly_rater weekly_batch; do
     run_sql 7 "marts.$m" "$SQL/marts/$m.sql" "marts.$m"
   done
 fi

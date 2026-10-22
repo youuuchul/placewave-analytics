@@ -2,14 +2,12 @@ import type { ReactNode } from 'react'
 import { num } from '../lib/format'
 import { REPO, type ReportMeta } from './registry'
 
-export const SYNTHETIC_NOTE = '모든 수치는 가상 서비스 시나리오와 분포 규칙으로 생성한 합성 데이터'
-
 export function GroupChip({ meta, step }: { meta: ReportMeta; step?: number }) {
   return (
     <span className="inline-flex flex-wrap items-center gap-2 text-xs">
       <span className="rounded-md bg-wash px-1.5 py-0.5 font-medium text-ink2">
-        {step != null && `단계 ${step} · `}
-        {meta.group} · {meta.code}
+        {step != null && `${step} · `}
+        {meta.kind} · {meta.code}
       </span>
       {meta.badge && <span className="rounded-md border border-line px-1.5 py-0.5 text-muted">{meta.badge}</span>}
     </span>
@@ -89,23 +87,6 @@ export function Spec({ items }: { items: [string, ReactNode][] }) {
         </div>
       ))}
     </dl>
-  )
-}
-
-export function QA({ items }: { items: [string, ReactNode][] }) {
-  return (
-    <div className="flex max-w-[860px] flex-col divide-y divide-[var(--line)] rounded-xl border border-line">
-      {items.map(([q, a]) => (
-        <details key={q} className="group px-4 py-3">
-          <summary className="cursor-pointer list-none text-[14px] font-medium text-ink marker:hidden">
-            <span className="mr-2 text-muted group-open:hidden">+</span>
-            <span className="mr-2 hidden text-muted group-open:inline">−</span>
-            {q}
-          </summary>
-          <div className="pt-2 text-[14px] leading-relaxed text-ink2">{a}</div>
-        </details>
-      ))}
-    </div>
   )
 }
 

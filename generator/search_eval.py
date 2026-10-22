@@ -1,9 +1,9 @@
-"""Placewave 검색 서버 로그 · 관련성 평가 원천 생성기 (시나리오 3.0).
+"""Placewave 관련성 평가 원천 생성기 (시나리오 3.0).
 
-기존 원천(`data/raw/ga4_events.ndjson.gz`, `db_venues.csv`, `db_events.csv`)을 **읽기만** 하고
-부속 원천 6개를 새로 쓴다. 기존 파일은 바꾸지 않는다. 설계는 `docs/scenario_v3_search_eval.md`.
+검색 서버 로그와 공간·행사 원장(`data/raw/search_log.ndjson.gz`, `db_venues.csv`, `db_events.csv`)을 **읽기만** 하고
+평가 운영 원천 5개를 새로 쓴다. 검색 로그 자체는 세션 시뮬레이션(`generate.py`)이 검색 엔진(`search_engine.py`)으로
+만든다. 설계는 `docs/scenario_v3_search_eval.md`.
 
-    raw/search_log.ndjson.gz   검색 요청 1건 = 1행 (GA search 이벤트마다 1건 + GA 미수집 요청)
     raw/eval_raters.csv        평가자
     raw/eval_batches.csv       평가 배치
     raw/eval_queries.csv       배치에 편입된 검색어
@@ -25,12 +25,12 @@ import logging
 import math
 import time
 from collections import Counter, defaultdict
-from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 import numpy as np
+from search_engine import PROMOTION_START, RANKER_AB_START, RANKER_V2_ALL, REINDEX_BUG, Catalog, day_no
 
 logger = logging.getLogger("placewave.search_eval")
 
@@ -38,20 +38,12 @@ SEED_DIR = Path(__file__).resolve().parent / "seed"
 KST = timezone(timedelta(hours=9))
 SNAPSHOT = date(2026, 9, 20)
 
-RANKER_AB_START = date(2026, 7, 13)
-RANKER_V2_ALL = date(2026, 7, 27)
 PROGRAM_START = date(2026, 4, 1)
-PROMOTION_START = date(2026, 5, 4)
 GUIDELINE_V2 = date(2026, 6, 1)
 CAMPAIGN_ADHOC = date(2026, 9, 1)
 PRELAUNCH_ADHOC = date(2026, 7, 6)
-REINDEX_BUG = (date(2026, 9, 1), date(2026, 9, 4))  # 가을 캠페인 대비 재색인에서 구분자(·) 정규화 누락, 9/5 핫픽스
-REINDEX_BUG_ZERO = 0.9  # 회귀 기간 구분자 검색어 중 클릭이 없던 요청이 결과 0건이 될 확률
 REGRESSION_ADHOC = date(2026, 9, 8)  # 회귀 검증용 검색팀 긴급 배치
 
-GA_MISSING_SHARE = 0.015  # 서버에만 남은 요청 비중 (GA 미수집)
-MATCH_WINDOW_US = 3_000_000
-TOP_N = 10
 LABELS_PER_TASK = 3
 GOLD_SHARE = 0.10
 AUDIT_SHARE = 0.20  # 검수 표본 비중. 표본 중 오답은 반려되어 재작업
@@ -59,32 +51,6 @@ FAILED_MIN_SEARCHES = 20
 FAILED_MIN_ZERO_RATE = 0.30
 TASKS_PER_QUERY = 12
 PLAN_SHARE = 0.80  # 주간 계획 과제 = 명목 용량(weekly_target 합 ÷ 과제당 라벨)의 80%. 결근·재작업 여유
-
-GENRE_NEIGHBOR = {
-    "힙합": ["K-pop/팝"],
-    "K-pop/팝": ["힙합", "일렉트로닉"],
-    "시티팝/디스코": ["일렉트로닉"],
-    "일렉트로닉": ["시티팝/디스코", "K-pop/팝"],
-    "재즈/소울": ["어쿠스틱"],
-    "어쿠스틱": ["재즈/소울"],
-}
-PARTY_GENRES = {"힙합", "K-pop/팝", "시티팝/디스코", "일렉트로닉"}
-PARTY_TYPES = {"팝업 스페이스", "카페", "루프탑"}
-CALM_TYPES = {"라운지", "바", "라이브홀"}
-EVENT_NEIGHBOR = {
-    "팝업 이벤트": ["루프탑 세션"],
-    "루프탑 세션": ["팝업 이벤트"],
-    "라이브 공연": ["쇼케이스", "리스닝 세션"],
-    "쇼케이스": ["라이브 공연"],
-    "리스닝 세션": ["라이브 공연"],
-}
-EVENT_VENUE_TYPE = {
-    "팝업 이벤트": {"팝업 스페이스"},
-    "루프탑 세션": {"루프탑"},
-    "라이브 공연": {"라이브홀"},
-    "쇼케이스": {"라이브홀", "라운지"},
-    "리스닝 세션": {"라운지", "바"},
-}
 
 
 def kst_date(us: int) -> date:
@@ -97,329 +63,64 @@ def monday(d: date) -> date:
     return d - timedelta(days=d.weekday())
 
 
-def bucket(client_id: str) -> int:
-    """기기 해시 버킷 0/1 (랭킹 50% 노출)."""
-    return int(hashlib.md5(client_id.encode()).hexdigest()[:8], 16) % 2
+def load_catalog(raw: Path) -> Catalog:
+    """db_venues·db_events·names.json 으로 검색 엔진과 같은 카탈로그를 만든다."""
+    names = json.loads((SEED_DIR / "names.json").read_text(encoding="utf-8"))
+    with open(raw / "db_venues.csv", encoding="utf-8") as f:
+        vs = list(csv.DictReader(f))
+    with open(raw / "db_events.csv", encoding="utf-8") as f:
+        es = list(csv.DictReader(f))
+
+    def day(ts: str) -> int:
+        return day_no(datetime.fromisoformat(ts.replace("Z", "+00:00")).astimezone(KST).date())
+
+    vidx = {int(v["venue_id"]): i for i, v in enumerate(vs)}
+    return Catalog(
+        venue_id=np.array([int(v["venue_id"]) for v in vs]),
+        v_name=np.array([v["name"] for v in vs]),
+        v_name_head=np.array([v["name"].split(" ")[0] for v in vs]),
+        v_region=np.array([v["region"] for v in vs]),
+        v_genre=np.array([v["genre"] for v in vs]),
+        v_type=np.array([v["venue_type"] for v in vs]),
+        v_lat=np.array([float(v["lat"]) for v in vs]),
+        v_lng=np.array([float(v["lng"]) for v in vs]),
+        v_reg_day=np.array([day(v["registered_at"]) for v in vs]),
+        v_close_day=np.full(len(vs), 10**6),
+        event_id=np.array([int(e["event_id"]) for e in es]),
+        e_venue_idx=np.array([vidx[int(e["venue_id"])] for e in es]),
+        e_type=np.array([e["event_type"] for e in es]),
+        e_start_day=np.array([day(e["starts_at"]) for e in es]),
+        e_partner=np.array([e["is_partner_venue"] == "true" for e in es]),
+        genres=list(names["genres"]),
+        regions={r["name"]: [tuple(c) for c in r["centers"]] for r in names["regions"]},
+        event_types=list(names["event_types"]),
+    )
 
 
-def ranker_for(d: date, client_id: str) -> str:
-    """요청 날짜·기기의 랭킹 버전."""
-    if d < RANKER_AB_START:
-        return "v1"
-    if d < RANKER_V2_ALL:
-        return "v2" if bucket(client_id) else "v1"
-    return "v2"
-
-
-def haversine_km(lat1: np.ndarray, lng1: np.ndarray, lat2: float, lng2: float) -> np.ndarray:
-    """위경도 배열과 한 점 사이 거리(km)."""
-    r = 6371.0
-    p1, p2 = np.radians(lat1), math.radians(lat2)
-    dp = p2 - p1
-    dl = math.radians(lng2) - np.radians(lng1)
-    a = np.sin(dp / 2) ** 2 + np.cos(p1) * math.cos(p2) * np.sin(dl / 2) ** 2
-    return 2 * r * np.arcsin(np.sqrt(a))
-
-
-@dataclass
-class Catalog:
-    """공간·행사 원장과 검색어 → 참 관련도 계산."""
-
-    venue_id: np.ndarray
-    v_name_head: np.ndarray
-    v_region: np.ndarray
-    v_genre: np.ndarray
-    v_type: np.ndarray
-    v_lat: np.ndarray
-    v_lng: np.ndarray
-    v_reg_day: np.ndarray
-    event_id: np.ndarray
-    e_venue_idx: np.ndarray
-    e_type: np.ndarray
-    e_start_day: np.ndarray
-    e_partner: np.ndarray
-    genres: set[str]
-    regions: dict[str, list[tuple[float, float]]]
-    event_types: set[str]
-    vidx: dict[int, int] = field(default_factory=dict)
-    eidx: dict[int, int] = field(default_factory=dict)
-    cache: dict[str, tuple[np.ndarray, np.ndarray]] = field(default_factory=dict)
-
-    @classmethod
-    def load(cls, raw: Path) -> Catalog:
-        """db_venues·db_events·names.json 을 읽는다."""
-        names = json.loads((SEED_DIR / "names.json").read_text(encoding="utf-8"))
-        with open(raw / "db_venues.csv", encoding="utf-8") as f:
-            vs = list(csv.DictReader(f))
-        with open(raw / "db_events.csv", encoding="utf-8") as f:
-            es = list(csv.DictReader(f))
-
-        def day(ts: str) -> int:
-            return (datetime.fromisoformat(ts.replace("Z", "+00:00")).astimezone(KST).date() - date(2025, 1, 1)).days
-
-        vid = np.array([int(v["venue_id"]) for v in vs])
-        vidx = {int(v): i for i, v in enumerate(vid)}
-        cat = cls(
-            venue_id=vid,
-            v_name_head=np.array([v["name"].split(" ")[0] for v in vs]),
-            v_region=np.array([v["region"] for v in vs]),
-            v_genre=np.array([v["genre"] for v in vs]),
-            v_type=np.array([v["venue_type"] for v in vs]),
-            v_lat=np.array([float(v["lat"]) for v in vs]),
-            v_lng=np.array([float(v["lng"]) for v in vs]),
-            v_reg_day=np.array([day(v["registered_at"]) for v in vs]),
-            event_id=np.array([int(e["event_id"]) for e in es]),
-            e_venue_idx=np.array([vidx[int(e["venue_id"])] for e in es]),
-            e_type=np.array([e["event_type"] for e in es]),
-            e_start_day=np.array([day(e["starts_at"]) for e in es]),
-            e_partner=np.array([e["is_partner_venue"] == "true" for e in es]),
-            genres=set(names["genres"]),
-            regions={r["name"]: [tuple(c) for c in r["centers"]] for r in names["regions"]},
-            event_types=set(names["event_types"]),
-        )
-        cat.vidx = vidx
-        cat.eidx = {int(e): i for i, e in enumerate(cat.event_id)}
-        return cat
-
-    def intent(self, term: str) -> str:
-        """검색어 의도 유형 genre / region / event_type / venue_name."""
-        if term in self.genres:
-            return "genre"
-        if term in self.regions:
-            return "region"
-        if term in self.event_types:
-            return "event_type"
-        return "venue_name"
-
-    def grades(self, term: str) -> tuple[np.ndarray, np.ndarray]:
-        """검색어에 대한 (공간 등급, 행사 등급) 0~3. 기간 무관 속성 일치로만 정한다."""
-        if term in self.cache:
-            return self.cache[term]
-        it = self.intent(term)
-        n = len(self.venue_id)
-        vg = np.zeros(n, dtype=np.int8)
-        if it == "genre":
-            near = GENRE_NEIGHBOR.get(term, [])
-            weak = PARTY_TYPES if term in PARTY_GENRES else CALM_TYPES
-            vg[np.isin(self.v_type, list(weak))] = 1
-            vg[np.isin(self.v_genre, near)] = 2
-            vg[self.v_genre == term] = 3
-            eg = vg[self.e_venue_idx].copy()
-        elif it == "region":
-            centers = self.regions.get(term, [])
-            if centers and term != "기타":
-                dist = np.min([haversine_km(self.v_lat, self.v_lng, la, ln) for la, ln in centers], axis=0)
-                vg[dist <= 5.0] = 1
-                vg[dist <= 2.5] = 2
-            vg[self.v_region == term] = 3
-            eg = vg[self.e_venue_idx].copy()
-        elif it == "event_type":
-            vg[np.isin(self.v_type, list(EVENT_VENUE_TYPE.get(term, set())))] = 1
-            eg = np.zeros(len(self.event_id), dtype=np.int8)
-            eg[np.isin(self.e_type, EVENT_NEIGHBOR.get(term, []))] = 2
-            eg[self.e_type == term] = 3
-            hosts = np.unique(self.e_venue_idx[self.e_type == term])
-            vg[hosts] = np.maximum(vg[hosts], 2)
-        else:
-            hit = self.v_name_head == term
-            if hit.any():
-                ref = np.flatnonzero(hit)[0]
-                vg[(self.v_region == self.v_region[ref]) & (self.v_genre == self.v_genre[ref])] = 1
-            vg[hit] = 3
-            eg = np.where(hit[self.e_venue_idx], 2, 0).astype(np.int8)
-        self.cache[term] = (vg, eg)
-        return vg, eg
-
-    def visible(self, d: date) -> tuple[np.ndarray, np.ndarray]:
-        """그날 보이는 공간(등록 완료)·행사(28일 안 시작 예정) 마스크."""
-        k = (d - date(2025, 1, 1)).days
-        return self.v_reg_day <= k, (self.e_start_day >= k) & (self.e_start_day <= k + 28)
-
-
-@dataclass
-class Search:
-    """GA search 이벤트에서 읽은 검색 1건."""
-
-    client_id: str
-    ts: int
-    term: str
-    next_kind: str  # click / research / other
-    click_venue: int | None
-
-
-def read_ga_searches(path: Path) -> list[Search]:
-    """GA 로그를 세션 단위로 훑어 search 이벤트와 그 다음 행동을 뽑는다.
-
-    다음 행동은 검색 결과 화면(screen_view search_result) 바로 다음의 screen_view 또는 search 이벤트로 정한다.
-    """
-    out: list[Search] = []
-    cur: tuple[str, int] | None = None
-    buf: list[tuple[int, str, str | None, int | None]] = []
-
-    def flush() -> None:
-        if not buf or not any(b[1] == "S" for b in buf):
-            return
-        buf.sort(key=lambda b: b[0])
-        for i, (ts, kind, val, _vid) in enumerate(buf):
-            if kind != "S":
-                continue
-            j = i + 1
-            while j < len(buf) and not (buf[j][1] == "V" and buf[j][2] == "search_result"):
-                j += 1
-            nxt, click = "other", None
-            if j + 1 < len(buf):
-                k = buf[j + 1]
-                if k[1] == "S":
-                    nxt = "research"
-                elif k[2] == "venue_detail" and k[3] is not None:
-                    nxt, click = "click", k[3]
-            out.append(Search(cur[0], ts, val or "", nxt, click))
-
+def read_search_log(path: Path) -> list[dict[str, Any]]:
+    """검색 서버 요청 로그를 읽는다. kst_date = 요청 시각의 KST 날짜."""
+    out: list[dict[str, Any]] = []
     with gzip.open(path, "rt", encoding="utf-8") as f:
         for line in f:
-            is_search = '"event_name":"search"' in line
-            if not is_search and '"screen_view"' not in line:
-                continue
-            e = json.loads(line)
-            key = (e["user_pseudo_id"], e["ga_session_id"])
-            if key != cur:
-                flush()
-                cur, buf = key, []
-            p = {
-                x["key"]: (x["string_value"] if x["string_value"] is not None else x["int_value"])
-                for x in e["event_params"]
-            }
-            if is_search:
-                buf.append((e["event_timestamp"], "S", p.get("search_term"), None))
-            else:
-                buf.append((e["event_timestamp"], "V", p.get("screen_name"), p.get("venue_id")))
-        flush()
+            r = json.loads(line)
+            at = datetime.fromisoformat(r["requested_at"].replace("Z", "+00:00"))
+            r["kst_date"] = at.astimezone(KST).date()
+            out.append(r)
     return out
 
 
 class Builder:
-    """검색 서버 로그와 평가 운영 원천을 만든다."""
+    """검색 서버 로그를 읽어 평가 운영 원천을 만든다."""
 
-    def __init__(self, cat: Catalog, seed: int) -> None:
+    def __init__(self, cat: Catalog, log: list[dict[str, Any]], seed: int) -> None:
         self.cat = cat
         self.rng = np.random.default_rng(seed)
-        self.bug_rng = np.random.default_rng([seed, 3])  # 재색인 회귀 전용 난수열. 기존 난수 흐름을 바꾸지 않는다
-        self.log: list[dict[str, Any]] = []
+        self.log = log
         self.raters: list[dict[str, Any]] = []
         self.batches: list[dict[str, Any]] = []
         self.queries: list[dict[str, Any]] = []
         self.tasks: list[dict[str, Any]] = []
         self.labels: list[dict[str, Any]] = []
-
-    # ---------- 검색 서버 로그 ----------
-
-    def zero_prob(self, term: str, ranker: str, d: date) -> float:
-        """클릭이 없었던 검색이 결과 0건일 확률. v1 은 구분자·영문 대소문자에 약하다."""
-        it = self.cat.intent(term)
-        punct = ("·" in term) or ("/" in term)
-        latin = term[:1].isascii() and term[:1].isalpha()
-        if it == "region":
-            p = 0.10 + (0.45 if punct else 0.0)
-        elif it == "genre":
-            p = 0.08 + (0.40 if punct else 0.0)
-        elif it == "event_type":
-            p = 0.12
-        else:
-            p = 0.18 + (0.30 if latin else 0.0)
-        if ranker == "v2":
-            p *= 0.22
-        return min(p, 0.9)
-
-    def rank(self, term: str, d: date, ranker: str, click: int | None) -> tuple[int, list[tuple[int, str, int]]]:
-        """결과 수와 상위 10 목록 [(순위, item_type, item_id)]. v1 은 등급 2 이상만, v2 는 1 이상을 찾는다."""
-        cat, rng = self.cat, self.rng
-        vg, eg = cat.grades(term)
-        vvis, evis = cat.visible(d)
-        floor = 2 if ranker == "v1" else 1
-        vi = np.flatnonzero(vvis & (vg >= floor))
-        ei = np.flatnonzero(evis & (eg >= floor))
-        noise = 1.2 if ranker == "v1" else 0.5
-        score = np.concatenate([vg[vi] + rng.normal(0, noise, len(vi)), eg[ei] - 0.2 + rng.normal(0, noise, len(ei))])
-        order = np.argsort(-score)[: TOP_N + 1]
-        top = [
-            ("venue", int(cat.venue_id[vi[k]])) if k < len(vi) else ("event", int(cat.event_id[ei[k - len(vi)]]))
-            for k in order
-        ]
-        count = len(vi) + len(ei)
-        if click is not None:
-            p = 0.35 if ranker == "v1" else 0.55
-            item = ("venue", click)
-            if item in top:
-                top.remove(item)
-            elif cat.vidx[click] not in set(vi.tolist()):
-                count += 1
-            pos = min(int(rng.geometric(p)), TOP_N, len(top) + 1)
-            top.insert(pos - 1, item)
-        top = top[:TOP_N]
-        return max(count, len(top)), [(k + 1, t, i) for k, (t, i) in enumerate(top)]
-
-    def promoted(self, term: str, d: date) -> int | None:
-        """상단 추천 슬롯 행사 (파트너 공간 예정 행사)."""
-        if d < PROMOTION_START or self.rng.random() > 0.6:
-            return None
-        _, evis = self.cat.visible(d)
-        pool = np.flatnonzero(evis & self.cat.e_partner)
-        if not len(pool):
-            return None
-        _, eg = self.cat.grades(term)
-        good = pool[eg[pool] >= 1]
-        pick = good if len(good) and self.rng.random() < 0.5 else pool
-        return int(self.cat.event_id[pick[int(self.rng.integers(len(pick)))]])
-
-    def build_log(self, searches: list[Search]) -> None:
-        """GA 검색마다 서버 요청 1건, 그리고 GA 미수집 요청을 만든다."""
-        rng = self.rng
-        extra = rng.random(len(searches)) < GA_MISSING_SHARE
-        rows: list[tuple[int, str, str, str | None, int | None]] = []
-        for s, ex in zip(searches, extra, strict=True):
-            rows.append((s.ts + int(rng.integers(50_000, 900_000)), s.client_id, s.term, s.next_kind, s.click_venue))
-            if ex:
-                rows.append((s.ts + int(rng.integers(20, 200)) * 1_000_000, s.client_id, s.term, None, None))
-        rows.sort(key=lambda r: r[0])
-        for n, (ts, cid, term, nxt, click) in enumerate(rows, 1):
-            d = kst_date(ts)
-            rk = ranker_for(d, cid)
-            if click is None and rng.random() < self.zero_prob(term, rk, d):
-                count, top = 0, []
-            else:
-                count, top = self.rank(term, d, rk, click)
-                if count == 0:
-                    top = []
-            med = 120 if rk == "v1" else 95
-            row = {
-                "request_id": f"q{n:08d}",
-                "requested_at": datetime.fromtimestamp(ts / 1e6, UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-                "kst_date": d,
-                "user_pseudo_id": cid,
-                "query_raw": term,
-                "ranker_version": rk,
-                "results_count": count,
-                "results": [{"position": p, "item_type": t, "item_id": i} for p, t, i in top],
-                "promoted_event_id": self.promoted(term, d) if count else None,
-                "latency_ms": int(rng.lognormal(math.log(med), 0.35)),
-                "_ga": nxt is not None,
-            }
-            if (
-                click is None
-                and "·" in term
-                and REINDEX_BUG[0] <= d <= REINDEX_BUG[1]
-                and self.bug_rng.random() < REINDEX_BUG_ZERO
-            ):
-                row["_bug"] = (row["results_count"], row["results"], row["promoted_event_id"])
-                row.update(results_count=0, results=[], promoted_event_id=None)
-            self.log.append(row)
-
-    def set_reindex_bug(self, on: bool) -> None:
-        """재색인 회귀로 0건이 된 요청을 회귀 상태(on) 또는 원래 결과(off)로 둔다."""
-        for r in self.log:
-            if "_bug" in r:
-                count, results, promoted = (0, [], None) if on else r["_bug"]
-                r.update(results_count=count, results=results, promoted_event_id=promoted)
 
     # ---------- 평가 운영 ----------
 
@@ -583,27 +284,14 @@ class Builder:
         pairs = [{"query": q, "item_type": "event", "item_id": e, "pos": 0, "ranker": None} for q, e in keys]
         self.add_batch("promotion", purpose, created, due, prio, pairs)
 
-    def plan_with_regression(self) -> None:
-        """재색인 회귀를 넣어 배치를 계획한다. 라벨 시뮬레이션은 회귀가 없을 때의 계획이 끝난 난수 지점에서
-        시작해, 회귀의 영향을 받는 9/7 배치 이전의 과제·라벨이 회귀 추가 전과 같게 남는다."""
-        start = self.rng.bit_generator.state
-        self.set_reindex_bug(False)
-        self.plan_batches(regression=False)
-        after = self.rng.bit_generator.state
-        self.batches, self.tasks, self.queries = [], [], []
-        self.rng.bit_generator.state = start
-        self.set_reindex_bug(True)
-        self.plan_batches(regression=True)
-        self.rng.bit_generator.state = after
-
-    def plan_batches(self, regression: bool = True) -> None:
+    def plan_batches(self) -> None:
         """한 해의 배치 일정. 목표는 그 시점 평가 인력 용량에 맞춘다."""
         days = [PROGRAM_START]
         d = monday(PROGRAM_START) + timedelta(days=7)
         while d <= SNAPSHOT - timedelta(days=3):
             days.append(d)
             d += timedelta(days=7)
-        for d in sorted({*days, CAMPAIGN_ADHOC, *([REGRESSION_ADHOC] if regression else [])}):
+        for d in sorted({*days, CAMPAIGN_ADHOC, REGRESSION_ADHOC}):
             if d == CAMPAIGN_ADHOC:
                 self.promotion_batch(d, 2400, "adhoc", 4, 1)
                 continue
@@ -711,15 +399,8 @@ class Builder:
     # ---------- 출력 ----------
 
     def write(self, raw: Path) -> dict[str, int]:
-        """부속 원천 6개를 쓴다. 기존 파일은 건드리지 않는다."""
+        """평가 원천 5개를 쓴다. 검색 로그·원장은 건드리지 않는다."""
         counts: dict[str, int] = {}
-        path = raw / "search_log.ndjson.gz"
-        with open(path, "wb") as fb, gzip.GzipFile(fileobj=fb, mode="wb", mtime=0) as gz:
-            for r in self.log:
-                rec = {k: v for k, v in r.items() if not k.startswith("_") and k != "kst_date"}
-                rec["snapshot_date"] = SNAPSHOT.isoformat()
-                gz.write((json.dumps(rec, ensure_ascii=False) + "\n").encode("utf-8"))
-        counts["search_log"] = len(self.log)
 
         def fmt(v: Any) -> Any:
             if isinstance(v, datetime):
@@ -787,13 +468,11 @@ def summarize(b: Builder) -> dict[str, Any]:
     ab = [r for r in b.log if RANKER_AB_START <= r["kst_date"] < RANKER_V2_ALL]
     out: dict[str, Any] = {
         "search_log": len(b.log),
-        "ga_missing": sum(not r["_ga"] for r in b.log),
         "zero_rate_v1_before": round(zr([r for r in b.log if r["kst_date"] < RANKER_AB_START]), 4),
         "zero_rate_ab_v1": round(zr([r for r in ab if r["ranker_version"] == "v1"]), 4),
         "zero_rate_ab_v2": round(zr([r for r in ab if r["ranker_version"] == "v2"]), 4),
         "zero_rate_v2_after": round(zr([r for r in b.log if r["kst_date"] >= RANKER_V2_ALL]), 4),
         "zero_rate_reindex_bug": round(zr([r for r in b.log if REINDEX_BUG[0] <= r["kst_date"] <= REINDEX_BUG[1]]), 4),
-        "reindex_bug_zeroed": sum("_bug" in r for r in b.log),
         "batches": len(b.batches),
         "tasks": len(b.tasks),
         "labels": len(b.labels),
@@ -837,16 +516,14 @@ def validate(b: Builder) -> list[str]:
         errs.append("50% 노출 기간 v2 0건 비율이 v1 보다 낮지 않음")
     if not s["gold_acc_v2"] > s["gold_acc_v1"]:
         errs.append("지침 v2 정답셋 정확도가 v1 보다 높지 않음")
-    if not 0.005 < s["ga_missing"] / s["search_log"] < 0.03:
-        errs.append("GA 미수집 요청 비중 범위 밖")
     if not s["zero_rate_reindex_bug"] > 2 * s["zero_rate_v2_after"]:
         errs.append("재색인 회귀 기간 0건 비율이 v2 전체 적용 후 평균의 2배를 넘지 않음")
     return errs
 
 
 def write_manifest(data: Path, counts: dict[str, int], seed: int, elapsed: float) -> None:
-    """data/MANIFEST_search_eval.txt — 부속 원천 행 수·SHA256."""
-    names = {"search_log": "search_log.ndjson.gz"}
+    """data/MANIFEST_search_eval.txt: 평가 원천 행 수·SHA256."""
+    names: dict[str, str] = {}
     lines = [
         "# Placewave 검색·평가 부속 원천 MANIFEST (합성, 실제 서비스 데이터 아님)",
         f"seed: {seed}",
@@ -870,14 +547,12 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     t0 = time.time()
     raw = args.data / "raw"
-    cat = Catalog.load(raw)
-    searches = read_ga_searches(raw / "ga4_events.ndjson.gz")
-    logger.info("GA 검색 %d건 읽음 (%.0f초)", len(searches), time.time() - t0)
-    b = Builder(cat, args.seed)
-    b.build_log(searches)
-    logger.info("서버 로그 %d건", len(b.log))
+    cat = load_catalog(raw)
+    log = read_search_log(raw / "search_log.ndjson.gz")
+    logger.info("검색 서버 로그 %d건 읽음 (%.0f초)", len(log), time.time() - t0)
+    b = Builder(cat, log, args.seed)
     b.build_raters()
-    b.plan_with_regression()
+    b.plan_batches()
     b.simulate()
     errs = validate(b)
     for k, v in summarize(b).items():

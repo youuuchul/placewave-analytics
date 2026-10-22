@@ -34,7 +34,16 @@ DATASET = "marts"
 SEG = ["channel1", "device_platform", "member_seg"]
 
 # 화면이 필요할 때 따로 받는 표. 나머지 표는 index.json 에 넣는다.
-LAZY = ["hourly_metrics", "daily_channel", "daily_venue", "daily_event", "weekly_path", "daily_search", "daily_query"]
+LAZY = [
+    "hourly_metrics",
+    "daily_channel",
+    "daily_venue",
+    "daily_event",
+    "weekly_path",
+    "daily_search",
+    "daily_query",
+    "exp_ranker_request",
+]
 
 # person_day.bin 비트 배치: (필드, 워드, 시작 비트, 비트 수). 리틀엔디언 Uint32 2개 = 행당 8바이트.
 PD_BITS = [("pk", 0, 0, 20), ("d", 0, 20, 9), ("c", 0, 29, 1), ("p", 0, 30, 2), ("m", 1, 0, 1), ("f", 1, 1, 16)]
@@ -50,8 +59,7 @@ TABLES: dict[str, tuple[list[str], list[str]]] = {
             *SEG,
             "searches",
             "zero_result_searches",
-            "ga_matched_searches",
-            "matched_result_searches",
+            "result_searches",
             "clicked_searches",
             "first_click_position_sum",
             "first_click_position_sq_sum",
@@ -59,6 +67,8 @@ TABLES: dict[str, tuple[list[str], list[str]]] = {
             "reformulated_searches",
             "search_sessions",
             "search_sessions_applied",
+            "latency_ms_sum",
+            "ga_logged_searches",
         ],
         ["kst_date", "query_intent", "ranker_version"],
     ),
@@ -70,12 +80,32 @@ TABLES: dict[str, tuple[list[str], list[str]]] = {
             "query_intent",
             "searches",
             "zero_result_searches",
-            "ga_matched_searches",
+            "result_searches",
             "clicked_searches",
             "reformulated_searches",
             "eval_dates",
         ],
         ["kst_date", "query_norm"],
+    ),
+    "exp_ranker_request": (
+        [
+            "kst_date",
+            "request_id",
+            "client_id",
+            "person_id",
+            "arm",
+            "ranker_version",
+            "query_intent",
+            *SEG,
+            "is_zero_result",
+            "is_clicked",
+            "first_click_position",
+            "is_reformulated",
+            "latency_ms",
+            "is_session_first",
+            "session_applied",
+        ],
+        ["kst_date", "request_id"],
     ),
     "weekly_eval_ops": (
         [
@@ -410,9 +440,13 @@ STRING_COLS = {
     "purpose",
     "created_date",
     "due_date",
+    "request_id",
+    "client_id",
+    "person_id",
+    "arm",
 }
 FLOAT_COLS = {"w1_retention", "lat", "lng"}
-BOOL_COLS = {"is_partner"}
+BOOL_COLS = {"is_partner", "is_zero_result", "is_clicked", "is_reformulated", "is_session_first", "session_applied"}
 MONTH_COLS = {"cohort_month", "month"}
 # 표마다 타입이 다른 열: weekly_path.step 은 정수 1~4 (funnel_daily.step 은 문자열)
 INT_OVERRIDE: dict[str, set[str]] = {"weekly_path": {"step"}}

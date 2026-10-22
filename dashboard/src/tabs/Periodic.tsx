@@ -5,7 +5,6 @@ import { num, pct, ratio, won } from '../lib/format'
 import { channel2Label, S } from '../lib/labels'
 import { ready, useTable } from '../lib/source'
 import type { Data, WeeklyActivity } from '../lib/types'
-import { kappa, riskIds, teamPace } from './EvalOps'
 import { Heatmap, TimeChart } from '../components/charts'
 import { DataTable, type Col } from '../components/DataTable'
 import { Card, type Delta, Legend, Tile, TileRow } from '../components/ui'
@@ -55,44 +54,23 @@ function Briefing({ data, s, wk, wau, prevWau, ret, prevRet }: {
   const sw = groupSum(
     ds.filter((r) => seg(r) && r.kst_date >= prevWk && r.kst_date <= addDays(wk, 6)),
     (r) => (r.kst_date >= wk ? 'cur' : 'prev'),
-    ['searches', 'zero_result_searches', 'clicked_searches', 'matched_result_searches'],
+    ['searches', 'zero_result_searches', 'clicked_searches'],
   )
   const zr = (k: string) => {
     const z = sw.get(k)
     return z ? ratio(z.zero_result_searches, z.searches) : null
   }
-  const ct = (k: string) => {
+  const sr = (k: string) => {
     const z = sw.get(k)
-    return z ? ratio(z.clicked_searches, z.matched_result_searches) : null
+    return z ? ratio(z.clicked_searches, z.searches) : null
   }
-  const segOn = s.ch !== 'all' || s.pf !== 'all' || s.ms !== 'all'
-  const ops = groupSum(
-    (data.weekly_eval_ops ?? []).filter((r) => r.week_start === wk || r.week_start === prevWk),
-    (r) => r.week_start,
-    ['labels', 'gold_labels', 'gold_correct', 'final_labels', 'label_pairs', 'agree_pairs', 'labels_g0', 'labels_g1', 'labels_g2', 'labels_g3', 'rework_labels', 'handle_seconds', 'tasks_completed'],
-  )
-  const oc = ops.get(wk)
-  const op = ops.get(prevWk)
-  const risk = riskIds(
-    (data.weekly_batch ?? []).filter((b) => b.week_start === wk),
-    teamPace(data, wk),
-  ).size
-
   const lines: { k: string; v: string }[] = [
     { k: '방문', v: `WAU ${num(wau)}명${chg(wau, prevWau)}, 재방문 비중 ${pct(ret)}${chgPt(ret, prevRet)}` },
   ]
   if (sw.get('cur'))
     lines.push({
       k: '검색',
-      v: `결과 0건 비율 ${pct(zr('cur'))}${chgPt(zr('cur'), zr('prev'))}, 결과 클릭률 ${pct(ct('cur'))}${chgPt(ct('cur'), ct('prev'))}`,
-    })
-  if (oc && !segOn)
-    lines.push({
-      k: '평가 운영',
-      v: `라벨 ${num(oc.labels)}건${chg(oc.labels, op?.labels ?? null)}, 정답셋 정확도 ${pct(ratio(oc.gold_correct, oc.gold_labels))}${chgPt(
-        ratio(oc.gold_correct, oc.gold_labels),
-        op ? ratio(op.gold_correct, op.gold_labels) : null,
-      )}, 카파 ${kappa(oc)?.toFixed(2) ?? '—'}, 마감 위험 배치 ${num(risk)}개`,
+      v: `검색 성공률 ${pct(sr('cur'))}${chgPt(sr('cur'), sr('prev'))}, 결과 0건 비율 ${pct(zr('cur'))}${chgPt(zr('cur'), zr('prev'))}`,
     })
   return (
     <Card title="주간 브리핑" meta={`${md(wk)} ~ ${md(addDays(wk, 6))}`}>

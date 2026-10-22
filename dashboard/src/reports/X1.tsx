@@ -7,7 +7,7 @@ import type { Data } from '../lib/types'
 import { TimeChart } from '../components/charts'
 import { Card, Legend } from '../components/ui'
 import { acc, agree, evalWeeks, GUIDELINE_V2, kappa, type Ops, OPS_KEYS, perLabel, rework } from '../tabs/EvalOps'
-import { Block, Bullets, DashLinks, Dataset, Para, QA, SideTable, Spec, type Cell } from './Frame'
+import { Block, Bullets, DashLinks, Dataset, Para, SideTable, Spec, type Cell } from './Frame'
 
 const V1 = '개정 전 (v1)'
 const V2 = '개정 후 (v2)'
@@ -154,20 +154,6 @@ export default function X1({ data }: { data: Data }) {
             '개정 주에 옛 지침 배치의 잔여 라벨이 11건뿐이라 같은 주 안의 두 지침 비교도 할 수 없다.',
             '정답셋 정확도는 정답셋 과제(과제의 약 10%)에서만 잰다. 일치율·카파는 같은 과제를 함께 본 평가자 쌍에서 잰다.',
             '가상 데이터에서 지침 효과는 생성 규칙으로 넣은 것이다. 보여 주려는 것은 효과 크기가 아니라 비용까지 같이 읽는 방법이다.',
-          ]}
-        />
-      </Block>
-
-      <Block title="예상 질문">
-        <QA
-          items={[
-            [
-              '정확도 상승은 지침 덕인가, 숙련 덕인가?',
-              '이 데이터로는 나눌 수 없다. 다시 한다면 같은 주에 평가자를 둘로 나눠 한쪽만 새 지침을 쓰게 하거나(평가자 단위 A/B), 같은 과제를 두 지침으로 이중 평가해 차이를 본다.',
-            ],
-            ['처리 시간 증가는 비용으로 얼마였나?', '개정 직후 3주 동안 건당 5~7초(개정 전 주 대비)가 늘었다. 4주째에 개정 전보다 빨라져 누적 평균은 같다. 그 3주의 주간 목표는 처리량 감소를 감안해 잡아야 했다.'],
-            ['왜 카파를 같이 봤나?', '일치율은 등급이 한쪽에 몰리면 우연만으로도 높아진다. 카파는 우연 일치를 뺀 값이라 지침이 같은 판단을 만들었는지 더 엄격하게 본다.'],
-            ['품질 기준(정확도 80% 미만이면 기준 미달)은 어디서 왔나?', '공개 근거가 없는 가정이다. 공개된 크라우드 라벨링 사례는 70% 미만을 제외하는데, 4점 척도의 정답 맞히기라 더 엄격하게 잡았다.'],
           ]}
         />
       </Block>

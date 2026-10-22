@@ -12,3 +12,4 @@ service-account*.json
 .DS_Store
 .claude/.pr_ok
 docs/portfolio/
+CLAUDE.md

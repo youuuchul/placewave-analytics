@@ -24,9 +24,21 @@ export interface TabGuide {
   key_metrics: string[]
 }
 
+/** 북극성 지표 절. 문구는 metrics.json 에만 두고 화면은 읽어서 그린다. */
+export interface NorthStar {
+  metric: string
+  definition: string
+  reasons: { head: string; body: string }[]
+  axes: { axis: string; inputs: string[]; guardrails: { id: string; rule: string }[] }[]
+  rejected: { name: string; reason: string }[]
+  limits: string[]
+  sources: { label: string; url: string }[]
+}
+
 export interface MetricSpec {
   groups: { id: string; name: string }[]
   axes?: { id: string; name: string }[]
+  north_star?: NorthStar
   tabs: TabGuide[]
   metrics: MetricDef[]
 }

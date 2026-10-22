@@ -1,13 +1,12 @@
-import { groupSum } from './agg'
 import { addDays } from './date'
-import { dec, num, pct, ratio } from './format'
-import type { DailyQuery, DailySearch } from './types'
+import { ratio } from './format'
+import type { DailyQuery, DailySearch, ExpRankerRequest } from './types'
 
+/** 검색 일 마트를 더할 때 쓰는 열. 검색 지표는 모두 서버 요청 기준이다. */
 export const SEARCH_KEYS = [
   'searches',
   'zero_result_searches',
-  'ga_matched_searches',
-  'matched_result_searches',
+  'result_searches',
   'clicked_searches',
   'first_click_position_sum',
   'first_click_position_sq_sum',
@@ -15,41 +14,28 @@ export const SEARCH_KEYS = [
   'reformulated_searches',
   'search_sessions',
   'search_sessions_applied',
+  'latency_ms_sum',
 ] as const satisfies readonly (keyof DailySearch)[]
 export type SearchKey = (typeof SEARCH_KEYS)[number]
 export type SearchSums = Record<SearchKey, number>
 export const ZERO_SUMS = Object.fromEntries(SEARCH_KEYS.map((k) => [k, 0])) as SearchSums
 
+/** 검색 성공률 = 결과를 1번 이상 클릭한 검색 ÷ 전체 검색 = (1 − 0건 비율) × 결과 클릭률 */
+export const success = (t: SearchSums) => ratio(t.clicked_searches, t.searches)
 export const zeroRate = (t: SearchSums) => ratio(t.zero_result_searches, t.searches)
-export const ctr = (t: SearchSums) => ratio(t.clicked_searches, t.matched_result_searches)
+export const ctr = (t: SearchSums) => ratio(t.clicked_searches, t.result_searches)
 export const avgPos = (t: SearchSums) => ratio(t.first_click_position_sum, t.clicked_searches)
 export const top3 = (t: SearchSums) => ratio(t.top3_clicks, t.clicked_searches)
-export const reform = (t: SearchSums) => ratio(t.reformulated_searches, t.ga_matched_searches)
+export const reform = (t: SearchSums) => ratio(t.reformulated_searches, t.searches)
 export const applyRate = (t: SearchSums) => ratio(t.search_sessions_applied, t.search_sessions)
-export const clickPerSearch = (t: SearchSums) => ratio(t.clicked_searches, t.ga_matched_searches)
 
-/** 랭킹 A/B 두 군. 대조군·실험군을 먼저 쓰고 버전 이름은 괄호로 병기한다. */
-export const RANKER_GROUPS = {
-  v1: { name: '대조군', what: '기존 랭킹', tag: 'v1' },
-  v2: { name: '실험군', what: '새 랭킹', tag: 'v2' },
-} as const
-
-/** v1·v2 가 같은 날 각각 그날 검색의 10% 이상인 기간 = 랭킹 A/B 테스트 기간(자정 넘긴 세션의 소수 섞임 제외). */
-export function rankerSpan(rows: DailySearch[]): { from: string; to: string; v2All: string | null } | null {
-  const by = new Map<string, { v1: number; v2: number }>()
-  for (const r of rows) {
-    const z = by.get(r.kst_date) ?? { v1: 0, v2: 0 }
-    if (r.ranker_version === 'v1') z.v1 += r.searches
-    else z.v2 += r.searches
-    by.set(r.kst_date, z)
-  }
-  const both = [...by.entries()]
-    .filter(([, z]) => Math.min(z.v1, z.v2) >= 0.1 * (z.v1 + z.v2))
-    .map(([d]) => d)
-    .sort()
-  if (!both.length) return null
-  const to = both[both.length - 1]
-  return { from: both[0], to, v2All: addDays(to, 1) }
+/** 랭킹 A/B 시나리오 일정(세션 시작일 기준). 설계서에 정한 날짜를 그대로 쓴다. */
+export const AB = {
+  baseline: ['2026-06-22', '2026-07-05'] as const,
+  pre: ['2026-06-29', '2026-07-12'] as const,
+  firstWeek: ['2026-07-13', '2026-07-19'] as const,
+  run: ['2026-07-13', '2026-07-26'] as const,
+  v2All: '2026-07-27',
 }
 
 export interface Ci {
@@ -61,7 +47,7 @@ export interface Ci {
 }
 
 /** 양측 p값 = erfc(|z| ÷ √2). Abramowitz–Stegun 7.1.26 근사(오차 1.5e-7). */
-function pTwo(z: number): number {
+export function pTwo(z: number): number {
   const x = Math.abs(z) / Math.SQRT2
   const t = 1 / (1 + 0.3275911 * x)
   return t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429)))) * Math.exp(-x * x)
@@ -70,23 +56,13 @@ function pTwo(z: number): number {
 /** p값 표기: 0.001 미만은 부등호, 아니면 소수 셋째 자리. */
 export const fmtP = (p: number) => (p < 0.001 ? '< 0.001' : p.toFixed(3))
 
-/** 두 비율의 차이(뒤 − 앞)와 95% 구간(정규 근사). */
+/** 두 비율의 차이(뒤 − 앞)와 95% 구간. 요청 하나하나를 독립으로 보는 단순 검정(정규 근사). */
 export function diffCi(x1: number, n1: number, x2: number, n2: number): Ci | null {
   if (!n1 || !n2) return null
   const p1 = x1 / n1
   const p2 = x2 / n2
   const se = Math.sqrt((p1 * (1 - p1)) / n1 + (p2 * (1 - p2)) / n2)
   const d = p2 - p1
-  return { d, lo: d - 1.96 * se, hi: d + 1.96 * se, p: se > 0 ? pTwo(d / se) : 1 }
-}
-
-/** 두 평균의 차이와 95% 구간(웰치, 정규 근사). 합·제곱합·표본 수로 계산한다. */
-export function meanDiffCi(s1: number, q1: number, n1: number, s2: number, q2: number, n2: number): Ci | null {
-  if (n1 < 2 || n2 < 2) return null
-  const m1 = s1 / n1
-  const m2 = s2 / n2
-  const se = Math.sqrt((q1 - n1 * m1 * m1) / (n1 - 1) / n1 + (q2 - n2 * m2 * m2) / (n2 - 1) / n2)
-  const d = m2 - m1
   return { d, lo: d - 1.96 * se, hi: d + 1.96 * se, p: se > 0 ? pTwo(d / se) : 1 }
 }
 
@@ -99,153 +75,240 @@ export function verdict(ci: Ci, down = false): Verdict {
 }
 
 const sign = (s: string) => (s.startsWith('-') ? `−${s.slice(1)}` : s === '0.0' || s === '0.00' ? s : `+${s}`)
-/** 비율 차이 %p(부호·− 기호). 구간 끝값은 단위를 뺀다(덱 표기와 같게). */
+/** 비율 차이 %p(부호·− 기호). */
 export const pp = (v: number) => `${sign((v * 100).toFixed(1))}%p`
-const ppBound = (v: number) => sign((v * 100).toFixed(1))
-const signed2 = (v: number) => sign(v.toFixed(2))
+/** 구간 끝값(단위 없이). */
+export const ppBound = (v: number) => sign((v * 100).toFixed(1))
+export const signed2 = (v: number) => sign(v.toFixed(2))
+export const signedMs = (v: number) => `${sign(v.toFixed(0))}ms`
 
-export const DENOM_TIP = '결과 0건이 줄어 분모(결과 있는 검색)가 늘었다. 분모를 전체 검색으로 둔 검색당 클릭은 차이 없음'
-export const EXCLUDED_TIP = '가상 데이터의 신청 로그는 랭킹과 무관하게 고정돼 있어 판정하지 않는다'
+// ---------- 실험 분석 (요청 단위 마트 → 기기 단위 클러스터) ----------
 
-export interface CompareLine {
+export type Arm = 'control' | 'treatment'
+export const ARM_LABEL: Record<Arm, string> = { control: '대조군', treatment: '실험군' }
+
+export const inSpan = (rows: ExpRankerRequest[], [from, to]: readonly [string, string]) =>
+  rows.filter((r) => r.kst_date >= from && r.kst_date <= to)
+
+/** 비율 지표 정의: 요청(또는 세션)마다 분자·분모 기여값. 분모가 0인 행은 그 지표에서 빠진다. */
+export interface RatioMetric {
   id: string
   label: string
-  a: number | null
-  b: number | null
-  fmt: (v: number | null) => string
-  ci: Ci | null
-  ciFmt: (v: number) => string
-  /** 차이 (95% 구간) 칸 글자. 예: −16.5%p (−18.0 ~ −15.0) */
-  ciText: string | null
-  /** p값 칸 글자 */
-  pText: string | null
-  /** 화면에 쓰는 판정. 분모 효과·판정 제외는 원래 판정 대신 쓴다 */
-  call: string | null
-  tone: 'good' | 'bad' | 'muted'
-  tip?: string
+  num: (r: ExpRankerRequest) => number
+  den: (r: ExpRankerRequest) => number
+  /** 표시 형식 */
+  fmt: (v: number) => string
+  /** 차이 표시 형식과 구간 끝값 형식 */
+  diff: (v: number) => string
+  bound: (v: number) => string
+  /** 낮을수록 좋은 지표 */
+  down?: boolean
+}
+
+export interface RatioEstimate {
+  value: number
+  /** 델타 방법 분산 (기기 단위 클러스터) */
+  variance: number
+  devices: number
+  num: number
+  den: number
 }
 
 /**
- * 랭킹 A/B 비교 표. 넘겨받은 행(기간·세그먼트를 이미 거른 daily_search)을 버전별로 합해 지표·차이·판정을 만든다.
- * 결과 클릭률이 악화이면서 검색당 클릭이 차이 없음이고 0건 비율이 개선이면 '분모 효과'로 쓴다.
- * 검색 세션 신청 전환은 값만 보이고 판정에서 뺀다(EXCLUDED_TIP).
+ * 기기 단위 클러스터를 반영한 비율 추정(델타 방법). R = Σy ÷ Σn, Var(R) = (s²_y − 2R·s_yn + R²·s²_n) ÷ (K · n̄²).
+ * y·n 은 기기별 분자·분모 합, K 는 분모가 있는 기기 수.
  */
-export function compareRanker(rows: DailySearch[]): { a: SearchSums; b: SearchSums; lines: CompareLine[] } {
-  const by = groupSum(rows, (r) => r.ranker_version, [...SEARCH_KEYS])
-  const a = by.get('v1') ?? ZERO_SUMS
-  const b = by.get('v2') ?? ZERO_SUMS
-  const p1 = (v: number | null) => pct(v)
-  type Spec = Omit<CompareLine, 'call' | 'tone' | 'tip' | 'ciText' | 'pText'> & { down?: boolean; excluded?: boolean; bound?: (v: number) => string }
-  const spec: Spec[] = [
-    { id: 'Q02', label: '검색 수', a: a.searches, b: b.searches, fmt: num, ci: null, ciFmt: pp },
-    {
-      id: 'Q03',
-      label: '결과 0건 비율',
-      a: zeroRate(a),
-      b: zeroRate(b),
-      fmt: p1,
-      ci: diffCi(a.zero_result_searches, a.searches, b.zero_result_searches, b.searches),
-      ciFmt: pp,
-      bound: ppBound,
-      down: true,
-    },
-    {
-      id: 'Q05',
-      label: '평균 첫 클릭 순위',
-      a: avgPos(a),
-      b: avgPos(b),
-      fmt: (v) => dec(v, 2),
-      ci: meanDiffCi(
-        a.first_click_position_sum,
-        a.first_click_position_sq_sum,
-        a.clicked_searches,
-        b.first_click_position_sum,
-        b.first_click_position_sq_sum,
-        b.clicked_searches,
-      ),
-      ciFmt: signed2,
-      bound: signed2,
-      down: true,
-    },
-    {
-      id: 'Q06',
-      label: '상위 3위 클릭 비중',
-      a: top3(a),
-      b: top3(b),
-      fmt: p1,
-      ci: diffCi(a.top3_clicks, a.clicked_searches, b.top3_clicks, b.clicked_searches),
-      ciFmt: pp,
-      bound: ppBound,
-    },
-    {
-      id: 'Q04',
-      label: '결과 클릭률',
-      a: ctr(a),
-      b: ctr(b),
-      fmt: p1,
-      ci: diffCi(a.clicked_searches, a.matched_result_searches, b.clicked_searches, b.matched_result_searches),
-      ciFmt: pp,
-      bound: ppBound,
-    },
-    {
-      id: 'Q12',
-      label: '검색당 클릭',
-      a: clickPerSearch(a),
-      b: clickPerSearch(b),
-      fmt: p1,
-      ci: diffCi(a.clicked_searches, a.ga_matched_searches, b.clicked_searches, b.ga_matched_searches),
-      ciFmt: pp,
-      bound: ppBound,
-    },
-    {
-      id: 'Q07',
-      label: '재검색률',
-      a: reform(a),
-      b: reform(b),
-      fmt: p1,
-      ci: diffCi(a.reformulated_searches, a.ga_matched_searches, b.reformulated_searches, b.ga_matched_searches),
-      ciFmt: pp,
-      bound: ppBound,
-      down: true,
-    },
-    {
-      id: 'Q08',
-      label: '검색 세션 신청 전환',
-      a: applyRate(a),
-      b: applyRate(b),
-      fmt: p1,
-      ci: diffCi(a.search_sessions_applied, a.search_sessions, b.search_sessions_applied, b.search_sessions),
-      ciFmt: pp,
-      bound: ppBound,
-      excluded: true,
-    },
-  ]
-  const raw = new Map(spec.map((l) => [l.id, l.ci ? verdict(l.ci, l.down) : null]))
-  const denomEffect = raw.get('Q04') === '악화' && raw.get('Q12') === '차이 없음' && raw.get('Q03') === '개선'
-  const lines = spec.map(({ down: _d, excluded, bound, ...spec1 }): CompareLine => {
-    const b = bound ?? spec1.ciFmt
-    const l = {
-      ...spec1,
-      ciText: spec1.ci ? `${spec1.ciFmt(spec1.ci.d)} (${b(spec1.ci.lo)} ~ ${b(spec1.ci.hi)})` : null,
-      pText: spec1.ci ? fmtP(spec1.ci.p) : null,
-    }
-    const v = raw.get(l.id) ?? null
-    if (excluded) return { ...l, call: '판정 제외', tone: 'muted', tip: EXCLUDED_TIP }
-    if (l.id === 'Q04' && denomEffect) return { ...l, call: '분모 효과', tone: 'muted', tip: DENOM_TIP }
-    return { ...l, call: v, tone: v === '개선' ? 'good' : v === '악화' ? 'bad' : 'muted' }
-  })
-  return { a, b, lines }
+export function ratioEstimate(rows: ExpRankerRequest[], m: RatioMetric): RatioEstimate | null {
+  const by = new Map<string, [number, number]>()
+  for (const r of rows) {
+    const n = m.den(r)
+    if (!n) continue
+    const z = by.get(r.client_id) ?? [0, 0]
+    z[0] += m.num(r)
+    z[1] += n
+    by.set(r.client_id, z)
+  }
+  const k = by.size
+  if (k < 2) return null
+  let sy = 0
+  let sn = 0
+  for (const [y, n] of by.values()) {
+    sy += y
+    sn += n
+  }
+  const R = sy / sn
+  const my = sy / k
+  const mn = sn / k
+  let vyy = 0
+  let vnn = 0
+  let vyn = 0
+  for (const [y, n] of by.values()) {
+    vyy += (y - my) ** 2
+    vnn += (n - mn) ** 2
+    vyn += (y - my) * (n - mn)
+  }
+  vyy /= k - 1
+  vnn /= k - 1
+  vyn /= k - 1
+  return { value: R, variance: (vyy - 2 * R * vyn + R * R * vnn) / (k * mn * mn), devices: k, num: sy, den: sn }
 }
 
-/** 일별 두 군 값(차트용). */
-export function rankerDaily(rows: DailySearch[], key: (t: SearchSums) => number | null) {
-  const byDay = new Map<string, DailySearch[]>()
-  for (const r of rows) byDay.set(r.kst_date, [...(byDay.get(r.kst_date) ?? []), r])
-  return [...byDay.keys()].sort().map((d) => {
-    const g = groupSum(byDay.get(d)!, (r) => r.ranker_version, [...SEARCH_KEYS])
-    return { date: d, v1: key(g.get('v1') ?? ZERO_SUMS), v2: key(g.get('v2') ?? ZERO_SUMS) }
-  })
+/** 두 집단 차이(실험군 − 대조군)와 95% 구간·p값. 기기 단위 델타 방법. */
+export function deltaDiff(c: RatioEstimate, t: RatioEstimate): Ci {
+  const d = t.value - c.value
+  const se = Math.sqrt(c.variance + t.variance)
+  return { d, lo: d - 1.96 * se, hi: d + 1.96 * se, p: se > 0 ? pTwo(d / se) : 1 }
 }
+
+/** 같은 지표를 요청 하나하나를 독립으로 본 단순 검정(분자가 0/1 인 비율 지표만). */
+export function naiveDiff(c: RatioEstimate, t: RatioEstimate): Ci | null {
+  return diffCi(c.num, c.den, t.num, t.den)
+}
+
+/** Holm 보정 p값(같은 순서로 돌려준다). */
+export function holm(ps: number[]): number[] {
+  const order = ps.map((p, i) => [p, i] as const).sort((a, b) => a[0] - b[0])
+  const out = new Array<number>(ps.length)
+  let run = 0
+  order.forEach(([p, i], rank) => {
+    run = Math.max(run, Math.min(1, p * (ps.length - rank)))
+    out[i] = run
+  })
+  return out
+}
+
+/** 표본 비율 불일치(SRM): 50:50 기대에 대한 카이제곱 적합도(자유도 1). */
+export function srm(nc: number, nt: number): { chi2: number; p: number; share: number } {
+  const n = nc + nt
+  const chi2 = n ? (nc - nt) ** 2 / n : 0
+  return { chi2, p: pTwo(Math.sqrt(chi2)), share: n ? nc / n : 0 }
+}
+
+/** 고정 시드 난수(mulberry32). 부트스트랩이 매번 같은 값을 내게 한다. */
+export function seeded(seed: number) {
+  let a = seed >>> 0
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0
+    let t = a
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+/** 분위수(선형 보간, 정렬된 배열). */
+export function quantileSorted(xs: number[], q: number): number {
+  if (!xs.length) return NaN
+  const h = (xs.length - 1) * q
+  const lo = Math.floor(h)
+  return xs[lo] + (xs[Math.min(lo + 1, xs.length - 1)] - xs[lo]) * (h - lo)
+}
+
+/**
+ * 응답 시간 p95 차이(실험군 − 대조군)와 95% 구간. 기기 단위 부트스트랩(기기를 복원 추출, 2,000회, 고정 시드).
+ * p값은 부트스트랩 분포에서 0 반대쪽 비중 × 2.
+ */
+export function p95Diff(rows: ExpRankerRequest[], reps = 2000): { c: number; t: number; ci: Ci } {
+  const byArm = (arm: Arm) => {
+    const m = new Map<string, number[]>()
+    for (const r of rows) if (r.arm === arm) m.set(r.client_id, [...(m.get(r.client_id) ?? []), r.latency_ms])
+    return [...m.values()]
+  }
+  const p95 = (groups: number[][]) => quantileSorted(groups.flat().sort((a, b) => a - b), 0.95)
+  const gc = byArm('control')
+  const gt = byArm('treatment')
+  const c = p95(gc)
+  const t = p95(gt)
+  const rnd = seeded(20260706)
+  const pick = (g: number[][]) => Array.from({ length: g.length }, () => g[Math.floor(rnd() * g.length)])
+  const ds: number[] = []
+  for (let i = 0; i < reps; i++) ds.push(p95(pick(gt)) - p95(pick(gc)))
+  ds.sort((x, y) => x - y)
+  const below = ds.filter((x) => x <= 0).length / reps
+  return {
+    c,
+    t,
+    ci: { d: t - c, lo: quantileSorted(ds, 0.025), hi: quantileSorted(ds, 0.975), p: Math.min(1, 2 * Math.min(below, 1 - below)) },
+  }
+}
+
+const bit = (v: boolean) => (v ? 1 : 0)
+const pct1 = (v: number) => `${(v * 100).toFixed(1)}%`
+
+/** 실험 지표. 요청 단위 지표는 검색 요청이, 세션 지표는 세션 첫 검색 행이 분모다. */
+export const EXP_METRICS = {
+  success: { id: 'success', label: '검색 성공률', num: (r) => bit(r.is_clicked), den: () => 1, fmt: pct1, diff: pp, bound: ppBound },
+  zero: { id: 'zero', label: '결과 0건 비율', num: (r) => bit(r.is_zero_result), den: () => 1, fmt: pct1, diff: pp, bound: ppBound, down: true },
+  pos: {
+    id: 'pos',
+    label: '평균 첫 클릭 순위',
+    num: (r) => (r.is_clicked ? (r.first_click_position ?? 0) : 0),
+    den: (r) => bit(r.is_clicked),
+    fmt: (v) => v.toFixed(2),
+    diff: signed2,
+    bound: signed2,
+    down: true,
+  },
+  top3: {
+    id: 'top3',
+    label: '상위 3위 클릭 비중',
+    num: (r) => bit(r.is_clicked && (r.first_click_position ?? 99) <= 3),
+    den: (r) => bit(r.is_clicked),
+    fmt: pct1,
+    diff: pp,
+    bound: ppBound,
+  },
+  reform: { id: 'reform', label: '재검색률', num: (r) => bit(r.is_reformulated), den: () => 1, fmt: pct1, diff: pp, bound: ppBound, down: true },
+  ctr: { id: 'ctr', label: '결과 클릭률', num: (r) => bit(r.is_clicked), den: (r) => bit(!r.is_zero_result), fmt: pct1, diff: pp, bound: ppBound },
+  apply: {
+    id: 'apply',
+    label: '검색 세션 신청 전환',
+    num: (r) => bit(r.session_applied),
+    den: (r) => bit(r.is_session_first),
+    fmt: (v) => `${(v * 100).toFixed(2)}%`,
+    diff: (v) => `${sign((v * 100).toFixed(2))}%p`,
+    bound: (v) => sign((v * 100).toFixed(2)),
+  },
+} satisfies Record<string, RatioMetric>
+
+export interface ArmCompare {
+  metric: RatioMetric
+  c: RatioEstimate
+  t: RatioEstimate
+  ci: Ci
+  naive: Ci | null
+}
+
+export function compareArms(rows: ExpRankerRequest[], m: RatioMetric): ArmCompare | null {
+  const c = ratioEstimate(
+    rows.filter((r) => r.arm === 'control'),
+    m,
+  )
+  const t = ratioEstimate(
+    rows.filter((r) => r.arm === 'treatment'),
+    m,
+  )
+  if (!c || !t) return null
+  return { metric: m, c, t, ci: deltaDiff(c, t), naive: m.id === 'pos' ? null : naiveDiff(c, t) }
+}
+
+/** 기기 수(배정 단위). 기간 안에 검색한 기기만 센다. */
+export function armDevices(rows: ExpRankerRequest[]): Record<Arm, number> {
+  const s: Record<Arm, Set<string>> = { control: new Set(), treatment: new Set() }
+  for (const r of rows) s[r.arm].add(r.client_id)
+  return { control: s.control.size, treatment: s.treatment.size }
+}
+
+/**
+ * 최소 검출 효과(양측 α 0.05, 검정력 0.8). 기준선 기간의 기기 단위 분산으로 실험(집단당 기기 수 = 기준선 기기 수 × scale ÷ 2)을 예측한다.
+ */
+export function mde(base: RatioEstimate, scale: number): number {
+  const perArm = (base.devices * scale) / 2
+  const v = (base.variance * base.devices) / perArm
+  return (1.959964 + 0.841621) * Math.sqrt(2 * v)
+}
+
+// ---------- 검색어 ----------
 
 export const FAILED_MIN = 20
 export const FAILED_ZERO = 0.3
@@ -254,7 +317,7 @@ export interface QueryStat {
   q: DailyQuery
   searches: number
   zero: number
-  matched: number
+  result: number
   clicked: number
   reform: number
   failed: boolean
@@ -262,15 +325,15 @@ export interface QueryStat {
   evalDate: string | null
 }
 
-/** 기간 안 검색 20건 이상 검색어의 합계와 실패 여부(0건 비율 30% 이상)·평가 편입일. 검색 탭과 이슈 보고서가 같이 쓴다. */
+/** 기간 안 검색 20건 이상 검색어의 합계와 실패 여부(0건 비율 30% 이상)·평가 편입일. 검색 탭과 보고서가 같이 쓴다. */
 export function queryStats(rows: DailyQuery[], from: string, to: string, keep: (r: DailyQuery) => boolean = () => true): QueryStat[] {
   const m = new Map<string, Omit<QueryStat, 'failed' | 'evalDate'>>()
   for (const r of rows) {
     if (r.kst_date < from || r.kst_date > to || !keep(r)) continue
-    const z = m.get(r.query_norm) ?? { q: r, searches: 0, zero: 0, matched: 0, clicked: 0, reform: 0 }
+    const z = m.get(r.query_norm) ?? { q: r, searches: 0, zero: 0, result: 0, clicked: 0, reform: 0 }
     z.searches += r.searches
     z.zero += r.zero_result_searches
-    z.matched += r.ga_matched_searches
+    z.result += r.result_searches
     z.clicked += r.clicked_searches
     z.reform += r.reformulated_searches
     m.set(r.query_norm, z)

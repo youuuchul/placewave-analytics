@@ -21,6 +21,8 @@ from datetime import UTC, date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from search_engine import RANKER_AB_START, RANKER_V2_ALL, REINDEX_BUG, ranker_for
+
 logger = logging.getLogger("placewave.validate")
 
 KST = timezone(timedelta(hours=9))
@@ -144,6 +146,7 @@ def validate(data: Path, weeks: int, end_date: date) -> tuple[list[tuple[str, bo
     prop_mismatch = 0
     boundary_rows: list[tuple[str, int, str]] = []
     sub_us: dict[str, list[int]] = defaultdict(list)
+    ga_search: dict[str, set[str]] = {"search": set(), "select_search_result": set()}
 
     with gzip.open(raw / "ga4_events.ndjson.gz", "rt", encoding="utf-8") as f:
         for line in f:
@@ -157,6 +160,8 @@ def validate(data: Path, weeks: int, end_date: date) -> tuple[list[tuple[str, bo
                     last_day_apply += 1
                 elif e == "purchase":
                     last_day_pay += 1
+            if e in ga_search:
+                ga_search[e].add(str(_param(r, "search_id")))
             k = (r["user_pseudo_id"], r["ga_session_id"])
             s = sessions.get(k)
             if s is None:
@@ -396,7 +401,7 @@ def validate(data: Path, weeks: int, end_date: date) -> tuple[list[tuple[str, bo
         "prop_missing": prop_missing,
         "prop_mismatch": prop_mismatch,
     }
-    v2_lines = _v2(ctx, check, start_date, end_date)
+    v2_lines = _v2(ctx, check, start_date, end_date) + _search(raw, check, ga_search) + _churn(raw, check, end_date)
     marker = "\n## 주별 추이"
     summary = summary.replace(marker, "\n".join(v2_lines) + "\n" + marker, 1)
     return checks, summary
@@ -904,6 +909,194 @@ def _v2(ctx: dict[str, Any], check: Any, start_date: date, end_date: date) -> li
         f"| 파트너 계약 월 해지율 | {contract_churn:.4f} |",
     ]
     return out
+
+
+def _search(raw: Path, check: Any, ga_ids: dict[str, set[str]]) -> list[str]:
+    """검색 서버 요청·클릭 로그 단언과 랭킹 구간별 요약.
+
+    Args:
+        raw: 원천 디렉터리.
+        check: 단언 기록 함수.
+        ga_ids: GA search·select_search_result 이벤트의 search_id 집합.
+
+    Returns:
+        요약 마크다운 줄.
+    """
+    reqs: dict[str, dict[str, Any]] = {}
+    with gzip.open(raw / "search_log.ndjson.gz", "rt", encoding="utf-8") as f:
+        for line in f:
+            r = json.loads(line)
+            reqs[r["request_id"]] = r
+    clicks = _read_csv(raw / "search_click_log.csv")
+    first: dict[str, dict[str, str]] = {}
+    orphan = bad = 0
+    for c in clicks:
+        r = reqs.get(c["request_id"])
+        if r is None:
+            orphan += 1
+            continue
+        pos, top = int(c["position"]), r["results"]
+        hit = top[pos - 1] if 0 < pos <= len(top) else None
+        if (
+            r["results_count"] == 0
+            or hit is None
+            or (hit["item_type"], hit["item_id"]) != (c["item_type"], int(c["item_id"]))
+        ):
+            bad += 1
+        first.setdefault(c["request_id"], c)
+    check(
+        "검색 클릭이 서버 요청에 있고 노출 목록의 그 순위 결과",
+        orphan == 0 and bad == 0,
+        f"요청 없음 {orphan} · 목록 불일치 {bad}",
+    )
+    check("검색 요청당 클릭 1건 이하", len(first) == len(clicks), f"클릭 {len(clicks):,} / 클릭 요청 {len(first):,}")
+
+    def sdate(r: dict[str, Any]) -> date:
+        return datetime.fromtimestamp(r["ga_session_id"], KST).date()
+
+    bad_rk = sum(r["ranker_version"] != ranker_for(sdate(r), r["user_pseudo_id"]) for r in reqs.values())
+    check("랭킹 버전 = 세션 시작일·기기 해시 규칙 (A/B 7/13~7/26, 7/27 전체 적용)", bad_rk == 0, f"위반 요청 {bad_rk}")
+    extra = len(ga_ids["search"] - reqs.keys()) + len(ga_ids["select_search_result"] - first.keys())
+    check("GA 검색·결과 클릭 이벤트의 search_id 가 서버 로그에 있음", extra == 0, f"없는 id {extra}")
+    share = len(ga_ids["search"] & reqs.keys()) / max(1, len(reqs))
+    check("GA search 수집률 97~99.5%", 0.97 <= share <= 0.995, f"{share:.4f}")
+
+    def rates(rows: list[dict[str, Any]]) -> tuple[int, float, float]:
+        n = max(1, len(rows))
+        return (
+            len(rows),
+            sum(r["results_count"] == 0 for r in rows) / n,
+            sum(r["request_id"] in first for r in rows) / n,
+        )
+
+    spans = [
+        ("A/B 전 (v1)", lambda r: sdate(r) < RANKER_AB_START),
+        ("A/B 대조군 (v1)", lambda r: RANKER_AB_START <= sdate(r) < RANKER_V2_ALL and r["ranker_version"] == "v1"),
+        ("A/B 실험군 (v2)", lambda r: RANKER_AB_START <= sdate(r) < RANKER_V2_ALL and r["ranker_version"] == "v2"),
+        (
+            "전체 적용 후 (v2, 회귀 제외)",
+            lambda r: sdate(r) >= RANKER_V2_ALL and not REINDEX_BUG[0] <= sdate(r) <= REINDEX_BUG[1],
+        ),
+        ("재색인 회귀 9/1~9/4", lambda r: REINDEX_BUG[0] <= sdate(r) <= REINDEX_BUG[1]),
+    ]
+    stat = {name: rates([r for r in reqs.values() if f(r)]) for name, f in spans}
+    a, b = stat["A/B 대조군 (v1)"], stat["A/B 실험군 (v2)"]
+    check(
+        "A/B 기간 실험군 결과 0건 비율 < 대조군, 검색 성공률 > 대조군",
+        b[1] < a[1] and b[2] > a[2],
+        f"0건 {a[1]:.3f}→{b[1]:.3f} · 성공 {a[2]:.3f}→{b[2]:.3f}",
+    )
+    bug, after = stat["재색인 회귀 9/1~9/4"], stat["전체 적용 후 (v2, 회귀 제외)"]
+    check(
+        "재색인 회귀 기간 결과 0건 비율 > 전체 적용 후의 2배", bug[1] > 2 * after[1], f"{bug[1]:.3f} vs {after[1]:.3f}"
+    )
+    lines = ["", "## 검색 (세션 시작일 기준 구간)", "", "| 구간 | 요청 | 결과 0건 | 검색 성공률 |", "|---|---|---|---|"]
+    lines += [f"| {k} | {n:,} | {z:.3f} | {c:.3f} |" for k, (n, z, c) in stat.items()]
+    return lines
+
+
+def _churn(raw: Path, check: Any, end_date: date) -> list[str]:
+    """이용·판매와 해지의 연결 검사 2개.
+
+    - 구독 회차 해지율: 직전 회차에 파트너 티켓을 멤버 할인으로 결제한 구독 ÷ 안 한 구독 (0.7 이하)
+    - 계약 월 해지율: 직전 3개월(계약 3개월 미만이면 있는 달) 월평균 파트너 거래액 하위 1/3 ÷ 상위 1/3 (1.5 이상)
+
+    Args:
+        raw: 원천 디렉터리.
+        check: 단언 기록 함수.
+        end_date: 마지막 날(KST).
+
+    Returns:
+        요약 마크다운 줄.
+    """
+    subs = _read_csv(raw / "db_subscriptions.csv")
+    pays = [p for p in _read_csv(raw / "db_payments.csv") if p["kind"] == "ticket"]
+    disc: dict[str, list[date]] = defaultdict(list)
+    for p in pays:
+        if int(p["discount_amount"] or 0) > 0:
+            disc[p["member_id"]].append(_kst_date(p["paid_at"]))
+    end_excl = end_date + timedelta(days=1)
+    risk = {True: [0, 0], False: [0, 0]}
+    for sb in subs:
+        s0 = _kst_date(sb["started_at"])
+        ended = _kst_date(sb["ended_at"]) if sb["ended_at"] else None
+        k = 2
+        while True:
+            p0 = _add_months(datetime(s0.year, s0.month, s0.day), k - 2).date()
+            w0 = _add_months(datetime(s0.year, s0.month, s0.day), k - 1).date()
+            w1 = _add_months(datetime(s0.year, s0.month, s0.day), k).date()
+            if (ended is not None and ended < w0) or w0 >= end_excl:
+                break
+            canceled = ended is not None and w0 <= ended < w1
+            if w1 > end_excl and not canceled:
+                break
+            used = any(p0 <= x < w0 for x in disc.get(sb["member_id"], []))
+            risk[used][0] += canceled
+            risk[used][1] += 1
+            if canceled:
+                break
+            k += 1
+    r_used = risk[True][0] / max(1, risk[True][1])
+    r_none = risk[False][0] / max(1, risk[False][1])
+    sub_ratio = r_used / r_none if r_none else float("inf")
+    check(
+        "구독 회차 해지율: 직전 회차 파트너 티켓 할인 결제 있음 ÷ 없음 ≤ 0.7",
+        sub_ratio <= 0.7,
+        f"{sub_ratio:.3f} ({r_used:.4f} / {r_none:.4f})",
+    )
+
+    ev_venue = {e["event_id"]: e["venue_id"] for e in _read_csv(raw / "db_events.csv")}
+    gmv: dict[tuple[str, str], int] = defaultdict(int)
+    for p in pays:
+        if p["status"] == "paid":
+            d = _kst_date(p["paid_at"])
+            gmv[(ev_venue[p["event_id"]], f"{d.year:04d}-{d.month:02d}")] += int(p["amount"]) + int(
+                p["discount_amount"] or 0
+            )
+    cons = _read_csv(raw / "db_venue_contracts.csv")
+    tiers = {0: [0, 0], 2: [0, 0]}
+    m = date(2025, 10, 1)
+    while _add_months(datetime(m.year, m.month, 1), 1).date() <= end_excl:
+        nxt = _add_months(datetime(m.year, m.month, 1), 1).date()
+        rows = []
+        for c in cons:
+            st = _kst_date(c["started_at"])
+            en = _kst_date(c["ended_at"]) if c["ended_at"] else None
+            if not (st < m and (en is None or en >= m)):
+                continue
+            hist = [_add_months(datetime(m.year, m.month, 1), -k).date() for k in (1, 2, 3)]
+            hist = [h for h in hist if _add_months(datetime(h.year, h.month, 1), 1).date() > st]
+            if not hist:
+                continue
+            avg = sum(gmv.get((c["venue_id"], f"{h.year:04d}-{h.month:02d}"), 0) for h in hist) / len(hist)
+            rows.append((avg, c["contract_id"], en is not None and en < nxt))
+        rows.sort()
+        third = len(rows) // 3
+        for t, part in ((0, rows[:third]), (2, rows[len(rows) - third :])):
+            tiers[t][0] += sum(x[2] for x in part)
+            tiers[t][1] += len(part)
+        m = nxt
+    r_low = tiers[0][0] / max(1, tiers[0][1])
+    r_high = tiers[2][0] / max(1, tiers[2][1])
+    con_ratio = r_low / r_high if r_high else float("inf")
+    check(
+        "계약 월 해지율: 직전 3개월 파트너 거래액 하위 1/3 ÷ 상위 1/3 ≥ 1.5",
+        con_ratio >= 1.5,
+        f"{con_ratio:.3f} ({r_low:.4f} / {r_high:.4f})",
+    )
+
+    def frac(x: list[int]) -> str:
+        return f"{x[0] / max(1, x[1]):.4f} ({x[0]}/{x[1]})"
+
+    return [
+        "",
+        "## 이용·판매와 해지",
+        "",
+        "| 검사 | 값 | 분자 | 분모 |",
+        "|---|---|---|---|",
+        f"| 구독 회차 해지율 (직전 회차 할인 결제 유무) | {sub_ratio:.3f} | {frac(risk[True])} | {frac(risk[False])} |",
+        f"| 계약 월 해지율 (거래액 하위 1/3 ÷ 상위 1/3) | {con_ratio:.3f} | {frac(tiers[0])} | {frac(tiers[2])} |",
+    ]
 
 
 def week_of_date(d: date, start_date: date) -> int:
