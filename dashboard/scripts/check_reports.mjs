@@ -91,6 +91,48 @@ const eq = (name, got, want) => {
   if (got !== want) fails.push(`${name}: 화면 ${JSON.stringify(got)} ≠ 재계산 ${JSON.stringify(want)}`)
 }
 
+// D1 — 실패 검색어 발견(평가 착수 전 28일). 검색어별 합 → 20건 이상 ∧ 0건 30% 이상, 편입일은 기간 시작 ~ 끝 + 7일의 첫 eval_dates
+const query = JSON.parse(readFileSync(`${DATA}${index.files.daily_query}`, 'utf8'))
+const D1_FROM = '2026-03-04'
+const D1_TO = '2026-03-31'
+const qsum = new Map()
+let d1s = 0
+let d1z = 0
+for (const r of query) {
+  if (r.kst_date < D1_FROM || r.kst_date > D1_TO) continue
+  d1s += r.searches
+  d1z += r.zero_result_searches
+  const z = qsum.get(r.query_norm) ?? { s: 0, z: 0, ev: r.eval_dates }
+  z.s += r.searches
+  z.z += r.zero_result_searches
+  qsum.set(r.query_norm, z)
+}
+const q20 = [...qsum].filter(([, z]) => z.s >= 20)
+const qfail = q20.filter(([, z]) => z.z / z.s >= 0.3).sort((a, b) => b[1].z / b[1].s - a[1].z / a[1].s)
+const failZero = qfail.reduce((a, [, z]) => a + z.z, 0)
+const evalOf = (ev) => (ev ?? '').split(',').find((d) => d && d >= D1_FROM && d <= '2026-04-07') ?? null
+const mdOf = (d) => `${+d.slice(5, 7)}/${+d.slice(8, 10)}`
+const d1sum = [
+  n0(d1s),
+  pct(d1z / d1s),
+  `${q20.length}개`,
+  `${qfail.length}개`,
+  `${pct(failZero / d1z)} (${n0(failZero)} / ${n0(d1z)})`,
+  `${qfail.filter(([, z]) => evalOf(z.ev) === '2026-04-01').length}개`,
+]
+
+await read('page=reports&r=search-failures')
+const d1tables = await page.$$eval('main table', (ts) =>
+  ts.map((t) => [...t.querySelectorAll('tbody tr')].map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent.trim()))),
+)
+const d1head = d1tables.find((rows) => rows[0]?.[0] === '검색 수') ?? []
+d1sum.forEach((w, i) => eq(`D1 요약[${i}]`, d1head[i]?.[1] ?? '', w))
+const d1fail = d1tables.find((rows) => rows.length === qfail.length && rows[0]?.length === 5) ?? []
+qfail.forEach(([q, z], i) => {
+  const ev = evalOf(z.ev)
+  ;[q, n0(z.s), pct(z.z / z.s), ev ? mdOf(ev) : '—'].forEach((w, j) => eq(`D1 실패[${i}][${j}]`, d1fail[i]?.[[0, 2, 3, 4][j]] ?? '', w))
+})
+
 await read('page=reports&r=ab-ranker-v2')
 for (const [id, want] of Object.entries(e1)) {
   const cells = await page.$$eval(`table[data-report="ab-ranker-v2"] tr[data-metric="${id}"] td`, (tds) => tds.map((td) => td.textContent.trim()))

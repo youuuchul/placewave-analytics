@@ -2,7 +2,7 @@ import type { MouseEvent, ReactNode } from 'react'
 import { DATA_NOTE_ID } from './components/Header'
 import { useCatalog } from './DataPage'
 import { GroupChip } from './reports/Frame'
-import { REPORTS } from './reports/registry'
+import { BUNDLES, shortTitle } from './reports/registry'
 
 const REPO = 'https://github.com/youuuchul/placewave-analytics'
 
@@ -629,9 +629,9 @@ export default function About({
         </a>
         <a href={hrefs.reports} onClick={open('reports')} className={tile}>
           <span className="text-xs font-medium text-muted">3 · 보고서</span>
-          <span className="text-[15px] font-semibold text-ink">실험 1 · 개선 1 · 이슈 1</span>
+          <span className="text-[15px] font-semibold text-ink">{BUNDLES.map((b) => `${b.title} ${b.steps.length}단계`).join(' · ')}</span>
           <span className="text-[13px] leading-relaxed text-ink2">
-            {REPORTS.map((r) => r.title.split(': ')[0]).join(' · ')}
+            {BUNDLES.map((b) => b.steps.map(shortTitle).join(' → ')).join(' / ')}
           </span>
           <span className="mt-auto text-xs font-medium text-accent">보고서 목록 →</span>
         </a>
@@ -708,18 +708,31 @@ export default function About({
       </Section>
 
       <Section n={4} title="보고서" id={REPORTS_ID}>
-        <ul className="grid gap-3 md:grid-cols-3">
-          {REPORTS.map((r) => (
-            <li key={r.id}>
-              <a href={reportHref(r.id)} onClick={report(r.id)} className={tile}>
-                <GroupChip meta={r} />
-                <span className="text-[14px] font-semibold leading-snug text-ink">{r.title}</span>
-                <span className="text-[13px] leading-relaxed text-ink2">{r.conclusion}</span>
-                <span className="tnum mt-auto text-xs text-muted">{r.period}</span>
-              </a>
-            </li>
-          ))}
-        </ul>
+        {BUNDLES.map((b) => (
+          <div key={b.id} className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1">
+              <span className="flex flex-wrap items-baseline gap-x-2 text-[14px] font-semibold text-ink">
+                {b.title}
+                <span className="tnum text-xs font-normal text-muted">
+                  {b.period} · {b.steps.length}단계
+                </span>
+              </span>
+              <p className="max-w-[720px] text-[14px] leading-relaxed text-ink2">{b.conclusion}</p>
+            </div>
+            <ol className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+              {b.steps.map((r, i) => (
+                <li key={r.id}>
+                  <a href={reportHref(r.id)} onClick={report(r.id)} className={tile}>
+                    <GroupChip meta={r} step={i + 1} />
+                    <span className="text-[14px] font-semibold leading-snug text-ink">{r.title}</span>
+                    <span className="text-[13px] leading-relaxed text-ink2">{r.conclusion}</span>
+                    <span className="tnum mt-auto text-xs text-muted">{r.period}</span>
+                  </a>
+                </li>
+              ))}
+            </ol>
+          </div>
+        ))}
       </Section>
 
       <Section n={5} title="데이터 흐름">

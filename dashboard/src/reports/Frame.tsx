@@ -4,13 +4,14 @@ import { REPO, type ReportMeta } from './registry'
 
 export const SYNTHETIC_NOTE = '모든 수치는 가상 서비스 시나리오와 분포 규칙으로 생성한 합성 데이터'
 
-export function GroupChip({ meta }: { meta: ReportMeta }) {
+export function GroupChip({ meta, step }: { meta: ReportMeta; step?: number }) {
   return (
-    <span className="inline-flex items-center gap-2 text-xs">
+    <span className="inline-flex flex-wrap items-center gap-2 text-xs">
       <span className="rounded-md bg-wash px-1.5 py-0.5 font-medium text-ink2">
+        {step != null && `단계 ${step} · `}
         {meta.group} · {meta.code}
       </span>
-      {!meta.causal && <span className="rounded-md border border-line px-1.5 py-0.5 text-muted">전후 비교(인과 아님)</span>}
+      {meta.badge && <span className="rounded-md border border-line px-1.5 py-0.5 text-muted">{meta.badge}</span>}
     </span>
   )
 }
