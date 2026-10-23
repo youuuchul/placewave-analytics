@@ -121,3 +121,24 @@
 -- 파티션·클러스터: 없음 / 없음
 -- 원천: data/raw/eval_labels.csv (generator/search_eval.py 출력). 재작업 라벨 포함
 -- 소비: staging.int_label, ops.reconciliation
+
+-- 표: raw.ml_query_parse — 검색어 해석 결과 (순위 모델 작업 산출)
+-- 1행: 검색어 1개
+-- 키: query_norm
+-- 파티션·클러스터: 없음 / 없음
+-- 원천: data/model/ml_query_parse.csv (ranker/train.py 출력). staging.int_search·ml_ranker_pairs 의 검색어를 동의어 사전·staging.dim_venue 공간명으로 해석
+-- 소비: marts.ranker_eval·ranker_query_eval, ops.reconciliation
+
+-- 표: raw.ml_ranker_scores — 순위 모델 오프라인 채점 (순위 모델 작업 산출)
+-- 1행: 검색어 × 후보 1쌍 (해석된 검색어만)
+-- 키: (query_norm, item_type, item_id)
+-- 파티션·클러스터: 없음 / 없음
+-- 원천: data/model/ml_ranker_scores.csv (ranker/train.py 출력). staging.ml_ranker_pairs·dim_venue·dim_event 로 5묶음 교차 검증 학습·채점
+-- 소비: marts.ranker_eval, ops.reconciliation
+
+-- 표: raw.ml_ranker_features — 순위 모델 피처 중요도 (순위 모델 작업 산출)
+-- 1행: 피처 1개
+-- 키: (model_version, feature)
+-- 파티션·클러스터: 없음 / 없음
+-- 원천: data/model/ml_ranker_features.csv (ranker/train.py 출력). staging.ml_ranker_pairs·dim_venue·dim_event 전체로 학습한 최종 모델
+-- 소비: marts.ranker_feature, ops.reconciliation

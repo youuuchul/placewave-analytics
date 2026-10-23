@@ -1,0 +1,244 @@
+{
+  "model_version": "ltr-2026-07-06",
+  "framework": "LightGBM 4.7.0 (lambdarank)",
+  "label_cutoff": "2026-07-06",
+  "data": {
+    "pairs": 11195,
+    "labels": 47775,
+    "queries": 563,
+    "queries_with_relevant": 290,
+    "folds": 5
+  },
+  "features": [
+    {
+      "name": "query_intent",
+      "kind": "cat",
+      "group": "query",
+      "desc": "검색어 의도 유형(장르·상권·행사 유형·공간명)"
+    },
+    {
+      "name": "query_term",
+      "kind": "cat",
+      "group": "query",
+      "desc": "해석한 정식 이름(공간명 검색은 한 값으로 묶음)"
+    },
+    {
+      "name": "item_type",
+      "kind": "cat",
+      "group": "item",
+      "desc": "후보 종류(공간·행사)"
+    },
+    {
+      "name": "item_genre",
+      "kind": "cat",
+      "group": "item",
+      "desc": "후보 장르(행사는 개최 공간 장르)"
+    },
+    {
+      "name": "item_venue_type",
+      "kind": "cat",
+      "group": "item",
+      "desc": "후보 공간 유형"
+    },
+    {
+      "name": "item_event_type",
+      "kind": "cat",
+      "group": "item",
+      "desc": "후보 행사 유형(공간은 없음)"
+    },
+    {
+      "name": "genre_match",
+      "kind": "num",
+      "group": "match",
+      "desc": "후보 장르 = 검색 장르"
+    },
+    {
+      "name": "region_match",
+      "kind": "num",
+      "group": "match",
+      "desc": "후보 상권 = 검색 상권"
+    },
+    {
+      "name": "region_dist_km",
+      "kind": "num",
+      "group": "distance",
+      "desc": "검색 상권 중심까지 거리(km, 상권 검색만)"
+    },
+    {
+      "name": "event_type_match",
+      "kind": "num",
+      "group": "match",
+      "desc": "후보 행사 유형 = 검색 행사 유형"
+    },
+    {
+      "name": "host_has_event_type",
+      "kind": "num",
+      "group": "match",
+      "desc": "후보 공간이 검색 행사 유형을 연 적이 있음"
+    },
+    {
+      "name": "name_match",
+      "kind": "num",
+      "group": "match",
+      "desc": "후보 공간명 첫 단어 = 검색 공간명(행사는 개최 공간)"
+    },
+    {
+      "name": "named_area_genre",
+      "kind": "num",
+      "group": "match",
+      "desc": "검색한 공간과 상권·장르가 같은 후보"
+    },
+    {
+      "name": "popularity_log",
+      "kind": "num",
+      "group": "popularity",
+      "desc": "학습 마감 전 신청 수 log(1+x)"
+    }
+  ],
+  "categories": {
+    "query_intent": [
+      "event_type",
+      "genre",
+      "region",
+      "venue_name"
+    ],
+    "query_term": [
+      "K-pop/팝",
+      "강남·역삼·논현",
+      "공간명",
+      "기타",
+      "라이브 공연",
+      "루프탑 세션",
+      "리스닝 세션",
+      "성수·건대",
+      "쇼케이스",
+      "시티팝/디스코",
+      "신촌·마포",
+      "압구정·청담",
+      "어쿠스틱",
+      "여의도·영등포",
+      "이태원·한남",
+      "일렉트로닉",
+      "잠실·송파",
+      "재즈/소울",
+      "종로·을지로",
+      "팝업 이벤트",
+      "홍대·합정·연남",
+      "힙합"
+    ],
+    "item_type": [
+      "event",
+      "venue"
+    ],
+    "item_genre": [
+      "K-pop/팝",
+      "시티팝/디스코",
+      "어쿠스틱",
+      "일렉트로닉",
+      "재즈/소울",
+      "힙합"
+    ],
+    "item_venue_type": [
+      "라운지",
+      "라이브홀",
+      "루프탑",
+      "바",
+      "카페",
+      "팝업 스페이스"
+    ],
+    "item_event_type": [
+      "라이브 공연",
+      "루프탑 세션",
+      "리스닝 세션",
+      "쇼케이스",
+      "없음",
+      "팝업 이벤트"
+    ]
+  },
+  "params": {
+    "objective": "lambdarank",
+    "metric": "ndcg",
+    "eval_at": [
+      10
+    ],
+    "learning_rate": 0.05,
+    "num_leaves": 15,
+    "min_data_in_leaf": 20,
+    "feature_fraction": 0.9,
+    "bagging_fraction": 0.8,
+    "bagging_freq": 1,
+    "lambda_l2": 1.0,
+    "seed": 20260706,
+    "deterministic": true,
+    "force_row_wise": true,
+    "num_threads": 1,
+    "verbose": -1
+  },
+  "rounds": 200,
+  "rounds_check_cv_ndcg": {
+    "100": 0.8715,
+    "200": 0.8726,
+    "400": 0.8742
+  },
+  "metrics_cv": {
+    "queries": 563,
+    "popularity": {
+      "all": 0.5699,
+      "event_type": 0.438,
+      "genre": 0.5902,
+      "region": 0.5726,
+      "venue_name": 0.5718
+    },
+    "popularity_n": {
+      "all": 290,
+      "event_type": 5,
+      "genre": 6,
+      "region": 10,
+      "venue_name": 269
+    },
+    "popularity_fold_sd": 0.0205,
+    "model": {
+      "all": 0.8726,
+      "event_type": 1.0,
+      "genre": 0.9766,
+      "region": 0.9654,
+      "venue_name": 0.8644
+    },
+    "model_n": {
+      "all": 290,
+      "event_type": 5,
+      "genre": 6,
+      "region": 10,
+      "venue_name": 269
+    },
+    "model_fold_sd": 0.0423
+  },
+  "metrics_in_sample_final": {
+    "popularity": {
+      "all": 0.5699,
+      "event_type": 0.438,
+      "genre": 0.5902,
+      "region": 0.5726,
+      "venue_name": 0.5718
+    },
+    "model": {
+      "all": 0.9201,
+      "event_type": 1.0,
+      "genre": 1.0,
+      "region": 0.996,
+      "venue_name": 0.914
+    }
+  },
+  "ablation_cv_ndcg": {
+    "distance": 0.8727,
+    "item": 0.8579,
+    "match": 0.638,
+    "popularity": 0.8656,
+    "query": 0.8707
+  },
+  "intent_check": {
+    "search_log_queries": 2139,
+    "mismatch": 0,
+    "multi_intent": 0
+  }
+}

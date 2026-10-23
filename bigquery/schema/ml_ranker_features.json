@@ -1,0 +1,38 @@
+[
+  {
+    "name": "model_version",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "모델 버전"
+  },
+  {
+    "name": "feature",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "피처 이름"
+  },
+  {
+    "name": "feature_group",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "피처 묶음 query / item / match / distance / popularity"
+  },
+  {
+    "name": "gain",
+    "type": "FLOAT",
+    "mode": "REQUIRED",
+    "description": "최종 모델 분할 이득 합"
+  },
+  {
+    "name": "gain_share",
+    "type": "FLOAT",
+    "mode": "REQUIRED",
+    "description": "분할 이득 비중 (합 1)"
+  },
+  {
+    "name": "splits",
+    "type": "INTEGER",
+    "mode": "REQUIRED",
+    "description": "분할에 쓰인 횟수"
+  }
+]

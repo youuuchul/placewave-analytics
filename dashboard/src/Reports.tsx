@@ -13,6 +13,7 @@ import ExpCheck from './reports/ExpCheck'
 import ExpDesign from './reports/ExpDesign'
 import I1 from './reports/I1'
 import LabelOps from './reports/LabelOps'
+import M1 from './reports/M1'
 import X1 from './reports/X1'
 
 type Props = { data: Data | null; s: State; set: (patch: Partial<State>) => void }
@@ -34,10 +35,13 @@ function StepCard({ meta, n, s, set }: { meta: ReportMeta; n: number } & Omit<Pr
       className="card flex h-full flex-col gap-3 p-4 transition-shadow hover:shadow-[0_0_0_1px_var(--axis)] sm:p-5"
     >
       <span className="flex flex-wrap items-center justify-between gap-2">
-        <GroupChip meta={meta} step={n} />
+        <span className="inline-flex flex-wrap items-center gap-2">
+          <GroupChip meta={meta} step={n} />
+          {meta.major && <span className="rounded-md border border-[var(--accent)] px-1.5 py-0.5 text-xs font-medium text-accent">주요</span>}
+        </span>
         <span className="tnum text-xs text-muted">{md(meta.date)}</span>
       </span>
-      <span className="text-[15px] font-semibold leading-snug text-ink">{meta.title}</span>
+      <span className={`text-[15px] leading-snug ${meta.major ? 'font-bold text-accent' : 'font-semibold text-ink'}`}>{meta.title}</span>
       <span className="text-[13px] leading-relaxed text-ink2">{meta.conclusion}</span>
       <span className="tnum mt-auto text-xs text-muted">{meta.period}</span>
     </a>
@@ -116,7 +120,7 @@ function List(p: Omit<Props, 'data'>) {
 /** 묶음의 단계 타임라인(시간 순서). 칸을 누르면 그 단계로 간다. */
 function Steps({ bundle, index, s, set }: { bundle: Bundle; index: number } & Omit<Props, 'data'>) {
   return (
-    <ol className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7" aria-label={`${bundle.title} 단계`}>
+    <ol className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8" aria-label={`${bundle.title} 단계`}>
       {bundle.steps.map((m, i) => {
         const on = i === index
         return (
@@ -132,7 +136,9 @@ function Steps({ bundle, index, s, set }: { bundle: Bundle; index: number } & Om
               <span className={`text-[11px] ${on ? 'font-medium text-accent' : 'text-muted'}`}>
                 {i + 1} · {m.kind}
               </span>
-              <span className={`text-[13px] leading-snug ${on ? 'font-semibold text-ink' : 'text-ink2'}`}>{shortTitle(m)}</span>
+              <span className={`text-[13px] leading-snug ${on || m.major ? 'font-semibold' : ''} ${m.major ? 'text-accent' : on ? 'text-ink' : 'text-ink2'}`}>
+                {shortTitle(m)}
+              </span>
               <span className="tnum hidden text-[11px] text-muted sm:block">{md(m.date)}</span>
             </a>
           </li>
@@ -148,13 +154,17 @@ function Body({ meta, data, s, set }: { meta: ReportMeta } & Props & { data: Dat
   const sL = useTable(data, 'daily_search', id === 'issue-reindex-0901' || id === 'ab-ranker-check')
   const qL = useTable(data, 'daily_query', id === 'issue-reindex-0901' || id === 'search-failures')
   const eL = useTable(data, 'exp_ranker_request', exp)
+  const mL = useTable(data, 'ranker_eval', id === 'ranker-model')
   const search = ready(sL)
   const queries = ready(qL)
   const rows = ready(eL)
+  const pairs = ready(mL)
   const wait = (h = 320, ...ls: Parameters<typeof waitOf>) => <Pending wait={waitOf(...ls) ?? 'loading'} h={h} />
   if (id === 'labeling-ops') return <LabelOps data={data} s={s} set={set} />
   if (id === 'guide-v2') return <X1 data={data} />
   if (id === 'search-failures') return queries ? <D1 queries={queries} /> : wait(320, qL)
+  if (id === 'ranker-model')
+    return pairs ? <M1 pairs={pairs} queries={data.ranker_query_eval ?? []} features={data.ranker_feature ?? []} /> : wait(320, mL)
   if (id === 'ab-ranker-design') return rows ? <ExpDesign rows={rows} /> : wait(320, eL)
   if (id === 'ab-ranker-check') return rows && search ? <ExpCheck rows={rows} search={search} /> : wait(320, eL, sL)
   if (id === 'ab-ranker-v2') return rows ? <E1 rows={rows} /> : wait(320, eL)
@@ -187,7 +197,7 @@ export default function Reports({ data, s, set }: Props) {
         <GroupChip meta={meta} step={index + 1} />
         <h2 className="text-[24px] font-semibold leading-tight tracking-tight text-ink sm:text-[28px]">{meta.title}</h2>
         <p className="tnum text-[13px] text-muted">
-          {meta.written ? `시나리오 시점 ${meta.date} · 작성 ${meta.written}` : `작성 ${meta.date}`} · {meta.period} · {meta.sources.join(' · ')}
+          {meta.written ? `작성 ${meta.date} · 최종 수정 ${meta.written}` : `작성 ${meta.date}`} · {meta.period} · {meta.sources.join(' · ')}
         </p>
         <div className="card border-l-2 border-l-[var(--accent)] px-4 py-3">
           <span className="text-xs text-muted">한 줄 결론</span>

@@ -3,7 +3,7 @@
 -- 키: request_id
 -- 파티션·클러스터: kst_date / query_norm
 -- 원천: raw.search_log·search_click_log, staging.events_clean·int_session·int_person_day
--- 소비: marts.daily_search·daily_query·exp_ranker_request, ops.reconciliation
+-- 소비: marts.daily_search·daily_query·exp_ranker_request·ranker_query_eval, raw.ml_query_parse, ops.reconciliation
 -- 검사: C16·C17·C21·R12·I5·I6·I9
 --
 -- 규칙

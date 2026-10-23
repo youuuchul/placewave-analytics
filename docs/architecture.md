@@ -101,13 +101,13 @@
 
 `bigquery/load_all.sh` 가 아래를 순서대로 실행한다. 각 단계는 멱등이다(전체 교체 또는 `DELETE` 후 `INSERT`).
 
-1. `raw` 적재 — 이벤트 NDJSON, RDB 스냅샷 CSV 8개, 광고 CSV
+1. `raw` 적재 — 이벤트 NDJSON, RDB 스냅샷 CSV 8개, 광고 CSV, 검색 서버 요청·클릭 로그, 평가 도구 CSV 5개, 순위 모델 산출 CSV 3개(`data/model`, `ranker/train.py` 가 `staging.ml_ranker_pairs` 를 읽어 만든다)
 2. `staging.map_channel` · `map_fee_rate` — 규칙 표 생성
 3. `staging.events_clean`
 4. `staging.int_session`
 5. `staging.dim_subscription` · `int_person_day`
-6. `staging.dim_member` · `dim_contract` · `dim_contract_change` · `int_contract_day` · `fct_order` · `dim_event` · `dim_venue` · `ad_spend`
-7. `marts.*` 21개
+6. `staging.dim_member` · `dim_contract` · `dim_contract_change` · `int_contract_day` · `fct_order` · `dim_event` · `dim_venue` · `ad_spend` · `int_search` · `int_label` · `ml_ranker_pairs`
+7. `marts.*` 30개(순위 모델 평가 `ranker_eval` · `ranker_query_eval` · `ranker_feature` 포함)
 8. `ops.reconciliation`(`bigquery/checks/reconciliation.sql`) — 어긋나면 종료 코드 1
 9. `ops.build_log` · `ops.freshness`
 

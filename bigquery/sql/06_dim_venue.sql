@@ -3,7 +3,7 @@
 -- 키: venue_id
 -- 파티션·클러스터: 없음 / 없음
 -- 원천: raw.db_venues, raw.db_events, staging.dim_contract, staging.int_contract_day (그 계약의 마지막 활성일 요금제)
--- 소비: marts.daily_venue·daily_venue_registry·venue_registry (공간 속성)
+-- 소비: marts.daily_venue·daily_venue_registry·venue_registry (공간 속성), raw.ml_query_parse·ml_ranker_scores·ml_ranker_features (공간명 해석·순위 모델 피처)
 --
 -- 파트너 여부·요금제·계약일은 스냅샷 기준일에 활성인 계약 기준이다(활성 규칙은 dim_contract).
 -- 기준일에 활성 계약이 없으면 is_partner = FALSE 이고 plan·계약일은 가장 최근 계약 값(계약 이력이 없으면 NULL).

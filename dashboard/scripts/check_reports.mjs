@@ -275,7 +275,56 @@ for (const [head, want] of Object.entries(check.guard)) {
   want.forEach((w, i) => eq(`진행 점검 가드레일 ${head}[${i}]`, r[i + 1] ?? '', w))
 }
 
+// M1 — 순위 모델 오프라인 평가. 기준선 검색어 마트 합계와, 쌍 마트에서 검색어별로 다시 센 NDCG@10(화면 reports/M1.tsx 와 따로 구현)
+const rq = index.ranker_query_eval ?? []
+const rqSum = (f) => rq.filter(f).reduce((a, r) => [a[0] + r.requests, a[1] + r.zero_results], [0, 0])
+const [mReq, mZero] = rqSum(() => true)
+const [mLeft] = rqSum((r) => r.query_intent === 'other')
+const [, mLinked] = rqSum((r) => r.query_intent !== 'other')
+const m1sum = [
+  [n0(mReq), n0(mReq)],
+  [`${n0(mZero)} (${pct(mZero / mReq)})`, `${n0(mLeft)} (${pct(mLeft / mReq)})`],
+  ['—', `${n0(mLinked)} (${pct(mLinked / mZero)})`],
+]
+const rk = JSON.parse(readFileSync(`${DATA}${index.files.ranker_eval}`, 'utf8'))
+const byQ = new Map()
+for (const r of rk) byQ.set(r.query_norm, [...(byQ.get(r.query_norm) ?? []), r])
+const gainAt = (labels) => {
+  let v = 0
+  for (let i = 0; i < Math.min(10, labels.length); i++) v += (Math.pow(2, labels[i]) - 1) / (Math.log(i + 2) / Math.LN2)
+  return v
+}
+const nd = { all: [[], []], venue_name: [[], []], region: [[], []], genre: [[], []], event_type: [[], []] }
+for (const rows of byQ.values()) {
+  const ideal = gainAt(rows.map((r) => r.label).sort((a, b) => b - a))
+  if (!ideal) continue
+  ;['rank_popularity', 'rank_model'].forEach((key, j) => {
+    const shown = rows.filter((r) => r[key] !== null).sort((a, b) => a[key] - b[key])
+    const v = shown.length ? gainAt(shown.map((r) => r.label)) / ideal : 0
+    nd.all[j].push(v)
+    nd[rows[0].query_intent]?.[j].push(v)
+  })
+}
+const avgOf = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length
+const f3 = (v) => v.toFixed(3)
+const m1nd = Object.entries(nd).map(([k, [p, m]]) => [k, [n0(p.length), f3(avgOf(p)), f3(avgOf(m)), sign(f3(avgOf(m) - avgOf(p)))]])
+
+await read('page=reports&r=ranker-model')
+const cardRows = (title) =>
+  page.$$eval(
+    'section.card',
+    (cards, t) => {
+      const c = cards.find((el) => el.querySelector('header h2')?.textContent?.startsWith(t))
+      return c ? [...c.querySelectorAll('tbody tr')].map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent.trim())) : []
+    },
+    title,
+  )
+const m1a = await cardRows('① 검색어 해석')
+m1sum.forEach((want, i) => want.forEach((w, j) => eq(`M1 해석[${i}][${j}]`, m1a[i]?.[j + 1] ?? '', w)))
+const m1b = (await cardRows('② 순위 모델')).map((r) => r.map((x) => x.replace(/−/g, '-')))
+m1nd.forEach(([k, want], i) => want.forEach((w, j) => eq(`M1 NDCG ${k}[${j}]`, m1b[i]?.[j + 1] ?? '', w)))
+
 await browser.close()
-console.log(`보고서 D1 · E1 설계서 · 진행 점검 · 결과 보고 · X1 · I1 · 비교 값 ${n}개 · 불일치 ${fails.length}개`)
+console.log(`보고서 D1 · M1 · E1 설계서 · 진행 점검 · 결과 보고 · X1 · I1 · 비교 값 ${n}개 · 불일치 ${fails.length}개`)
 for (const f of fails) console.log('  ', f)
 process.exit(fails.length ? 1 : 0)

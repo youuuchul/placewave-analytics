@@ -293,6 +293,43 @@ export interface DailyQuery extends Seg {
   eval_dates: string | null
 }
 
+/** 순위 모델 오프라인 평가 쌍 (검색어 × 후보). 순위는 결과가 없는 방식이면 null */
+export interface RankerEval {
+  query_norm: string
+  query_intent: string
+  query_term: string | null
+  fold: number
+  item_type: string
+  item_id: number
+  label: number
+  n_labels: number
+  popularity: number
+  v1_match: boolean
+  model_score: number | null
+  rank_popularity: number | null
+  rank_model: number | null
+}
+
+/** 검색어 해석 오프라인 평가 (설계서 기준선 2주의 검색어) */
+export interface RankerQueryEval {
+  query_norm: string
+  query_intent: string
+  query_term: string | null
+  v1_match: boolean
+  requests: number
+  zero_results: number
+}
+
+/** 순위 모델 피처 중요도 (최종 모델 분할 이득) */
+export interface RankerFeature {
+  model_version: string
+  feature: string
+  feature_group: string
+  gain: number
+  gain_share: number
+  splits: number
+}
+
 /** 랭킹 A/B 실험 요청 단위 마트 (세션 시작일 2026-06-22 ~ 07-26). 배정은 기기 해시 규칙을 실험 전 기간에도 붙인 값 */
 export interface ExpRankerRequest extends Seg {
   kst_date: string
@@ -392,6 +429,8 @@ export interface Data {
   weekly_eval_ops?: WeeklyEvalOps[]
   weekly_rater?: WeeklyRater[]
   weekly_batch?: WeeklyBatch[]
+  ranker_query_eval?: RankerQueryEval[]
+  ranker_feature?: RankerFeature[]
 }
 
 export interface LazyTables {
@@ -403,6 +442,7 @@ export interface LazyTables {
   daily_search: DailySearch[]
   daily_query: DailyQuery[]
   exp_ranker_request: ExpRankerRequest[]
+  ranker_eval: RankerEval[]
   person_day: PersonDay
 }
 

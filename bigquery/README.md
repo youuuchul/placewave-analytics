@@ -1,7 +1,7 @@
 <!-- 생성물: python3 bigquery/build_catalog.py 가 SQL 머리 주석에서 만든다. 직접 고치지 않는다. -->
 # bigquery — 표 카탈로그
 
-합성 이벤트 로그와 서비스 원장을 raw → staging → marts → ops 네 층으로 쌓는 SQL 모음. 표 63개, 층마다 BigQuery 데이터셋 하나. 이 문서의 모든 표 정보는 각 SQL 파일 머리 주석에서 온다.
+합성 이벤트 로그와 서비스 원장을 raw → staging → marts → ops 네 층으로 쌓는 SQL 모음. 표 70개, 층마다 BigQuery 데이터셋 하나. 이 문서의 모든 표 정보는 각 SQL 파일 머리 주석에서 온다.
 
 ```bash
 bigquery/load_all.sh                     # 적재 → 정제 → 마트 → 검사 → 신선도 (0~9단계)
@@ -48,6 +48,9 @@ python3 bigquery/build_catalog.py        # 이 문서 재생성 (주석·본문�
 | **eval_queries**<br>평가 배치에 편입된 검색어 (합성) | 배치 × 검색어 | (batch_id, query_norm) | 없음 / 없음 | data/raw/eval_queries.csv (generator/search_eval.py 출력). 출처 failed / head / random / promoted | marts.daily_query, ops.reconciliation |  | [raw_tables.sql](schema/raw_tables.sql) |
 | **eval_tasks**<br>평가 도구 과제 스냅샷 (합성) | 검색어 × 후보 과제 1건 | task_id | 없음 / 없음 | data/raw/eval_tasks.csv (generator/search_eval.py 출력). 정답셋 과제는 정답 등급 포함 | staging.int_label, ops.reconciliation |  | [raw_tables.sql](schema/raw_tables.sql) |
 | **eval_labels**<br>평가 도구 라벨 스냅샷 (합성) | 라벨 1건 | label_id | 없음 / 없음 | data/raw/eval_labels.csv (generator/search_eval.py 출력). 재작업 라벨 포함 | staging.int_label, ops.reconciliation |  | [raw_tables.sql](schema/raw_tables.sql) |
+| **ml_query_parse**<br>검색어 해석 결과 (순위 모델 작업 산출) | 검색어 1개 | query_norm | 없음 / 없음 | data/model/ml_query_parse.csv (ranker/train.py 출력). staging.int_search·ml_ranker_pairs 의 검색어를 동의어 사전·staging.dim_venue 공간명으로 해석 | marts.ranker_eval·ranker_query_eval, ops.reconciliation |  | [raw_tables.sql](schema/raw_tables.sql) |
+| **ml_ranker_scores**<br>순위 모델 오프라인 채점 (순위 모델 작업 산출) | 검색어 × 후보 1쌍 (해석된 검색어만) | (query_norm, item_type, item_id) | 없음 / 없음 | data/model/ml_ranker_scores.csv (ranker/train.py 출력). staging.ml_ranker_pairs·dim_venue·dim_event 로 5묶음 교차 검증 학습·채점 | marts.ranker_eval, ops.reconciliation |  | [raw_tables.sql](schema/raw_tables.sql) |
+| **ml_ranker_features**<br>순위 모델 피처 중요도 (순위 모델 작업 산출) | 피처 1개 | (model_version, feature) | 없음 / 없음 | data/model/ml_ranker_features.csv (ranker/train.py 출력). staging.ml_ranker_pairs·dim_venue·dim_event 전체로 학습한 최종 모델 | marts.ranker_feature, ops.reconciliation |  | [raw_tables.sql](schema/raw_tables.sql) |
 
 ### staging — 정제·중간·차원
 
@@ -63,12 +66,13 @@ python3 bigquery/build_catalog.py        # 이 문서 재생성 (주석·본문�
 | **ad_spend**<br>광고 집행 정리 | 캠페인 × 일(KST) | (campaign_id, kst_date) | kst_date / campaign_id | raw.ads_spend | marts.daily_ad·monthly_summary (월 광고비), ops.reconciliation (집행일) |  | [06_ad_spend.sql](sql/06_ad_spend.sql) |
 | **dim_contract**<br>공간 파트너 계약 차원 | 계약 1건 | contract_id | 없음 / venue_id | raw.db_venue_contracts | staging.dim_contract_change·int_contract_day·dim_venue, marts.daily_venue_registry·monthly_contract·contract_cohort, ops.reconciliation |  | [06_dim_contract.sql](sql/06_dim_contract.sql) |
 | **dim_contract_change**<br>파트너 계약 요금제 변경 이력 | 요금제 변경 1건 | change_id | 없음 / contract_id | raw.db_venue_contract_changes, staging.dim_contract (계약 기간) | staging.int_contract_day, marts.monthly_contract |  | [06_dim_contract_change.sql](sql/06_dim_contract_change.sql) |
-| **dim_event**<br>행사 차원 | 행사 1건 | event_id | 없음 / event_id | raw.db_events, raw.db_venues, staging.fct_order | marts.daily_event·venue_registry (행사 속성·365일 개최 행사), 행사 리스트 |  | [06_dim_event.sql](sql/06_dim_event.sql) |
-| **dim_venue**<br>공간 차원 | 공간 1곳 | venue_id | 없음 / 없음 | raw.db_venues, raw.db_events, staging.dim_contract, staging.int_contract_day (그 계약의 마지막 활성일 요금제) | marts.daily_venue·daily_venue_registry·venue_registry (공간 속성) |  | [06_dim_venue.sql](sql/06_dim_venue.sql) |
-| **fct_order**<br>주문 원장 정리 (티켓 신청 + 구독 결제) | 주문 1건 = 티켓 신청 1건(kind ticket) 또는 구독 결제 1건(kind subscription) | order_id | applied_date / kind, event_id | raw.db_applications, raw.db_payments, raw.db_events, staging.int_contract_day (개최일 공간 요금제 → 수수료 등급), staging.map_fee_rate (등급별 수수료율) | staging.dim_event, marts.daily_event·daily_venue·monthly_summary·daily_revenue·daily_subscription·venue_registry, ops.reconciliation | R5·R6·I4·C9·C14·R10·R11 | [06_fct_order.sql](sql/06_fct_order.sql) |
+| **dim_event**<br>행사 차원 | 행사 1건 | event_id | 없음 / event_id | raw.db_events, raw.db_venues, staging.fct_order | marts.daily_event·venue_registry (행사 속성·365일 개최 행사), 행사 리스트, staging.ml_ranker_pairs, raw.ml_ranker_scores·ml_ranker_features (순위 모델 피처) |  | [06_dim_event.sql](sql/06_dim_event.sql) |
+| **dim_venue**<br>공간 차원 | 공간 1곳 | venue_id | 없음 / 없음 | raw.db_venues, raw.db_events, staging.dim_contract, staging.int_contract_day (그 계약의 마지막 활성일 요금제) | marts.daily_venue·daily_venue_registry·venue_registry (공간 속성), raw.ml_query_parse·ml_ranker_scores·ml_ranker_features (공간명 해석·순위 모델 피처) |  | [06_dim_venue.sql](sql/06_dim_venue.sql) |
+| **fct_order**<br>주문 원장 정리 (티켓 신청 + 구독 결제) | 주문 1건 = 티켓 신청 1건(kind ticket) 또는 구독 결제 1건(kind subscription) | order_id | applied_date / kind, event_id | raw.db_applications, raw.db_payments, raw.db_events, staging.int_contract_day (개최일 공간 요금제 → 수수료 등급), staging.map_fee_rate (등급별 수수료율) | staging.dim_event·ml_ranker_pairs, marts.daily_event·daily_venue·monthly_summary·daily_revenue·daily_subscription·venue_registry, ops.reconciliation | R5·R6·I4·C9·C14·R10·R11 | [06_fct_order.sql](sql/06_fct_order.sql) |
 | **int_contract_day**<br>파트너 계약 활성일 (요금제 변경 반영) | 계약 × 활성일(KST) | (contract_id, kst_date) | kst_date / venue_id | staging.dim_contract (계약 기간), staging.dim_contract_change (요금제 변경) | staging.fct_order·dim_venue, marts.daily_revenue·daily_venue_registry·monthly_contract·contract_cohort |  | [06_int_contract_day.sql](sql/06_int_contract_day.sql) |
-| **int_label**<br>평가 라벨 단일 원본 | 라벨 1건 | label_id | kst_date / batch_id, rater_id | raw.eval_labels·eval_tasks·eval_batches·eval_raters | marts.weekly_eval_ops·weekly_rater·weekly_batch, ops.reconciliation | C18·C19·I7 | [07_int_label.sql](sql/07_int_label.sql) |
-| **int_search**<br>검색 요청 단일 원본 (서버 요청 로그 + 서버 클릭 로그) | 서버 검색 요청 1건 | request_id | kst_date / query_norm | raw.search_log·search_click_log, staging.events_clean·int_session·int_person_day | marts.daily_search·daily_query·exp_ranker_request, ops.reconciliation | C16·C17·C21·R12·I5·I6·I9 | [07_int_search.sql](sql/07_int_search.sql) |
+| **int_label**<br>평가 라벨 단일 원본 | 라벨 1건 | label_id | kst_date / batch_id, rater_id | raw.eval_labels·eval_tasks·eval_batches·eval_raters | marts.weekly_eval_ops·weekly_rater·weekly_batch, staging.ml_ranker_pairs, ops.reconciliation | C18·C19·I7 | [07_int_label.sql](sql/07_int_label.sql) |
+| **int_search**<br>검색 요청 단일 원본 (서버 요청 로그 + 서버 클릭 로그) | 서버 검색 요청 1건 | request_id | kst_date / query_norm | raw.search_log·search_click_log, staging.events_clean·int_session·int_person_day | marts.daily_search·daily_query·exp_ranker_request·ranker_query_eval, raw.ml_query_parse, ops.reconciliation | C16·C17·C21·R12·I5·I6·I9 | [07_int_search.sql](sql/07_int_search.sql) |
+| **ml_ranker_pairs**<br>순위 모델 학습·평가 쌍 | 검색어 × 후보(공간·행사) 1쌍 | (query_norm, item_type, item_id) | 없음 / 없음 | staging.int_label (최종 라벨), staging.dim_event (행사의 개최 공간), staging.fct_order (인기 = 학습 마감 전 티켓 신청) | raw.ml_query_parse·ml_ranker_scores·ml_ranker_features (ranker/train.py 가 읽어 해석·학습·채점), marts.ranker_eval, ops.reconciliation | C22·C23 | [08_ml_ranker_pairs.sql](sql/08_ml_ranker_pairs.sql) |
 
 ### marts — 화면용 지표·리스트
 
@@ -92,6 +96,9 @@ python3 bigquery/build_catalog.py        # 이 문서 재생성 (주석·본문�
 | **monthly_contract**<br>파트너 계약 월 흐름 (계약 수·플랜 MRR 다리) | 월(KST) × 요금제(basic / pro / all) | (month, plan) | DATE_TRUNC(month, MONTH) / plan | staging.dim_contract (계약 시작·종료), staging.int_contract_day (날짜별 요금제·요금), staging.dim_contract_change (요금제 변경) | 공간 탭 ARPA·계약 월 해지율·매출 해지율·GRR·NRR, ops.reconciliation | C15 | [monthly_contract.sql](sql/marts/monthly_contract.sql) |
 | **monthly_summary**<br>월간 브리핑 표 | 월(KST) | month | DATE_TRUNC(month, MONTH) / 없음 | staging.int_person_day (방문), staging.int_session (세션·채널), staging.dim_member (가입), staging.fct_order (원장), staging.ad_spend (월 광고비), marts.weekly_cohort·daily_revenue·daily_subscription·daily_venue_registry (W1 리텐션·매출 구성·월말 구독자·월말 공간 — 같은 층 마트를 재사용해 정의를 한 곳에 둔다. 먼저 생성돼야 한다) | 주간·월간 탭 월간 보기의 브리핑 표. 비율은 분자·분모 열로 둔다. 예외: w1_retention 은 화면 계약상 비율(0~1)로도 둔다. 분자·분모는 w1_retained·w1_cohort_size |  | [monthly_summary.sql](sql/marts/monthly_summary.sql) |
 | **person_day**<br>사람 × 일 행동 플래그 마트 (기간 고유 사람 수 계산용) | 사람 × 일(KST). 행동 플래그(비트 1~16384)가 하나도 없는 날(자동 로드만 있는 날)은 뺀다. 상태 비트 32768 만 있는 날도 뺀다 | (person_key, kst_date) | kst_date / person_key | staging.int_person_day | 대시보드 사람 지표 타일·분해·전기 대비(기간 고유 사람 수). ops.reconciliation | C8 | [person_day.sql](sql/marts/person_day.sql) |
+| **ranker_eval**<br>순위 모델 오프라인 평가 쌍 | 검색어 × 후보 1쌍 | (query_norm, item_type, item_id) | 없음 / 없음 | staging.ml_ranker_pairs (정답 등급·교차 검증 묶음·인기), raw.ml_query_parse (해석·v1 일치), raw.ml_ranker_scores (묶음 밖 모델 점수) | 보고서 랭킹 모델 설계·오프라인 평가(방식별 NDCG@10). ops.reconciliation | C23 | [ranker_eval.sql](sql/marts/ranker_eval.sql) |
+| **ranker_feature**<br>순위 모델 피처 중요도 | 피처 1개 | (model_version, feature) | 없음 / 없음 | raw.ml_ranker_features (최종 모델 분할 이득) | 보고서 랭킹 모델 설계·오프라인 평가(피처 중요도). ops.reconciliation | I10 | [ranker_feature.sql](sql/marts/ranker_feature.sql) |
+| **ranker_query_eval**<br>검색어 해석 오프라인 평가 (랭킹 A/B 설계서 기준선 2주) | 검색어 1개 (2026-06-22 ~ 07-05 요청에 나온 검색어) | query_norm | 없음 / 없음 | staging.int_search (기준선 2주 요청, 전부 기존 랭킹), raw.ml_query_parse (새 해석) | 보고서 랭킹 모델 설계·오프라인 평가(기존 0건 중 새 해석이 정식 이름에 연결하는 비율, 해석 뒤 예상 0건). ops.reconciliation | I11 | [ranker_query_eval.sql](sql/marts/ranker_query_eval.sql) |
 | **subscription_cohort**<br>멤버십 구독 시작 월 코호트 유지 | 코호트 월(구독 시작 월) × 경과 월(0~9) | (cohort_month, month_offset) | DATE_TRUNC(cohort_month, MONTH) / 없음 | staging.dim_subscription (시작·종료일·스냅샷 기준일) | 회원 탭 구독 보기 코호트 히트맵 |  | [subscription_cohort.sql](sql/marts/subscription_cohort.sql) |
 | **venue_registry**<br>공간 목록 (기준일 스냅샷, 리스트 집계) | 공간 1곳 | venue_id | 없음 / region | staging.dim_venue (속성·파트너 여부·요금제·계약일), staging.dim_event (개최 행사), staging.fct_order (티켓 매출), staging.events_clean·int_session (공간 상세 조회 사람) | 공간 탭 서울 분포 지도(좌표·28일 조회·파트너 여부)·상권별 표·파트너 공간 표, ops.reconciliation. 기간 필터를 받지 않는 기준일 고정 표 |  | [venue_registry.sql](sql/marts/venue_registry.sql) |
 | **weekly_activity**<br>주간 활동 마트 | 주(월요일 시작) × channel1 × device_platform × member_seg | 이 네 열 | week_start / channel1, device_platform, member_seg | staging.int_person_day, staging.dim_member (가입일) | 주간·월간 탭 주간 보기 — WAU·신규·재방문·주 2일+ 방문. 기간 필터 대신 주차 선택기로 본다. ops.reconciliation (C6·C7 기준값) |  | [weekly_activity.sql](sql/marts/weekly_activity.sql) |
@@ -108,7 +115,7 @@ python3 bigquery/build_catalog.py        # 이 문서 재생성 (주석·본문�
 |---|---|---|---|---|---|---|---|
 | **build_log**<br>파이프라인 실행 기록 (없을 때만 만든다. 기록은 누적된다) | 실행 1회 × 단계(SQL 파일 1개) | (run_id, step, step_name) | DATE(started_at) / 없음 | load_all.sh 가 단계마다 1행 추가 | 파이프라인 상태 확인, bigquery/README.md 마지막 실행 요약 |  | [00_ops_tables.sql](sql/00_ops_tables.sql) |
 | **freshness**<br>표별 신선도 (전체 교체) | 표 1개 | (dataset_name, table_name) | 없음 / 없음 | 각 데이터셋 __TABLES__ (행 수·변경 시각), INFORMATION_SCHEMA.PARTITIONS (마지막 파티션) | 파이프라인 상태 확인 (화면 소비 없음) |  | [09_freshness.sql](sql/09_freshness.sql) |
-| **reconciliation**<br>대조·범위·무결성 검사 결과 (행 추가) | 실행 1회 × 검사 항목 | (run_id, check_id) | DATE(checked_at) / 없음 | raw.db_payments·db_applications·db_subscriptions·db_venues·db_events·db_venue_contracts, staging.events_clean·int_session·int_person_day·fct_order·ad_spend·dim_contract, marts.daily_metrics·weekly_cohort·daily_channel·weekly_activity·weekly_audience_funnel·weekly_path·person_day, marts.daily_revenue·daily_subscription·daily_venue_registry·daily_event·venue_registry·monthly_contract, raw.search_log·search_click_log·eval_queries·eval_labels·eval_tasks·eval_batches, staging.int_search·int_label, marts.daily_search·exp_ranker_request·weekly_eval_ops·weekly_batch | load_all.sh 8단계. passed = FALSE 가 하나라도 있으면 파이프라인이 exit 1 |  | [reconciliation.sql](checks/reconciliation.sql) |
+| **reconciliation**<br>대조·범위·무결성 검사 결과 (행 추가) | 실행 1회 × 검사 항목 | (run_id, check_id) | DATE(checked_at) / 없음 | raw.db_payments·db_applications·db_subscriptions·db_venues·db_events·db_venue_contracts, staging.events_clean·int_session·int_person_day·fct_order·ad_spend·dim_contract, marts.daily_metrics·weekly_cohort·daily_channel·weekly_activity·weekly_audience_funnel·weekly_path·person_day, marts.daily_revenue·daily_subscription·daily_venue_registry·daily_event·venue_registry·monthly_contract, raw.search_log·search_click_log·eval_queries·eval_labels·eval_tasks·eval_batches, staging.int_search·int_label, marts.daily_search·exp_ranker_request·weekly_eval_ops·weekly_batch, staging.ml_ranker_pairs, raw.ml_query_parse·ml_ranker_scores·ml_ranker_features, marts.ranker_eval·ranker_query_eval·ranker_feature | load_all.sh 8단계. passed = FALSE 가 하나라도 있으면 파이프라인이 exit 1 |  | [reconciliation.sql](checks/reconciliation.sql) |
 
 ## 계보
 
@@ -134,6 +141,9 @@ flowchart LR
     raw_eval_queries["eval_queries"]
     raw_eval_tasks["eval_tasks"]
     raw_eval_labels["eval_labels"]
+    raw_ml_query_parse["ml_query_parse"]
+    raw_ml_ranker_scores["ml_ranker_scores"]
+    raw_ml_ranker_features["ml_ranker_features"]
   end
   subgraph staging
     staging_map_channel["map_channel"]
@@ -152,6 +162,7 @@ flowchart LR
     staging_int_contract_day["int_contract_day"]
     staging_int_label["int_label"]
     staging_int_search["int_search"]
+    staging_ml_ranker_pairs["ml_ranker_pairs"]
   end
   subgraph marts
     marts_contract_cohort["contract_cohort"]
@@ -172,6 +183,9 @@ flowchart LR
     marts_monthly_contract["monthly_contract"]
     marts_monthly_summary["monthly_summary"]
     marts_person_day["person_day"]
+    marts_ranker_eval["ranker_eval"]
+    marts_ranker_feature["ranker_feature"]
+    marts_ranker_query_eval["ranker_query_eval"]
     marts_subscription_cohort["subscription_cohort"]
     marts_venue_registry["venue_registry"]
     marts_weekly_activity["weekly_activity"]
@@ -187,6 +201,15 @@ flowchart LR
     ops_freshness["freshness"]
     ops_reconciliation["reconciliation"]
   end
+  staging_dim_venue --> raw_ml_query_parse
+  staging_int_search --> raw_ml_query_parse
+  staging_ml_ranker_pairs --> raw_ml_query_parse
+  staging_dim_event --> raw_ml_ranker_scores
+  staging_dim_venue --> raw_ml_ranker_scores
+  staging_ml_ranker_pairs --> raw_ml_ranker_scores
+  staging_dim_event --> raw_ml_ranker_features
+  staging_dim_venue --> raw_ml_ranker_features
+  staging_ml_ranker_pairs --> raw_ml_ranker_features
   raw_ga4_events --> staging_map_channel
   raw_ga4_events --> staging_events_clean
   staging_events_clean --> staging_int_session
@@ -225,6 +248,9 @@ flowchart LR
   staging_events_clean --> staging_int_search
   staging_int_person_day --> staging_int_search
   staging_int_session --> staging_int_search
+  staging_dim_event --> staging_ml_ranker_pairs
+  staging_fct_order --> staging_ml_ranker_pairs
+  staging_int_label --> staging_ml_ranker_pairs
   staging_dim_contract --> marts_contract_cohort
   staging_int_contract_day --> marts_contract_cohort
   staging_ad_spend --> marts_daily_ad
@@ -269,6 +295,12 @@ flowchart LR
   staging_int_person_day --> marts_monthly_summary
   staging_int_session --> marts_monthly_summary
   staging_int_person_day --> marts_person_day
+  raw_ml_query_parse --> marts_ranker_eval
+  raw_ml_ranker_scores --> marts_ranker_eval
+  staging_ml_ranker_pairs --> marts_ranker_eval
+  raw_ml_ranker_features --> marts_ranker_feature
+  raw_ml_query_parse --> marts_ranker_query_eval
+  staging_int_search --> marts_ranker_query_eval
   staging_dim_subscription --> marts_subscription_cohort
   staging_dim_event --> marts_venue_registry
   staging_dim_venue --> marts_venue_registry
@@ -319,6 +351,9 @@ flowchart LR
 | 1 | raw.eval_queries | [schema/eval_queries.json](schema/eval_queries.json) |
 | 1 | raw.eval_tasks | [schema/eval_tasks.json](schema/eval_tasks.json) |
 | 1 | raw.eval_labels | [schema/eval_labels.json](schema/eval_labels.json) |
+| 1 | raw.ml_query_parse | [schema/ml_query_parse.json](schema/ml_query_parse.json) |
+| 1 | raw.ml_ranker_scores | [schema/ml_ranker_scores.json](schema/ml_ranker_scores.json) |
+| 1 | raw.ml_ranker_features | [schema/ml_ranker_features.json](schema/ml_ranker_features.json) |
 | 2 | staging.map_channel | [sql/01_map_channel.sql](sql/01_map_channel.sql) |
 | 2 | staging.map_fee_rate | [sql/01_map_fee_rate.sql](sql/01_map_fee_rate.sql) |
 | 3 | staging.events_clean | [sql/02_events_clean.sql](sql/02_events_clean.sql) |
@@ -335,6 +370,7 @@ flowchart LR
 | 6 | staging.ad_spend | [sql/06_ad_spend.sql](sql/06_ad_spend.sql) |
 | 6 | staging.int_search | [sql/07_int_search.sql](sql/07_int_search.sql) |
 | 6 | staging.int_label | [sql/07_int_label.sql](sql/07_int_label.sql) |
+| 6 | staging.ml_ranker_pairs | [sql/08_ml_ranker_pairs.sql](sql/08_ml_ranker_pairs.sql) |
 | 7 | marts.daily_metrics | [sql/marts/daily_metrics.sql](sql/marts/daily_metrics.sql) |
 | 7 | marts.hourly_metrics | [sql/marts/hourly_metrics.sql](sql/marts/hourly_metrics.sql) |
 | 7 | marts.daily_channel | [sql/marts/daily_channel.sql](sql/marts/daily_channel.sql) |
@@ -362,6 +398,9 @@ flowchart LR
 | 7 | marts.weekly_eval_ops | [sql/marts/weekly_eval_ops.sql](sql/marts/weekly_eval_ops.sql) |
 | 7 | marts.weekly_rater | [sql/marts/weekly_rater.sql](sql/marts/weekly_rater.sql) |
 | 7 | marts.weekly_batch | [sql/marts/weekly_batch.sql](sql/marts/weekly_batch.sql) |
+| 7 | marts.ranker_eval | [sql/marts/ranker_eval.sql](sql/marts/ranker_eval.sql) |
+| 7 | marts.ranker_query_eval | [sql/marts/ranker_query_eval.sql](sql/marts/ranker_query_eval.sql) |
+| 7 | marts.ranker_feature | [sql/marts/ranker_feature.sql](sql/marts/ranker_feature.sql) |
 | 8 | ops.reconciliation | [checks/reconciliation.sql](checks/reconciliation.sql) |
 | 9 | ops.freshness | [sql/09_freshness.sql](sql/09_freshness.sql) |
 
@@ -417,16 +456,20 @@ flowchart LR
 | C19 | 대조 | 정답셋 성분: 원천 재집계 vs 주간 마트 (첫 제출 라벨 수 + 정답 수) | 0 | int_label, weekly_eval_ops | 0.0 | 통과 |
 | I7 | 무결성 | 과제당 평가자 초과·배치 완료 > 목표 | 0 | int_label, weekly_batch | 0.0 | 통과 |
 | C20 | 대조 | 실패 출처 편입 검색어가 직전 7일 실패 조건(20건 이상·0건 30% 이상)을 만족 | 0 |  | 0.0 | 통과 |
+| C22 | 대조 | 순위 모델 채점: 해석된 검색어의 학습 쌍 vs 채점 결과 (+ 키 불일치) | 0 | ml_ranker_pairs | 0.0 | 통과 |
+| C23 | 대조 | 순위 모델 평가 마트: 학습 쌍 vs ranker_eval (행 + 정답 등급 합) | 0 | ml_ranker_pairs, ranker_eval | 0.0 | 통과 |
+| I10 | 무결성 | 순위 모델 산출 짝: 버전 둘 이상·중요도 합 ≠ 1·해석 표에 없는 검색 로그 검색어 | 0 | ranker_feature | 0.0 | 통과 |
+| I11 | 무결성 | 검색어 해석: 새 해석 의도 ≠ 검색 로그 의도 분류 + 해석 평가 마트 요청 ≠ 기준선 요청 | 0 | ranker_query_eval | 0.0 | 통과 |
 
 ## 마지막 실행
 
-검사 run `20261022T150824Z` (2026-10-23 00:20 KST): 46/46 통과
+검사 run `20261023T070254Z` (2026-10-23 16:02 KST): 50/50 통과
 
 단계별 마지막 기록 (`ops.build_log`, 시각 KST):
 
 | 단계 | 표 | run | 종료 | 초 | 행 | 처리 바이트 | 상태 |
 |---|---|---|---|---:|---:|---:|---|
-| 1 | raw | 20261022T150824Z | 2026-10-23 00:13 | 286 | 9,897,973 | 0 | ok |
+| 1 | raw | 20261023T042223Z | 2026-10-23 13:22 | 18 | 13,348 | 0 | ok |
 | 2 | staging.map_channel | 20261022T150824Z | 2026-10-23 00:13 | 5 | 21 | 257,336,992 | ok |
 | 2 | staging.map_fee_rate | 20261022T150824Z | 2026-10-23 00:13 | 4 | 3 | 0 | ok |
 | 3 | staging.events_clean | 20261022T150824Z | 2026-10-23 00:13 | 10 | 9,504,245 | 2,498,608,894 | ok |
@@ -443,6 +486,7 @@ flowchart LR
 | 6 | staging.ad_spend | 20261022T150824Z | 2026-10-23 00:15 | 7 | 153 | 11,299 | ok |
 | 6 | staging.int_search | 20261022T150824Z | 2026-10-23 00:15 | 11 | 73,116 | 352,046,762 | ok |
 | 6 | staging.int_label | 20261022T150824Z | 2026-10-23 00:15 | 7 | 116,664 | 7,514,701 | ok |
+| 6 | staging.ml_ranker_pairs | 20261023T042141Z | 2026-10-23 13:21 | 5 | 11,195 | 3,565,152 | ok |
 | 7 | marts.daily_metrics | 20261022T150824Z | 2026-10-23 00:15 | 10 | 4,141 | 96,014,807 | ok |
 | 7 | marts.hourly_metrics | 20261022T150824Z | 2026-10-23 00:16 | 9 | 82,446 | 130,576,017 | ok |
 | 7 | marts.daily_channel | 20261022T150824Z | 2026-10-23 00:16 | 9 | 21,241 | 166,460,644 | ok |
@@ -470,6 +514,9 @@ flowchart LR
 | 7 | marts.weekly_eval_ops | 20261022T150824Z | 2026-10-23 00:19 | 5 | 88 | 8,461,025 | ok |
 | 7 | marts.weekly_rater | 20261022T150824Z | 2026-10-23 00:19 | 5 | 480 | 7,411,049 | ok |
 | 7 | marts.weekly_batch | 20261022T150824Z | 2026-10-23 00:20 | 5 | 59 | 1,753,035 | ok |
-| 8 | ops.reconciliation | 20261022T150824Z | 2026-10-23 00:20 | 8 | 0 | 782,226,945 | ok |
-| 9 | ops.freshness | 20261022T150824Z | 2026-10-23 00:20 | 17 | 60 | 31,460,940 | ok |
+| 7 | marts.ranker_eval | 20261023T042247Z | 2026-10-23 13:22 | 5 | 11,195 | 1,388,595 | ok |
+| 7 | marts.ranker_query_eval | 20261023T042247Z | 2026-10-23 13:23 | 4 | 505 | 174,925 | ok |
+| 7 | marts.ranker_feature | 20261023T042247Z | 2026-10-23 13:23 | 4 | 14 | 873 | ok |
+| 8 | ops.reconciliation | 20261023T070254Z | 2026-10-23 16:03 | 8 | 0 | 785,004,423 | ok |
+| 9 | ops.freshness | 20261023T070318Z | 2026-10-23 16:03 | 11 | 67 | 31,460,940 | ok |
 

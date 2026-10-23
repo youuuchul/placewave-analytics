@@ -1,6 +1,6 @@
 """BigQuery 마트 → dashboard/public/data/ 분할 추출기.
 
-marts 데이터셋의 표 26개를 개인 GCP 래퍼(scripts/bq.sh)로 읽어 분할 파일로 쓴다.
+marts 데이터셋의 표 29개를 개인 GCP 래퍼(scripts/bq.sh)로 읽어 분할 파일로 쓴다.
 조회는 SELECT 뿐이며 표를 만들거나 바꾸지 않는다. 마트가 적재된 뒤에 실행한다.
 
     uv run dashboard/scripts/extract.py
@@ -43,6 +43,7 @@ LAZY = [
     "daily_search",
     "daily_query",
     "exp_ranker_request",
+    "ranker_eval",
 ]
 
 # person_day.bin 비트 배치: (필드, 워드, 시작 비트, 비트 수). 리틀엔디언 Uint32 2개 = 행당 8바이트.
@@ -51,6 +52,32 @@ HASHED = re.compile(r"^[a-z_]+(\.meta)?\.[0-9a-f]{8}\.(json|bin|pdz)$")
 
 # 표 이름 → (열 목록, 정렬 열). 열 이름은 docs/architecture.md §2 marts 와 docs/dashboard.md 계약을 따른다.
 TABLES: dict[str, tuple[list[str], list[str]]] = {
+    "ranker_eval": (
+        [
+            "query_norm",
+            "query_intent",
+            "query_term",
+            "fold",
+            "item_type",
+            "item_id",
+            "label",
+            "n_labels",
+            "popularity",
+            "v1_match",
+            "model_score",
+            "rank_popularity",
+            "rank_model",
+        ],
+        ["query_norm", "item_type", "item_id"],
+    ),
+    "ranker_query_eval": (
+        ["query_norm", "query_intent", "query_term", "v1_match", "requests", "zero_results"],
+        ["query_norm"],
+    ),
+    "ranker_feature": (
+        ["model_version", "feature", "feature_group", "gain", "gain_share", "splits"],
+        ["feature"],
+    ),
     "daily_search": (
         [
             "kst_date",
@@ -444,9 +471,22 @@ STRING_COLS = {
     "client_id",
     "person_id",
     "arm",
+    "query_term",
+    "item_type",
+    "model_version",
+    "feature",
+    "feature_group",
 }
-FLOAT_COLS = {"w1_retention", "lat", "lng"}
-BOOL_COLS = {"is_partner", "is_zero_result", "is_clicked", "is_reformulated", "is_session_first", "session_applied"}
+FLOAT_COLS = {"w1_retention", "lat", "lng", "model_score", "gain", "gain_share"}
+BOOL_COLS = {
+    "is_partner",
+    "is_zero_result",
+    "is_clicked",
+    "is_reformulated",
+    "is_session_first",
+    "session_applied",
+    "v1_match",
+}
 MONTH_COLS = {"cohort_month", "month"}
 # 표마다 타입이 다른 열: weekly_path.step 은 정수 1~4 (funnel_daily.step 은 문자열)
 INT_OVERRIDE: dict[str, set[str]] = {"weekly_path": {"step"}}

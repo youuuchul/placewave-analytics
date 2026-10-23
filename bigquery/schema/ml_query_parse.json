@@ -1,0 +1,32 @@
+[
+  {
+    "name": "query_norm",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "정규화 검색어 (검색 로그·학습 쌍에 나온 모든 검색어)"
+  },
+  {
+    "name": "query_term",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "해석한 정식 이름 (장르·상권·행사 유형·공간명 첫 단어). 해석 못 하면 NULL"
+  },
+  {
+    "name": "query_intent",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "의도 유형 genre / region / event_type / venue_name / other(해석 못 함)"
+  },
+  {
+    "name": "v1_match",
+    "type": "BOOLEAN",
+    "mode": "REQUIRED",
+    "description": "기존 랭킹(v1) 기준 정식 이름과 글자가 같은가 (대소문자만 무시)"
+  },
+  {
+    "name": "parser_version",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "해석기·모델 버전"
+  }
+]

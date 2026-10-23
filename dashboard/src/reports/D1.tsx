@@ -133,9 +133,9 @@ export default function D1({ queries }: { queries: DailyQuery[] }) {
         <Bullets
           items={[
             `검색 20건 이상 검색어 ${num(stats.length)}개 중 ${num(failed.length)}개가 실패 기준을 넘었고, 이 ${num(failed.length)}개가 같은 기간 결과 0건의 ${pct(failedZero / total.zero)}를 차지했다. 실패는 드문 오타가 아니라 자주 찾는 검색어에 몰려 있었다.`,
-            `실패 검색어를 의도로 나누면 ${byIntent.map(([k, n]) => `${QUERY_INTENT[k] ?? k} ${n}개`).join(' · ')}다. ${allZero ? '모두 결과 0건 비율이 100%이고, ' : ''}정식 이름이 아니라 장르·행사 유형의 줄임말·영문 표기(kpop · hiphop · 재즈 · 팝업)나 상권의 한 동네 이름(홍대 · 이태원 · 성수)·띄어 쓴 이름(이태원 한남)이었다. 정식 이름과 글자가 같아야 찾는 기존 랭킹이 놓치는 입력이라고 가설을 세웠고, 이 가설이 새 랭킹의 동의어·부분 일치(단계 4 설계서)로 이어진다.`,
+            `실패 검색어를 의도로 나누면 ${byIntent.map(([k, n]) => `${QUERY_INTENT[k] ?? k} ${n}개`).join(' · ')}다. ${allZero ? '모두 결과 0건 비율이 100%이고, ' : ''}정식 이름이 아니라 장르·행사 유형의 줄임말·영문 표기(kpop · hiphop · 재즈 · 팝업)나 상권의 한 동네 이름(홍대 · 이태원 · 성수)·띄어 쓴 이름(이태원 한남)이었다. 정식 이름과 글자가 같아야 찾는 기존 랭킹이 놓치는 입력이라고 가설을 세웠고, 이 가설이 새 랭킹의 검색어 해석(동의어·부분 일치, 단계 4)으로 이어진다.`,
             `${num(firstBatch)}개가 ${md(FIRST_BATCH)} 첫 평가 배치에 들어갔다${later.length ? `. 나머지 ${later.length}개(${later.map((q) => q.q.query_norm).join(' · ')})는 ${[...new Set(later.map((q) => md(q.evalDate!)))].join(' · ')} 배치에 들어갔다` : ''}.`,
-            `주 단위로 보면 실패 검색어는 평가를 시작한 4월부터 A/B 기간까지 주당 ${Math.min(...pre)}~${Math.max(...pre)}개였고, 새 랭킹 전체 적용(7/27) 뒤 ${Math.max(...post) === 0 ? '0개가 됐다' : `주당 ${Math.max(...post)}개 이하로 줄었다`}. 재색인 회귀 주(8/31)에 ${regWeek}개로 다시 나타났다(단계 7).`,
+            `주 단위로 보면 실패 검색어는 평가를 시작한 4월부터 A/B 기간까지 주당 ${Math.min(...pre)}~${Math.max(...pre)}개였고, 새 랭킹 전체 적용(7/27) 뒤 ${Math.max(...post) === 0 ? '0개가 됐다' : `주당 ${Math.max(...post)}개 이하로 줄었다`}. 재색인 회귀 주(8/31)에 ${regWeek}개로 다시 나타났다(단계 8).`,
           ]}
         />
       </Block>

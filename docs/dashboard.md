@@ -151,6 +151,7 @@
 | 실패 검색어 | `daily_query` 검색어별 기간 합으로 검색 20건 이상이고 결과 0건 비율 30% 이상 | 검색어 |
 | 평가 편입일 | `daily_query.eval_dates`(검색팀 배치 — 실패·상위·무작위 출처 — 에 편입된 날 목록. 프로모션 추천 슬롯 배치는 검색 결과가 아니라 추천 행사를 평가하므로 뺀다) 중 기간 시작 ~ 기간 끝 + 7일 안의 첫 날. 없으면 비운다. 실패가 반복된 검색어는 그 기간의 편입을 보고, 예전 편입을 끌어오지 않는다. 상위 검색량 출처로 들어간 실패 검색어도 라벨이 붙으므로 편입으로 센다 | 날짜 |
 | 랭킹 실험 비교 (보고서) | `exp_ranker_request` 요청 행을 기기(무작위 배정 단위)별 분자·분모 합으로 접고, 집단별 비율 R = Σy ÷ Σn 과 델타 방법 분산 (s²y − 2R·syn + R²·s²n) ÷ (k·n̄²) 로 차이·95% 구간·p값을 낸다. 지표가 여럿이라 Holm 보정 p값을 같이 둔다. 배정 점검은 기기 수 50:50 카이제곱(SRM), 응답 시간 p95 차이는 기기 단위 부트스트랩 2,000회 | — |
+| 순위 모델 NDCG@10 (보고서) | `ranker_eval` 검색어마다 방식별 순위(rank_popularity · rank_model) 순서의 DCG = Σ (2^label − 1) ÷ log2(순위 + 1) (순위 ≤ 10) ÷ 이상적 순서의 같은 값. 관련 후보가 없는 검색어(이상적 값 0)는 빼고 검색어 평균. 결과가 없는 방식(순위 null)은 0 | — |
 | 목표 대비 진척률 | 그 주 배치(요청 부서 필터) Σ done_tasks ÷ Σ target_tasks, 주말 시점 누적 | 과제 |
 | 마감 위험 배치 | 그 주 진행 배치를 우선순위 → 생성일 순으로 세워 앞 배치까지 남은 과제 누적 ÷ 팀 처리량(그 주와 전주 완료 과제 ÷ 14)이 마감까지 남은 일수보다 크면 위험, 마감이 지났으면 위험. 줄과 처리량은 부서 필터 전 전체로 본다(평가자는 같은 대기열을 처리) | 개 |
 | 정답셋 정확도 · 일치율 · 재작업률 | Σ gold_correct ÷ Σ gold_labels · Σ agree_pairs ÷ Σ label_pairs · Σ rework_labels ÷ Σ labels | 건 · 쌍 |
@@ -173,6 +174,7 @@
 | `daily_search.<해시>.json` | 행 배열 | 검색 탭, 주간 브리핑, 보고서(진행 점검·재색인 회귀) |
 | `daily_query.<해시>.json` | 행 배열 | 검색 탭 검색어 표, 보고서(실패 검색어 발견·재색인 회귀) |
 | `exp_ranker_request.<해시>.json` | 행 배열(요청 단위, 6/22~7/26) | 보고서(실험 설계서·진행 점검·결과 보고) |
+| `ranker_eval.<해시>.json` | 행 배열(검색어 × 후보) | 보고서(순위 모델 설계·오프라인 평가) |
 | `person_day.<해시>.pdz`(gzip) 또는 `person_day.<해시>.bin` + `person_day.meta.<해시>.json` | 사람×일 행동 비트(아래) | 사람 단위 지표가 있는 탭(개요·퍼널·행사 흐름·회원) |
 
 - `files` = `{표 이름: 파일 이름}`(`person_day` 는 `.bin`, `person_day_gz` 는 같은 바이너리의 gzip -9 `.pdz`, `person_day_meta` 는 메타 JSON). 로더는 `DecompressionStream('gzip')` 이 있으면 `.pdz` 를 받아 풀고, 없으면 `.bin` 을 받는다. 받은 본문이 gzip 머리(`1f 8b`)로 시작하지 않으면(서버가 `Content-Encoding` 으로 이미 풀어 보냈으면) 그대로 쓴다. 확장자를 `.gz` 로 두지 않는 이유: 정적 서버 일부(vite preview 의 sirv 등)가 `.gz` 를 `Content-Encoding: gzip` 으로 내보내 브라우저가 먼저 풀어 버린다. 이름의 8자리는 내용 SHA-256 앞자리라 내용이 바뀌면 이름이 바뀐다(캐시 무효화). `files` 에 없는 표는 추출되지 않은 것으로 본다.
@@ -207,6 +209,9 @@
 | `daily_search` | `kst_date, query_intent(genre/region/event_type/venue_name/other), ranker_version(v1/v2), channel1, device_platform, member_seg, searches, zero_result_searches, result_searches, clicked_searches, first_click_position_sum, first_click_position_sq_sum, top3_clicks, reformulated_searches, search_sessions, search_sessions_applied, latency_ms_sum, ga_logged_searches` — 날짜는 세션 시작일 |
 | `daily_query` | `kst_date, query_norm, channel1, device_platform, member_seg, query_intent, searches, zero_result_searches, result_searches, clicked_searches, reformulated_searches, eval_dates` — 검색어 속성(모든 행에 같은 값, `YYYY-MM-DD` 쉼표 구분 오름차순). 마트의 `first_eval_date`·`first_failed_eval_date`·`failed_eval_dates`(실패 출처만) 는 추출하지 않는다 |
 | `exp_ranker_request` | `kst_date, request_id, client_id, person_id, arm(control/treatment), ranker_version, query_intent, channel1, device_platform, member_seg, is_zero_result, is_clicked, first_click_position, is_reformulated, latency_ms, is_session_first, session_applied` — 1행 = 요청, 세션 시작일 6/22~7/26. `arm` 은 기기 ID MD5 앞 8자리 mod 2(실험 전 기간에도 같은 규칙, A/A 비교용) |
+| `ranker_eval` | `query_norm, query_intent, query_term, fold(0~4), item_type, item_id, label(0~3), n_labels, popularity, v1_match, model_score, rank_popularity, rank_model` — 1행 = 검색어 × 후보. 순위는 결과가 없는 방식이면 null |
+| `ranker_query_eval` | `query_norm, query_intent, query_term, v1_match, requests, zero_results` — 1행 = 기준선 2주(6/22~7/5) 검색어. index.json |
+| `ranker_feature` | `model_version, feature, feature_group, gain, gain_share, splits` — 1행 = 피처. index.json |
 | `weekly_eval_ops` | `week_start, requester(search/promotion), rater_group(internal/vendor), guideline_version(v1/v2), labels, rework_labels, handle_seconds, gold_labels, gold_correct, final_labels, label_pairs, agree_pairs, labels_g0..labels_g3, tasks_completed` |
 | `weekly_rater` | `week_start, rater_id, requester, rater_group, labels, rework_labels, handle_seconds, gold_labels, gold_correct, label_pairs, agree_pairs` |
 | `weekly_batch` | `week_start, batch_id, requester, purpose(train/eval/adhoc), guideline_version, priority, created_date, due_date, as_of_date, target_tasks, done_tasks, done_in_week, remaining_tasks, recent_done_14d, days_to_due` — 주말 시점 누적 |
@@ -253,23 +258,24 @@
 - 지표 표: 수익 축 선택(전체 축·공통·마켓플레이스·구독·B2B, 개수 병기) → 탭 칩(전체 + 탭별 개수, 선택한 축 안의 개수) · 검색(이름·코드·정의·산식·마트 열) → 행 = 이름·코드·탭 / 정의·의의 / 산식·분모 / 단위 / 마트 열. 폭 1024px 미만은 행 안에서 세로로 쌓는다.
 - 타일·카드 이름 옆 `?`(`metricId` prop): 같은 JSON 의 이름·정의·산식·분모·단위를 팝오버로 띄운다. 바깥 클릭·Esc·스크롤로 닫힌다. JSON 이 없거나 id 가 없으면 `?` 를 그리지 않는다.
 
-**보고서** — 한 사업을 단계 순서로 읽는 묶음 페이지. 목록(`?page=reports`)은 묶음별로 단계 카드를 놓고 `단계별`(큰 단계 발견 · 데이터 구축 · 실험 · 운영 이슈로 묶음)·`시간순`(문서 시점 순, 왼쪽에 날짜) 보기를 고른다. 단계 페이지(`&r=<단계 id>`)는 위에 묶음 이름·한 줄 결론·단계 타임라인(칸을 누르면 그 단계로, 폭 1024px 이상 7칸 한 줄, 640px 미만은 2열이고 날짜를 숨김), 단계 머리(번호 · 문서 종류 · 코드, 제목, 메타 `작성 <날짜>` 또는 시나리오 시점과 작성일이 다르면 `시나리오 시점 <날짜> · 작성 <날짜>` · 기간 · 원천, 한 줄 결론), 아래에 본문과 이전·다음 단계 이동을 둔다. `r` 에 묶음 id(`search-quality`)를 주면 첫 단계를 연다. 정보는 `src/reports/registry.ts`(묶음: id·제목·기간·한 줄 결론·큰 단계·단계 목록 / 단계: id·코드·큰 단계·문서 종류·제목·문서 시점·작성일·기간·원천·표기·한 줄 결론)이고, 한 줄 결론과 서술 문장의 숫자는 수치 근거 값이다. 표·차트는 대시보드와 같은 마트 파일을 받아 같은 함수(`src/lib/experiments.ts`, 라벨링 운영 지표는 `tabs/EvalOps.tsx` 의 함수)로 화면이 계산한다. 실험 구간 표식·실험 집단 비교처럼 한 사업의 맥락이 있는 표시는 보고서 안에만 두고 대시보드 탭에는 두지 않는다.
+**보고서** — 한 사업을 단계 순서로 읽는 묶음 페이지. 목록(`?page=reports`)은 묶음별로 단계 카드를 놓고 `단계별`(큰 단계 발견 · 데이터 구축 · 모델 · 실험 · 운영 이슈로 묶음)·`시간순`(문서 시점 순, 왼쪽에 날짜) 보기를 고른다. 묶음의 줄기(문제 → 해결 → 검증 → 운영)를 이루는 주요 보고서는 카드에 `주요` 표시를 달고 제목을 강조색으로 쓴다(타임라인 칸 제목도 강조색). 단계 페이지(`&r=<단계 id>`)는 위에 묶음 이름·한 줄 결론·단계 타임라인(칸을 누르면 그 단계로, 폭 1024px 이상 8칸 한 줄, 640px 미만은 2열이고 날짜를 숨김), 단계 머리(번호 · 문서 종류 · 코드, 제목, 메타 `작성 <날짜>` 또는 나중에 다시 쓴 문서면 `작성 <날짜> · 최종 수정 <날짜>` · 기간 · 원천, 한 줄 결론), 아래에 본문과 이전·다음 단계 이동을 둔다. `r` 에 묶음 id(`search-quality`)를 주면 첫 단계를 연다. 정보는 `src/reports/registry.ts`(묶음: id·제목·기간·한 줄 결론·큰 단계·단계 목록 / 단계: id·코드·큰 단계·문서 종류·제목·문서 시점·최종 수정일·기간·원천·표기·주요 여부·한 줄 결론)이고, 한 줄 결론과 서술 문장의 숫자는 수치 근거 값이다. 표·차트는 대시보드와 같은 마트 파일을 받아 같은 함수(`src/lib/experiments.ts`, 라벨링 운영 지표는 `tabs/EvalOps.tsx` 의 함수)로 화면이 계산한다. 실험 구간 표식·실험 집단 비교처럼 한 사업의 맥락이 있는 표시는 보고서 안에만 두고 대시보드 탭에는 두지 않는다.
 
-묶음 `search-quality` 검색 품질 개선(2026-03 ~ 09, 7단계):
+묶음 `search-quality` 검색 품질 개선(2026-03 ~ 09, 8단계, 주요 = 1·4·7·8):
 
 | 단계 | id | 큰 단계 · 문서 종류 · 코드 | 원천 | 내용 |
 |---|---|---|---|---|
 | 1 | `search-failures` | 발견 · 발견 · D1 | `daily_query` | 평가 착수 전 28일(3/4~3/31) 검색 수·결과 0건 비율, 검색 20건 이상 검색어 · 실패 검색어 · 결과 0건 중 실패 검색어 몫 · 4/1 첫 배치 편입, 실패 검색어 표, 주별(월요일 시작) 실패 검색어 수 1년. `관찰` |
 | 2 | `labeling-ops` | 데이터 구축 · 운영 · O1 | `weekly_eval_ops` · `weekly_rater` · `weekly_batch` | 라벨링 운영 대시보드(주차·요청 부서 선택): 진척(목표 대비 진척률·완료 과제·마감 위험 배치) / 생산성(라벨 수·활동 평가자·평가자당 라벨 수·건당 처리 시간) / 품질(정답셋 정확도·평가자 간 일치율·카파·재작업률·기준 미달 평가자) → 품질 추이·라벨 수 12주 → 배치 진척 · 처리 속도 × 정확도 산점도 + 평가자 표. 옛 주소 `?tab=evalops` 는 이 단계로 넘긴다 |
 | 3 | `guide-v2` | 데이터 구축 · 개선 · X1 | `weekly_eval_ops` · `weekly_rater` | 평가 지침 개정 전(v1) · 후(v2), 마지막 완료 주까지 누적 + 주별 품질·처리 시간. `전후 비교(인과 아님)` |
-| 4 | `ab-ranker-design` | 실험 · 설계서 · E1 | `exp_ranker_request` | 7/6 시점 설계서(작성일 별도 표기): 가설, 변경 내용, 배정 단위(기기 해시 50:50)·기간(세션 시작일 7/13~7/26, 2주), 지표 역할(주 지표 검색 성공률 · 보조 · 가드레일 결과 클릭률 −2.0%p · 신청 전환 −0.50%p · 응답 p95 +30ms), 기준선(6/22~7/5)으로 낸 표본·최소 검출 효과, 판정 규칙(Holm 보정) |
-| 5 | `ab-ranker-check` | 실험 · 진행 점검 · E1 | `exp_ranker_request` · `daily_search` | 첫 주(7/13~7/19) 배정 점검(기기 수 SRM, 받은 랭킹 버전), 실험 전 2주(6/29~7/12) A/A 비교, 가드레일 감시, 로그 품질(GA 수집률·고아 클릭) |
-| 6 | `ab-ranker-v2` | 실험 · 결과 보고 · E1 | `exp_ranker_request` | 2주 결과: 지표별 대조·실험·95% 구간·p·Holm p·기준·판정, 요청 독립 단순 검정 vs 기기 단위 비교, 일별 검색 성공률, 의도 유형·플랫폼 세그먼트, 결정 |
-| 7 | `issue-reindex-0901` | 운영 이슈 · 이슈 · I1 | `daily_search` · `daily_query` · `weekly_batch` | 회귀 전(8/29~8/31) · 중(9/1~9/4) · 핫픽스 후(9/5~9/8) 결과 0건 비율·검색 성공률(전체·상권·상권 외), 회귀 주 실패 검색어, 9/7 주 배치 진척·마감 위험. `전후 비교(인과 아님)` |
+| 4 | `ranker-model` | 모델 · 모델 · M1 | `ranker_eval` · `ranker_query_eval` · `ranker_feature` | 7/3 시점(작성일 별도 표기) 새 랭킹 두 부분의 오프라인 평가: ① 검색어 해석 = 기준선 2주(6/22~7/5) 기존 랭킹 0건 중 정식 이름에 연결되는 몫·해석 뒤 0건, 의도 유형별, 연결 예시 ② 순위 모델(LightGBM LambdaRank) = 검색어 단위 5묶음 교차 검증 NDCG@10 기존 정렬(인기순) 대비, 의도 유형별·묶음별, 피처 중요도. 설계(구조·해석 규칙·하이퍼파라미터·피처), 모델 코드 링크(`ranker/`) |
+| 5 | `ab-ranker-design` | 실험 · 설계서 · E1 | `exp_ranker_request` | 7/6 시점 설계서(작성일 별도 표기): 가설, 변경 내용, 배정 단위(기기 해시 50:50)·기간(세션 시작일 7/13~7/26, 2주), 지표 역할(주 지표 검색 성공률 · 보조 · 가드레일 결과 클릭률·검색 세션 신청 전환은 유의한 하락 없음 · 응답 p95 +50ms 예산), 기준선(6/22~7/5)으로 낸 표본·최소 검출 효과, 판정 규칙(Holm 보정) |
+| 6 | `ab-ranker-check` | 실험 · 진행 점검 · E1 | `exp_ranker_request` · `daily_search` | 첫 주(7/13~7/19) 배정 점검(기기 수 SRM, 받은 랭킹 버전), 실험 전 2주(6/29~7/12) A/A 비교, 가드레일 감시, 로그 품질(GA 수집률·고아 클릭) |
+| 7 | `ab-ranker-v2` | 실험 · 결과 보고 · E1 | `exp_ranker_request` | 2주 결과: 지표별 대조·실험·95% 구간·p·Holm p·기준·판정, 요청 독립 단순 검정 vs 기기 단위 비교, 일별 검색 성공률, 의도 유형·플랫폼 세그먼트, 결정 |
+| 8 | `issue-reindex-0901` | 운영 이슈 · 이슈 · I1 | `daily_search` · `daily_query` · `weekly_batch` | 회귀 전(8/29~8/31) · 중(9/1~9/4) · 핫픽스 후(9/5~9/8) 결과 0건 비율·검색 성공률(전체·상권·상권 외), 회귀 주 실패 검색어, 9/7 주 배치 진척·마감 위험. `전후 비교(인과 아님)` |
 
 - 한 단계의 칸 순서: 한 줄 결론 → 배경·질문 → 무엇을 바꿨나(발견은 무엇을 정했나, 이슈는 무엇이 바뀌었나) → 설계 → 결과 → 해석 → 한계 → 데이터셋 구성(경로·그레인·지표별 분자·분모 열·기간 규칙·기간 내 마트 행 수·재현 SQL `bigquery/reports/*.sql` 링크·기간 내 집계 표 + CSV 내려받기) → 대시보드에서 보기(딥링크). 설계서·진행 점검은 그 시점에 쓸 수 있는 칸만 둔다. 방어용 예상 질문 칸은 두지 않는다(설계 근거는 설계서 본문에)
 - 단계 id 는 묶음으로 바꾸기 전 보고서 주소와 같다(`r=ab-ranker-v2` 등). 옛 주소 `?tab=search&view=ranker`(검색 탭 랭킹 실험 보기)는 `?page=reports&r=ab-ranker-v2` 로 넘긴다
-- 대조: `npm run check:reports` 가 보고서 표(D1 요약·실패 검색어, A/B 설계서 기준선·표본, 진행 점검 배정·A/A·가드레일, 결과 보고 비교 표, X1 개정 전·후, I1 구간)를 마트 파일에서 따로 계산한 값과 비교해 어긋나면 exit 1(빌드 결과를 preview 로 띄운 뒤, `NP_BASE` 로 주소 지정). BigQuery 재집계 대조는 `docs/reconciliation_dashboard.md` §2·§3
+- 대조: `npm run check:reports` 가 보고서 표(D1 요약·실패 검색어, M1 해석 요약·의도 유형별 NDCG@10, A/B 설계서 기준선·표본, 진행 점검 배정·A/A·가드레일, 결과 보고 비교 표, X1 개정 전·후, I1 구간)를 마트 파일에서 따로 계산한 값과 비교해 어긋나면 exit 1(빌드 결과를 preview 로 띄운 뒤, `NP_BASE` 로 주소 지정). BigQuery 재집계 대조는 `docs/reconciliation_dashboard.md` §2·§3
 
 ## 6. 캡처
 

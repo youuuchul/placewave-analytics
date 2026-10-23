@@ -1,0 +1,32 @@
+[
+  {
+    "name": "query_norm",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "정규화 검색어"
+  },
+  {
+    "name": "item_type",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "후보 종류 venue / event"
+  },
+  {
+    "name": "item_id",
+    "type": "INTEGER",
+    "mode": "REQUIRED",
+    "description": "공간 ID 또는 행사 ID"
+  },
+  {
+    "name": "model_score",
+    "type": "FLOAT",
+    "mode": "REQUIRED",
+    "description": "순위 모델 점수. 그 검색어가 속한 교차 검증 묶음을 빼고 학습한 모델의 값"
+  },
+  {
+    "name": "model_version",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "모델 버전"
+  }
+]

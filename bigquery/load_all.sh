@@ -16,6 +16,7 @@ BQ="$ROOT/scripts/bq.sh"
 SQL="$ROOT/bigquery/sql"
 SCHEMA="$ROOT/bigquery/schema"
 RAW="$ROOT/data/raw"
+MODEL="$ROOT/data/model"  # 순위 모델 작업(ranker/train.py) 산출. staging.ml_ranker_pairs 를 읽어 만들므로 그 표가 바뀌면 다시 학습한다
 MAX_BYTES="${NP_MAX_BYTES:-5000000000}"
 RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)"
 
@@ -186,6 +187,22 @@ load_raw() {
   loaded+=(raw.ads_spend)
   fi
 
+  for spec in \
+    "ml_query_parse|검색어 해석 결과 (순위 모델 작업 산출). 1행 = 검색어. 키 query_norm" \
+    "ml_ranker_scores|순위 모델 오프라인 채점 (순위 모델 작업 산출). 1행 = 검색어 × 후보. 키 (query_norm, item_type, item_id). 교차 검증 묶음 밖 점수" \
+    "ml_ranker_features|순위 모델 피처 중요도 (순위 모델 작업 산출). 1행 = 피처. 키 (model_version, feature)"; do
+    IFS='|' read -r tbl desc <<<"$spec"
+    hit "raw.$tbl" || continue
+    f="$MODEL/$tbl.csv"
+    [ -f "$f" ] || fail 1 "raw.$tbl" "$started" "data/model 에 $tbl.csv 없음 — uv run --group ml python -m ranker.train 을 먼저 실행"
+    if ! out="$("$BQ" load --quiet --replace --source_format=CSV --skip_leading_rows=1 \
+        "raw.$tbl" "$f" "$SCHEMA/$tbl.json" 2>&1)"; then
+      fail 1 "raw.$tbl" "$started" "$out"
+    fi
+    "$BQ" update --quiet --description "$desc" "raw.$tbl" >/dev/null 2>&1
+    loaded+=("raw.$tbl")
+  done
+
   [ ${#loaded[@]} -gt 0 ] || return 0
   rows="$(table_rows "${loaded[@]}")"
   secs=$(( $(date +%s) - t0 ))
@@ -221,6 +238,8 @@ if want 6; then
   # 검색·평가 (시나리오 3.0): int_search 는 int_session·int_person_day 뒤
   run_sql 6 staging.int_search  "$SQL/07_int_search.sql"  staging.int_search
   run_sql 6 staging.int_label   "$SQL/07_int_label.sql"   staging.int_label
+  # 순위 모델 학습 쌍: int_label 뒤. 이 표가 바뀌면 ranker/train.py 를 다시 돌려 data/model 을 새로 만든다
+  run_sql 6 staging.ml_ranker_pairs "$SQL/08_ml_ranker_pairs.sql" staging.ml_ranker_pairs
 fi
 if want 7; then
   # weekly_cohort·daily_revenue·daily_subscription·daily_venue_registry 는 monthly_summary 보다 먼저
@@ -229,7 +248,8 @@ if want 7; then
            daily_revenue daily_subscription daily_venue_registry venue_registry monthly_summary \
            monthly_contract contract_cohort subscription_cohort \
            weekly_audience_funnel weekly_path person_day \
-           daily_search daily_query exp_ranker_request weekly_eval_ops weekly_rater weekly_batch; do
+           daily_search daily_query exp_ranker_request weekly_eval_ops weekly_rater weekly_batch \
+           ranker_eval ranker_query_eval ranker_feature; do
     run_sql 7 "marts.$m" "$SQL/marts/$m.sql" "marts.$m"
   done
 fi

@@ -3,7 +3,7 @@
 -- 키: label_id
 -- 파티션·클러스터: kst_date / batch_id, rater_id
 -- 원천: raw.eval_labels·eval_tasks·eval_batches·eval_raters
--- 소비: marts.weekly_eval_ops·weekly_rater·weekly_batch, ops.reconciliation
+-- 소비: marts.weekly_eval_ops·weekly_rater·weekly_batch, staging.ml_ranker_pairs, ops.reconciliation
 -- 검사: C18·C19·I7
 --
 -- 규칙

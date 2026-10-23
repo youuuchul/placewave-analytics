@@ -308,7 +308,7 @@ export default function E1({ rows }: { rows: ExpRankerRequest[] }) {
       <Block title="한계">
         <Bullets
           items={[
-            '두 변경(라벨 학습 정렬, 동의어·부분 일치)을 함께 넣어 각각의 효과를 나눌 수 없다.',
+            '두 변경(라벨 학습 정렬, 동의어·부분 일치)을 함께 넣어 A/B 로는 각각의 효과를 나눌 수 없다. 오프라인으로 나눈 몫은 단계 4에 있다.',
             `기기 2대 이상으로 두 집단을 함께 본 사람이 ${pct(both.multi / Math.max(1, both.persons))} 있어 효과가 조금 작게 잡혔을 수 있다.`,
           ]}
         />

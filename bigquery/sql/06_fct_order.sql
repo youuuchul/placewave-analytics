@@ -4,7 +4,7 @@
 -- 파티션·클러스터: applied_date / kind, event_id
 -- 원천: raw.db_applications, raw.db_payments, raw.db_events,
 --       staging.int_contract_day (개최일 공간 요금제 → 수수료 등급), staging.map_fee_rate (등급별 수수료율)
--- 소비: staging.dim_event, marts.daily_event·daily_venue·monthly_summary·daily_revenue·daily_subscription·venue_registry,
+-- 소비: staging.dim_event·ml_ranker_pairs, marts.daily_event·daily_venue·monthly_summary·daily_revenue·daily_subscription·venue_registry,
 --       ops.reconciliation
 -- 검사: R5·R6·I4·C9·C14·R10·R11
 --

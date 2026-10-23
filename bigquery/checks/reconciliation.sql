@@ -7,7 +7,8 @@
 --       marts.daily_metrics·weekly_cohort·daily_channel·weekly_activity·weekly_audience_funnel·weekly_path·person_day,
 --       marts.daily_revenue·daily_subscription·daily_venue_registry·daily_event·venue_registry·monthly_contract,
 --       raw.search_log·search_click_log·eval_queries·eval_labels·eval_tasks·eval_batches, staging.int_search·int_label,
---       marts.daily_search·exp_ranker_request·weekly_eval_ops·weekly_batch
+--       marts.daily_search·exp_ranker_request·weekly_eval_ops·weekly_batch,
+--       staging.ml_ranker_pairs, raw.ml_query_parse·ml_ranker_scores·ml_ranker_features, marts.ranker_eval·ranker_query_eval·ranker_feature
 -- 소비: load_all.sh 8단계. passed = FALSE 가 하나라도 있으면 파이프라인이 exit 1
 --
 -- 표 정의는 sql/00_ops_tables.sql.
@@ -552,6 +553,49 @@ con_churn AS (
     SAFE_DIVIDE(COUNTIF(rn > n - DIV(n, 3) AND churned), COUNTIF(rn > n - DIV(n, 3))) AS r_high
   FROM con_rank
 ),
+-- C22 순위 모델 채점: 해석된 검색어의 학습 쌍 vs 채점 결과 (+ 양쪽 키 불일치)
+ml_score AS (
+  SELECT
+    (SELECT COUNT(*) FROM staging.ml_ranker_pairs AS p JOIN raw.ml_query_parse AS q USING (query_norm)
+     WHERE q.query_intent != 'other') AS pairs_n,
+    (SELECT COUNT(*) FROM raw.ml_ranker_scores) AS scores_n,
+    (SELECT COUNT(*) FROM staging.ml_ranker_pairs AS p JOIN raw.ml_query_parse AS q USING (query_norm)
+     LEFT JOIN raw.ml_ranker_scores AS s USING (query_norm, item_type, item_id)
+     WHERE q.query_intent != 'other' AND s.query_norm IS NULL)
+    + (SELECT COUNT(*) FROM raw.ml_ranker_scores AS s
+       LEFT JOIN staging.ml_ranker_pairs AS p USING (query_norm, item_type, item_id) WHERE p.query_norm IS NULL) AS orphan
+),
+-- C23 순위 모델 평가 마트: 학습 쌍 vs ranker_eval (행 + 정답 등급 합)
+ml_eval AS (
+  SELECT
+    (SELECT COUNT(*) FROM staging.ml_ranker_pairs) AS pairs_n,
+    (SELECT SUM(label) FROM staging.ml_ranker_pairs) AS pairs_label,
+    (SELECT COUNT(*) FROM marts.ranker_eval) AS mart_n,
+    (SELECT SUM(label) FROM marts.ranker_eval) AS mart_label
+),
+-- I10 순위 모델 산출 짝: 버전이 하나가 아님 + 중요도 비중 합 ≠ 1 + 검색 로그 검색어 중 해석 표에 없는 것
+ml_ver AS (
+  SELECT
+    (SELECT COUNT(DISTINCT v) FROM (
+       SELECT parser_version AS v FROM raw.ml_query_parse
+       UNION ALL SELECT model_version FROM raw.ml_ranker_scores
+       UNION ALL SELECT model_version FROM raw.ml_ranker_features
+       UNION ALL SELECT model_version FROM marts.ranker_feature)) - 1
+    + IF(ABS((SELECT SUM(gain_share) FROM marts.ranker_feature) - 1) > 0.001, 1, 0)
+    + (SELECT COUNT(DISTINCT s.query_norm) FROM staging.int_search AS s
+       LEFT JOIN raw.ml_query_parse AS q USING (query_norm)
+       WHERE s.kst_date BETWEEN DATE '2000-01-01' AND DATE '2099-12-31' AND q.query_norm IS NULL) AS bad
+),
+-- I11 검색어 해석: 새 해석의 의도 유형이 검색 로그 의도 분류와 다른 검색어 + 해석 평가 마트 요청 수 ≠ 기준선 요청 수
+ml_parse AS (
+  SELECT
+    (SELECT COUNT(*) FROM (
+       SELECT DISTINCT s.query_norm, s.query_intent FROM staging.int_search AS s
+       WHERE s.kst_date BETWEEN DATE '2000-01-01' AND DATE '2099-12-31') AS s
+     JOIN raw.ml_query_parse AS q USING (query_norm) WHERE q.query_intent != s.query_intent)
+    + ABS((SELECT SUM(requests) FROM marts.ranker_query_eval)
+          - (SELECT COUNT(*) FROM staging.int_search WHERE kst_date BETWEEN DATE '2026-06-22' AND DATE '2026-07-05')) AS bad
+),
 checks AS (
   SELECT 'C1a' AS check_id, 'reconcile' AS category, '결제 건수: 로그 vs 원장' AS check_name,
          'events_clean purchase' AS left_label, CAST(l.purchases AS FLOAT64) AS left_value,
@@ -777,6 +821,24 @@ checks AS (
          '조건 미달 편입', bad, '실패 출처 편입', n,
          bad, 0, 0, NULL
   FROM failed_src
+  UNION ALL
+  SELECT 'C22', 'reconcile', '순위 모델 채점: 해석된 검색어의 학습 쌍 vs 채점 결과 (+ 키 불일치)',
+         '해석된 학습 쌍', pairs_n, 'ml_ranker_scores 행', scores_n,
+         ABS(pairs_n - scores_n) + orphan, 0, 0, NULL
+  FROM ml_score
+  UNION ALL
+  SELECT 'C23', 'reconcile', '순위 모델 평가 마트: 학습 쌍 vs ranker_eval (행 + 정답 등급 합)',
+         'ml_ranker_pairs 행', pairs_n, 'ranker_eval 행', mart_n,
+         ABS(pairs_n - mart_n) + ABS(pairs_label - mart_label), 0, 0, NULL
+  FROM ml_eval
+  UNION ALL
+  SELECT 'I10', 'integrity', '순위 모델 산출 짝: 버전 둘 이상·중요도 합 ≠ 1·해석 표에 없는 검색 로그 검색어', '위반 건', bad, NULL, NULL,
+         bad, 0, 0, NULL
+  FROM ml_ver
+  UNION ALL
+  SELECT 'I11', 'integrity', '검색어 해석: 새 해석 의도 ≠ 검색 로그 의도 분류 + 해석 평가 마트 요청 ≠ 기준선 요청', '위반 건', bad, NULL, NULL,
+         bad, 0, 0, NULL
+  FROM ml_parse
 )
 SELECT
   @run_id,

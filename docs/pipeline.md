@@ -35,6 +35,7 @@ python3 bigquery/build_catalog.py --export dashboard/public/catalog.json   # + �
 | 수수료율만 바꿨다 (`01_map_fee_rate.sql`) | `--only 2` → `--only 6` → `--only 7` → `--only 8` (주문 원장 수수료부터 마트까지) |
 | 마트 SQL 하나를 고쳤다 | `--only 7` 후 `--only 8` |
 | 검사 기준만 바꿨다 | `--only 8` |
+| 라벨이 바뀌었다(순위 모델 다시 학습) | `--only 6 --match ml_ranker_pairs` → `uv run --group ml python -m ranker.train` → `--match 'raw.ml_|marts.ranker'` → `--only 8` (학습 쌍과 채점이 어긋나면 검사 C22·C23 이 실패한다) |
 
 `--only` 는 앞 단계 결과가 이미 있다고 가정한다. 상위 표를 고쳤으면 그 단계부터 끝까지 돌리는 편이 안전하다(`--skip-raw` 는 2단계부터 전부).
 
@@ -67,7 +68,7 @@ ORDER BY started_at;
 
 ## 검사 (8단계)
 
-검사 32개(C1a·C1b·C2~C11·C12a·C12b·C13~C15, R1~R11, I1~I4)의 ID·통과 기준·대상 표·최근 관측값은 [bigquery/README.md § 검사](../bigquery/README.md#검사). 하나라도 통과하지 못하면 `load_all.sh` 가 exit 1. 범위 검사(R)의 분자·분모 정의는 [metrics.md](metrics.md) 의 해당 지표와 같다.
+검사 50개(대조 C · 범위 R · 무결성 I)의 ID·통과 기준·대상 표·최근 관측값은 [bigquery/README.md § 검사](../bigquery/README.md#검사). 하나라도 통과하지 못하면 `load_all.sh` 가 exit 1. 범위 검사(R)의 분자·분모 정의는 [metrics.md](metrics.md) 의 해당 지표와 같다.
 
 ## 비용
 
