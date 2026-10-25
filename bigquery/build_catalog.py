@@ -39,6 +39,19 @@ FIELDS = ["표", "1행", "키", "파티션·클러스터", "원천", "소비", "
 REQUIRED = FIELDS[:6]
 TOKEN = re.compile(r"\b(raw|staging|marts|ops)\.([a-z][a-z0-9_]*(?:·[a-z][a-z0-9_]*)*)")
 CHECK_ID = re.compile(r"^[CRI]\d+[a-z]?$")
+# README 검사 표의 목적별 묶음(ID 는 추가된 순서라 그대로 둔다). 판정은 종류로 정한다: 대조·무결성 = 차단, 범위 = 경보.
+CHECK_GROUPS: list[tuple[str, list[str]]] = [
+    (
+        "원천 정합: 원장과 로그·마트가 같은가",
+        ["C1a", "C1b", "C2", "C12a", "C12b", "C9", "C14", "C10", "C11", "C13", "C15"],
+    ),
+    (
+        "층 보존: 층을 지나며 빠지거나 겹친 행이 없는가",
+        ["C3", "C4", "C5", "C6", "C7", "C8", "C16", "C17", "C21", "C18", "C19", "C22", "C23"],
+    ),
+    ("무결성: 규칙을 어긴 행이 0인가", ["I1", "I2", "I3", "I4", "I5", "I6", "I7", "I8", "I9", "I10", "I11", "C20"]),
+    ("지표 범위: 지표가 상식 범위 안인가", ["R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R9", "R12"]),
+]
 KEY_COUNT = {"두": 2, "세": 3, "네": 4, "다섯": 5, "여섯": 6, "일곱": 7, "여덟": 8, "아홉": 9}
 
 
@@ -221,6 +234,15 @@ def bq_select(sql: str) -> list[dict]:
 
 def validate(tables: dict[str, Table], checks: list[dict[str, str]], steps, errors: list[str]) -> None:
     check_ids = {c["id"] for c in checks}
+    grouped = [cid for _, ids in CHECK_GROUPS for cid in ids]
+    for cid in sorted(check_ids - set(grouped)):
+        errors.append(f"checks/reconciliation.sql: 검사 {cid} 가 build_catalog.py CHECK_GROUPS 묶음에 없음")
+    for cid in sorted({c for c in grouped if grouped.count(c) > 1 or c not in check_ids}):
+        errors.append(f"build_catalog.py CHECK_GROUPS: {cid} 가 두 번 있거나 checks/reconciliation.sql 에 없음")
+    for title, ids in CHECK_GROUPS:
+        kinds = {c["category"] == "range" for c in checks if c["id"] in ids}
+        if len(kinds) > 1:
+            errors.append(f"build_catalog.py CHECK_GROUPS: {title} 에 차단·경보 검사가 섞임")
     specs = ddl_specs()
     for t in tables.values():
         for fname in ("원천", "소비"):
@@ -518,8 +540,11 @@ def render(tables: dict[str, Table], checks, steps, build, recon, offline: bool)
 
     w("## 검사\n")
     w(
-        "[checks/reconciliation.sql](checks/reconciliation.sql) — 8단계. "
-        "하나라도 통과하지 못하면 `load_all.sh` 가 exit 1.\n"
+        "[checks/reconciliation.sql](checks/reconciliation.sql), 8단계. "
+        "대조·무결성은 차단 검사다. 하나라도 통과하지 못하면 `load_all.sh` 가 exit 1 로 멈추고, "
+        "`dashboard/scripts/extract.py` 는 마지막 실행에 차단 실패가 있거나 "
+        "그 뒤 1~7단계가 다시 돌았으면 추출을 거부한다. "
+        "범위는 경보 검사다. 결과를 기록하고 범위 밖 건수만 출력한다. ID 는 추가된 순서이고 표는 목적별로 묶었다.\n"
     )
     by_check: dict[str, list[str]] = {}
     for t in tables.values():
@@ -527,32 +552,43 @@ def render(tables: dict[str, Table], checks, steps, build, recon, offline: bool)
             if cid:
                 by_check.setdefault(cid, []).append(t.short)
     last = {r["check_id"]: r for r in recon}
-    head = "| ID | 종류 | 이름 | 통과 기준 | 대상 표 |"
-    if last:
-        head += " 최근 관측 | 통과 |"
-    w(head)
-    w("|" + "---|" * (head.count("|") - 1))
+    by_id = {c["id"]: c for c in checks}
     kind = {"reconcile": "대조", "range": "범위", "integrity": "무결성"}
-    for c in checks:
-        crit = f"{c['lo']} ~ {c['hi']}" if c["category"] == "range" else "0"
-        targets = ", ".join(by_check.get(c["id"], []))
-        row = f"| {c['id']} | {kind.get(c['category'], c['category'])} | {cell(c['name'])} | {crit} | {targets} |"
+    for title, ids in CHECK_GROUPS:
+        warn = by_id[ids[0]]["category"] == "range"
+        w(f"### {title} ({'경보' if warn else '차단'} {len(ids)}개)\n")
+        head = "| ID | 종류 | 이름 | 통과 기준 | 대상 표 |"
         if last:
-            r = last.get(c["id"], {})
-            row += f" {r.get('observed', '')} | {'통과' if r.get('passed') == 'true' else ('실패' if r else '')} |"
-        w(row)
-    w("")
+            head += " 최근 관측 | 판정 |"
+        w(head)
+        w("|" + "---|" * (head.count("|") - 1))
+        for cid in ids:
+            c = by_id[cid]
+            crit = f"{c['lo']} ~ {c['hi']}" if c["category"] == "range" else "0"
+            targets = ", ".join(by_check.get(cid, []))
+            row = f"| {cid} | {kind.get(c['category'], c['category'])} | {cell(c['name'])} | {crit} | {targets} |"
+            if last:
+                r = last.get(cid, {})
+                bad = "범위 밖" if warn else "실패"
+                row += f" {r.get('observed', '')} | {'통과' if r.get('passed') == 'true' else (bad if r else '')} |"
+            w(row)
+        w("")
 
     w("## 마지막 실행\n")
     if offline:
         w("오프라인 생성 — 실행 기록을 조회하지 않았다.\n")
     else:
         if recon:
-            failed = [r["check_id"] for r in recon if r["passed"] != "true"]
+            warn_ids = {c["id"] for c in checks if c["category"] == "range"}
+            block = [r for r in recon if r["check_id"] not in warn_ids]
+            failed = sorted(r["check_id"] for r in block if r["passed"] != "true")
+            out_of_range = sorted(r["check_id"] for r in recon if r["check_id"] in warn_ids and r["passed"] != "true")
             w(
                 f"검사 run `{recon[0]['run_id']}` ({recon[0]['checked_kst']} KST): "
-                f"{len(recon) - len(failed)}/{len(recon)} 통과"
-                + (f", 실패 {', '.join(failed)}" if failed else "")
+                f"차단 {len(block) - len(failed)}/{len(block)} 통과"
+                + (f"(실패 {', '.join(failed)})" if failed else "")
+                + f", 경보 {len(recon) - len(block)}개 중 범위 밖 {len(out_of_range)}"
+                + (f"({', '.join(out_of_range)})" if out_of_range else "")
                 + "\n"
             )
         w("단계별 마지막 기록 (`ops.build_log`, 시각 KST):\n")

@@ -5,7 +5,7 @@
 -- 원천: staging.fct_order (티켓·구독 결제, 결제일 기준), staging.int_contract_day (파트너 플랜 활성일·요금)
 -- 소비: 개요 플랫폼 매출 타일·매출 구성 추이, 행사·결제 탭 매출 구성, 공간 탭 파트너 부담률. marts.monthly_summary,
 --       ops.reconciliation
--- 검사: C9·C14·R10·R11
+-- 검사: C9·C14
 --
 -- kind
 --   ticket        행사 티켓 결제. fee_tier = 개최일 공간 요금제(none/basic/pro) 행으로 나뉜다

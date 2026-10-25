@@ -7,7 +7,7 @@
 #                                        표 이름이 정규식에 맞는 적재·SQL 만 실행 (다른 단계 표는 그대로 둔다)
 # BigQuery 명령은 모두 scripts/bq.sh 래퍼를 거친다(개인 프로젝트·리전 고정).
 # 단계마다 ops.build_log 에 1행을 쓰고, 실패하면 그 단계를 failed 로 기록한 뒤 즉시 종료한다.
-# 8단계 검사가 하나라도 어긋나면 exit 1.
+# 8단계 차단 검사(대조·무결성)가 하나라도 어긋나면 exit 1. 범위 검사(경보)는 범위 밖 건수만 출력하고 계속한다.
 # 환경 변수: NP_MAX_BYTES (단계당 청구 바이트 상한, 기본 5000000000). 넘으면 BigQuery 가 쿼리를 거부하고 단계가 실패한다.
 set -euo pipefail
 
@@ -260,11 +260,17 @@ if want 8; then
      FROM ops.reconciliation
      WHERE run_id = @run_id AND DATE(checked_at) >= CURRENT_DATE() - 1
      ORDER BY check_id"
-  failed="$("$BQ" query --quiet --format=csv --parameter="run_id::$RUN_ID" \
-    "SELECT COUNTIF(NOT passed) FROM ops.reconciliation
+  counts="$("$BQ" query --quiet --format=csv --parameter="run_id::$RUN_ID" \
+    "SELECT COUNTIF(NOT passed AND category != 'range'), COUNTIF(NOT passed AND category = 'range')
+     FROM ops.reconciliation
      WHERE run_id = @run_id AND DATE(checked_at) >= CURRENT_DATE() - 1" | tail -1)"
+  failed="${counts%,*}"
+  warned="${counts#*,}"
+  if [ "$warned" != "0" ]; then
+    echo "[8] 경보 ${warned}건: 범위 밖 지표 (ops.reconciliation run_id=$RUN_ID, category = range)" >&2
+  fi
   if [ "$failed" != "0" ]; then
-    echo "[8] 검사 실패 ${failed}건 (ops.reconciliation run_id=$RUN_ID)" >&2
+    echo "[8] 차단 검사 실패 ${failed}건 (ops.reconciliation run_id=$RUN_ID)" >&2
     want 9 && run_sql 9 ops.freshness "$SQL/09_freshness.sql" ops.freshness
     exit 1
   fi

@@ -6,7 +6,7 @@
 --       staging.int_contract_day (개최일 공간 요금제 → 수수료 등급), staging.map_fee_rate (등급별 수수료율)
 -- 소비: staging.dim_event·ml_ranker_pairs, marts.daily_event·daily_venue·monthly_summary·daily_revenue·daily_subscription·venue_registry,
 --       ops.reconciliation
--- 검사: R5·R6·I4·C9·C14·R10·R11
+-- 검사: R5·R6·I4·C9·C14
 --
 -- 결제·신청·취소의 건수와 금액은 이 표(원장)에서 센다. 로그는 흐름을 보는 데만 쓴다.
 -- 행사·신청 지표는 kind = 'ticket' 만 쓴다. 구독 결제 행은 신청이 없으므로 applied_date = 결제일, event_id·venue_id NULL.

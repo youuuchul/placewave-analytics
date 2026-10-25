@@ -34,12 +34,12 @@ python3 bigquery/build_catalog.py        # 이 문서 재생성 (주석·본문�
 | **ga4_events**<br>행동 로그 원천 (GA4 export 단순화, 합성) | 이벤트 1건 | (user_pseudo_id, ga_session_id, event_timestamp, event_name) | event_date / event_name | data/raw/ga4_events.ndjson.gz (생성기 출력). event_date 는 KST, 파티션 필터 필수 | staging.map_channel·events_clean |  | [raw_tables.sql](schema/raw_tables.sql) |
 | **db_members**<br>서비스 RDB 회원 스냅샷 (합성) | 회원 1명 | member_id | 없음 / 없음 | data/raw/db_members.csv (생성기 출력) | staging.int_person_day·dim_member |  | [raw_tables.sql](schema/raw_tables.sql) |
 | **db_venues**<br>서비스 RDB 공간 스냅샷 (합성) | 공간 1곳 | venue_id | 없음 / 없음 | data/raw/db_venues.csv (생성기 출력). 상권·구·좌표·등록일·상태 포함 | staging.dim_event·dim_venue, ops.reconciliation |  | [raw_tables.sql](schema/raw_tables.sql) |
-| **db_events**<br>서비스 RDB 행사 스냅샷 (합성) | 행사 1건 | event_id | 없음 / 없음 | data/raw/db_events.csv (생성기 출력). 정원·가격대·가격·개최 시점 파트너 여부 포함 | staging.dim_event·dim_venue·fct_order, ops.reconciliation |  | [raw_tables.sql](schema/raw_tables.sql) |
+| **db_events**<br>서비스 RDB 행사 스냅샷 (합성) | 행사 1건 | event_id | 없음 / 없음 | data/raw/db_events.csv (생성기 출력). 정원·가격대·가격·개최 시점 파트너 여부 포함 | staging.dim_event·dim_venue·fct_order |  | [raw_tables.sql](schema/raw_tables.sql) |
 | **db_applications**<br>서비스 RDB 신청 원장 스냅샷 (합성) | 신청 1건 | order_id | 없음 / 없음 | data/raw/db_applications.csv (생성기 출력) | staging.fct_order, ops.reconciliation |  | [raw_tables.sql](schema/raw_tables.sql) |
 | **db_payments**<br>서비스 RDB 결제 원장 스냅샷 (합성) | 결제 1건 | order_id | 없음 / 없음 | data/raw/db_payments.csv (생성기 출력). kind = ticket / subscription, 할인액·구독 ID 포함 | staging.fct_order·dim_subscription, ops.reconciliation |  | [raw_tables.sql](schema/raw_tables.sql) |
-| **db_venue_contracts**<br>서비스 RDB 파트너 계약 스냅샷 (합성) | 계약 1건 | contract_id | 없음 / 없음 | data/raw/db_venue_contracts.csv (생성기 출력). ended_at NULL = 진행 중 | staging.dim_contract, ops.reconciliation | R14 | [raw_tables.sql](schema/raw_tables.sql) |
+| **db_venue_contracts**<br>서비스 RDB 파트너 계약 스냅샷 (합성) | 계약 1건 | contract_id | 없음 / 없음 | data/raw/db_venue_contracts.csv (생성기 출력). ended_at NULL = 진행 중 | staging.dim_contract |  | [raw_tables.sql](schema/raw_tables.sql) |
 | **db_venue_contract_changes**<br>서비스 RDB 파트너 계약 요금제 변경 스냅샷 (합성) | 요금제 변경 1건 | change_id | 없음 / 없음 | data/raw/db_venue_contract_changes.csv (생성기 출력). changed_at(UTC, KST 자정)부터 to_plan·to_fee 적용 | staging.dim_contract_change |  | [raw_tables.sql](schema/raw_tables.sql) |
-| **db_subscriptions**<br>서비스 RDB 소비자 구독 스냅샷 (합성) | 구독 1건 | subscription_id | 없음 / 없음 | data/raw/db_subscriptions.csv (생성기 출력). ended_at NULL = 진행 중 | staging.dim_subscription, ops.reconciliation | R13 | [raw_tables.sql](schema/raw_tables.sql) |
+| **db_subscriptions**<br>서비스 RDB 소비자 구독 스냅샷 (합성) | 구독 1건 | subscription_id | 없음 / 없음 | data/raw/db_subscriptions.csv (생성기 출력). ended_at NULL = 진행 중 | staging.dim_subscription, ops.reconciliation | C10 | [raw_tables.sql](schema/raw_tables.sql) |
 | **ads_spend**<br>광고 플랫폼 일별 집행 리포트 (합성) | 캠페인 × 일 | (campaign_id, date) | date / 없음 | data/raw/ads_spend.csv (생성기 출력). date 는 KST | staging.ad_spend |  | [raw_tables.sql](schema/raw_tables.sql) |
 | **search_log**<br>검색 서버 요청 로그 (합성) | 검색 요청 1건 | request_id | requested_at / 없음 | data/raw/search_log.ndjson.gz (generator/generate.py 세션 시뮬레이션 출력). GA search 이벤트의 search_id 파라미터와 같은 키, ga_session_id 로 세션 연결 | staging.int_search, ops.reconciliation |  | [raw_tables.sql](schema/raw_tables.sql) |
 | **search_click_log**<br>검색 서버 클릭 로그 (합성) | 검색 결과 클릭 1건 | (request_id, clicked_at) | clicked_at / 없음 | data/raw/search_click_log.csv (generator/generate.py 세션 시뮬레이션 출력). 클릭 추적 엔드포인트 기록 | staging.int_search, ops.reconciliation |  | [raw_tables.sql](schema/raw_tables.sql) |
@@ -68,7 +68,7 @@ python3 bigquery/build_catalog.py        # 이 문서 재생성 (주석·본문�
 | **dim_contract_change**<br>파트너 계약 요금제 변경 이력 | 요금제 변경 1건 | change_id | 없음 / contract_id | raw.db_venue_contract_changes, staging.dim_contract (계약 기간) | staging.int_contract_day, marts.monthly_contract |  | [06_dim_contract_change.sql](sql/06_dim_contract_change.sql) |
 | **dim_event**<br>행사 차원 | 행사 1건 | event_id | 없음 / event_id | raw.db_events, raw.db_venues, staging.fct_order | marts.daily_event·venue_registry (행사 속성·365일 개최 행사), 행사 리스트, staging.ml_ranker_pairs, raw.ml_ranker_scores·ml_ranker_features (순위 모델 피처) |  | [06_dim_event.sql](sql/06_dim_event.sql) |
 | **dim_venue**<br>공간 차원 | 공간 1곳 | venue_id | 없음 / 없음 | raw.db_venues, raw.db_events, staging.dim_contract, staging.int_contract_day (그 계약의 마지막 활성일 요금제) | marts.daily_venue·daily_venue_registry·venue_registry (공간 속성), raw.ml_query_parse·ml_ranker_scores·ml_ranker_features (공간명 해석·순위 모델 피처) |  | [06_dim_venue.sql](sql/06_dim_venue.sql) |
-| **fct_order**<br>주문 원장 정리 (티켓 신청 + 구독 결제) | 주문 1건 = 티켓 신청 1건(kind ticket) 또는 구독 결제 1건(kind subscription) | order_id | applied_date / kind, event_id | raw.db_applications, raw.db_payments, raw.db_events, staging.int_contract_day (개최일 공간 요금제 → 수수료 등급), staging.map_fee_rate (등급별 수수료율) | staging.dim_event·ml_ranker_pairs, marts.daily_event·daily_venue·monthly_summary·daily_revenue·daily_subscription·venue_registry, ops.reconciliation | R5·R6·I4·C9·C14·R10·R11 | [06_fct_order.sql](sql/06_fct_order.sql) |
+| **fct_order**<br>주문 원장 정리 (티켓 신청 + 구독 결제) | 주문 1건 = 티켓 신청 1건(kind ticket) 또는 구독 결제 1건(kind subscription) | order_id | applied_date / kind, event_id | raw.db_applications, raw.db_payments, raw.db_events, staging.int_contract_day (개최일 공간 요금제 → 수수료 등급), staging.map_fee_rate (등급별 수수료율) | staging.dim_event·ml_ranker_pairs, marts.daily_event·daily_venue·monthly_summary·daily_revenue·daily_subscription·venue_registry, ops.reconciliation | R5·R6·I4·C9·C14 | [06_fct_order.sql](sql/06_fct_order.sql) |
 | **int_contract_day**<br>파트너 계약 활성일 (요금제 변경 반영) | 계약 × 활성일(KST) | (contract_id, kst_date) | kst_date / venue_id | staging.dim_contract (계약 기간), staging.dim_contract_change (요금제 변경) | staging.fct_order·dim_venue, marts.daily_revenue·daily_venue_registry·monthly_contract·contract_cohort |  | [06_int_contract_day.sql](sql/06_int_contract_day.sql) |
 | **int_label**<br>평가 라벨 단일 원본 | 라벨 1건 | label_id | kst_date / batch_id, rater_id | raw.eval_labels·eval_tasks·eval_batches·eval_raters | marts.weekly_eval_ops·weekly_rater·weekly_batch, staging.ml_ranker_pairs, ops.reconciliation | C18·C19·I7 | [07_int_label.sql](sql/07_int_label.sql) |
 | **int_search**<br>검색 요청 단일 원본 (서버 요청 로그 + 서버 클릭 로그) | 서버 검색 요청 1건 | request_id | kst_date / query_norm | raw.search_log·search_click_log, staging.events_clean·int_session·int_person_day | marts.daily_search·daily_query·exp_ranker_request·ranker_query_eval, raw.ml_query_parse, ops.reconciliation | C16·C17·C21·R12·I5·I6·I9 | [07_int_search.sql](sql/07_int_search.sql) |
@@ -84,7 +84,7 @@ python3 bigquery/build_catalog.py        # 이 문서 재생성 (주석·본문�
 | **daily_event**<br>행사별 일 마트 (리스트 집계) | 일(KST) × 행사 | (kst_date, event_id) | kst_date / event_id | staging.events_clean·int_session (조회 흐름, 세션 시작일·사람 단위), staging.fct_order (원장, 신청일 기준), staging.dim_event (속성) | 행사 리스트, 행사 결제 퍼널 (상세 조회 → 신청 화면 → 신청 → 결제), ops.reconciliation. 세그먼트 축 없음 |  | [daily_event.sql](sql/marts/daily_event.sql) |
 | **daily_metrics**<br>일 지표 마트 | 일(KST) × channel1 × device_platform × member_seg | 이 네 열 | kst_date / channel1, device_platform, member_seg | staging.int_person_day | 개요·퍼널·행사·결제(흐름 보기)·회원(회원·구독 보기) 탭 스코어보드와 추이. 세그먼트 조합의 합 = 전체. ops.reconciliation | C3·R4 | [daily_metrics.sql](sql/marts/daily_metrics.sql) |
 | **daily_query**<br>검색어별 일 집계 | 일(KST) × query_norm × channel1 × device_platform × member_seg | 이 다섯 열 | kst_date / query_norm | staging.int_search, raw.eval_queries | 검색 탭 실패 검색어 표, 보고서 실패 검색어 발견·재색인 회귀 |  | [daily_query.sql](sql/marts/daily_query.sql) |
-| **daily_revenue**<br>플랫폼 매출 종류별 일 마트 | 일(KST) × 매출 종류 × 수수료 등급(티켓만) | (kst_date, kind, fee_tier) | kst_date / kind | staging.fct_order (티켓·구독 결제, 결제일 기준), staging.int_contract_day (파트너 플랜 활성일·요금) | 개요 플랫폼 매출 타일·매출 구성 추이, 행사·결제 탭 매출 구성, 공간 탭 파트너 부담률. marts.monthly_summary, ops.reconciliation | C9·C14·R10·R11 | [daily_revenue.sql](sql/marts/daily_revenue.sql) |
+| **daily_revenue**<br>플랫폼 매출 종류별 일 마트 | 일(KST) × 매출 종류 × 수수료 등급(티켓만) | (kst_date, kind, fee_tier) | kst_date / kind | staging.fct_order (티켓·구독 결제, 결제일 기준), staging.int_contract_day (파트너 플랜 활성일·요금) | 개요 플랫폼 매출 타일·매출 구성 추이, 행사·결제 탭 매출 구성, 공간 탭 파트너 부담률. marts.monthly_summary, ops.reconciliation | C9·C14 | [daily_revenue.sql](sql/marts/daily_revenue.sql) |
 | **daily_search**<br>검색 품질 일 마트 | 일(KST) × query_intent × ranker_version × channel1 × device_platform × member_seg | 이 여섯 열 | kst_date / query_intent, ranker_version | staging.int_search | 검색 탭 스코어보드·추이·의도 유형, 주간·월간 탭 주간 브리핑, 보고서 진행 점검·재색인 회귀. ops.reconciliation | C16·I8 | [daily_search.sql](sql/marts/daily_search.sql) |
 | **daily_subscription**<br>구독 일 마트 | 일(KST) | kst_date | kst_date / 없음 | staging.dim_subscription (구독 원장), staging.fct_order (구독자의 티켓 결제, 결제일 기준) | 회원 탭 구독 보기 스코어보드·추이·구독자 결제 비교, 개요 기준일 구독자. marts.monthly_summary, ops.reconciliation | C10 | [daily_subscription.sql](sql/marts/daily_subscription.sql) |
 | **daily_venue**<br>공간별 일 마트 (리스트 집계) | 일(KST) × 공간 | (kst_date, venue_id) | kst_date / venue_id | staging.events_clean·int_session (공간 상세·리뷰 조회, 세션 시작일·사람 단위), staging.fct_order (그 공간 행사의 신청, 신청일 기준), staging.dim_venue | 공간 상위 N 표. 단위가 공간이므로 사람 세그먼트 축이 없다 |  | [daily_venue.sql](sql/marts/daily_venue.sql) |
@@ -115,7 +115,7 @@ python3 bigquery/build_catalog.py        # 이 문서 재생성 (주석·본문�
 |---|---|---|---|---|---|---|---|
 | **build_log**<br>파이프라인 실행 기록 (없을 때만 만든다. 기록은 누적된다) | 실행 1회 × 단계(SQL 파일 1개) | (run_id, step, step_name) | DATE(started_at) / 없음 | load_all.sh 가 단계마다 1행 추가 | 파이프라인 상태 확인, bigquery/README.md 마지막 실행 요약 |  | [00_ops_tables.sql](sql/00_ops_tables.sql) |
 | **freshness**<br>표별 신선도 (전체 교체) | 표 1개 | (dataset_name, table_name) | 없음 / 없음 | 각 데이터셋 __TABLES__ (행 수·변경 시각), INFORMATION_SCHEMA.PARTITIONS (마지막 파티션) | 파이프라인 상태 확인 (화면 소비 없음) |  | [09_freshness.sql](sql/09_freshness.sql) |
-| **reconciliation**<br>대조·범위·무결성 검사 결과 (행 추가) | 실행 1회 × 검사 항목 | (run_id, check_id) | DATE(checked_at) / 없음 | raw.db_payments·db_applications·db_subscriptions·db_venues·db_events·db_venue_contracts, staging.events_clean·int_session·int_person_day·fct_order·ad_spend·dim_contract, marts.daily_metrics·weekly_cohort·daily_channel·weekly_activity·weekly_audience_funnel·weekly_path·person_day, marts.daily_revenue·daily_subscription·daily_venue_registry·daily_event·venue_registry·monthly_contract, raw.search_log·search_click_log·eval_queries·eval_labels·eval_tasks·eval_batches, staging.int_search·int_label, marts.daily_search·exp_ranker_request·weekly_eval_ops·weekly_batch, staging.ml_ranker_pairs, raw.ml_query_parse·ml_ranker_scores·ml_ranker_features, marts.ranker_eval·ranker_query_eval·ranker_feature | load_all.sh 8단계. passed = FALSE 가 하나라도 있으면 파이프라인이 exit 1 |  | [reconciliation.sql](checks/reconciliation.sql) |
+| **reconciliation**<br>대조·범위·무결성 검사 결과 (행 추가) | 실행 1회 × 검사 항목 | (run_id, check_id) | DATE(checked_at) / 없음 | raw.db_payments·db_applications·db_subscriptions·db_venues, staging.events_clean·int_session·int_person_day·fct_order·ad_spend·dim_contract, marts.daily_metrics·weekly_cohort·daily_channel·weekly_activity·weekly_audience_funnel·weekly_path·person_day, marts.daily_revenue·daily_subscription·daily_venue_registry·daily_event·venue_registry·monthly_contract, raw.search_log·search_click_log·eval_queries·eval_labels·eval_tasks·eval_batches, staging.int_search·int_label, marts.daily_search·exp_ranker_request·weekly_eval_ops·weekly_batch, staging.ml_ranker_pairs, raw.ml_query_parse·ml_ranker_scores·ml_ranker_features, marts.ranker_eval·ranker_query_eval·ranker_feature | load_all.sh 8단계(차단 검사가 하나라도 실패하면 exit 1), dashboard/scripts/extract.py(마지막 실행에 차단 실패가 있거나 그 뒤 1~7단계가 다시 돌았으면 추출 거부) |  | [reconciliation.sql](checks/reconciliation.sql) |
 
 ## 계보
 
@@ -406,24 +406,63 @@ flowchart LR
 
 ## 검사
 
-[checks/reconciliation.sql](checks/reconciliation.sql) — 8단계. 하나라도 통과하지 못하면 `load_all.sh` 가 exit 1.
+[checks/reconciliation.sql](checks/reconciliation.sql), 8단계. 대조·무결성은 차단 검사다. 하나라도 통과하지 못하면 `load_all.sh` 가 exit 1 로 멈추고, `dashboard/scripts/extract.py` 는 마지막 실행에 차단 실패가 있거나 그 뒤 1~7단계가 다시 돌았으면 추출을 거부한다. 범위는 경보 검사다. 결과를 기록하고 범위 밖 건수만 출력한다. ID 는 추가된 순서이고 표는 목적별로 묶었다.
 
-| ID | 종류 | 이름 | 통과 기준 | 대상 표 | 최근 관측 | 통과 |
+### 원천 정합: 원장과 로그·마트가 같은가 (차단 11개)
+
+| ID | 종류 | 이름 | 통과 기준 | 대상 표 | 최근 관측 | 판정 |
 |---|---|---|---|---|---|---|
 | C1a | 대조 | 결제 건수: 로그 vs 원장 | 0 | events_clean | 0.0 | 통과 |
 | C1b | 대조 | 결제 금액: 로그 vs 원장 | 0 | events_clean | 0.0 | 통과 |
 | C2 | 대조 | 신청 건수: 로그 vs 원장 | 0 | events_clean | 0.0 | 통과 |
+| C12a | 대조 | 신청 건수 전 기간: 일 마트(로그) vs 행사 마트(원장) | 0 |  | 0.0 | 통과 |
+| C12b | 대조 | 결제 금액 전 기간: 일 마트(로그) vs 행사 마트(원장) | 0 |  | 0.0 | 통과 |
+| C9 | 대조 | 티켓 결제 금액: 매출 마트 vs 결제 원장 | 0 | fct_order, daily_revenue | 0.0 | 통과 |
+| C14 | 대조 | 수수료 매출: 매출 마트 vs 주문 원장 | 0 | fct_order, daily_revenue | 0.0 | 통과 |
+| C10 | 대조 | 일별 활성 구독자: 구독 마트 vs 구독 원장 | 0 | db_subscriptions, daily_subscription | 0.0 | 통과 |
+| C11 | 대조 | 등록 공간 누적: 상권 마트 vs 공간 원장 | 0 | daily_venue_registry | 0.0 | 통과 |
+| C13 | 대조 | 기준일 파트너 공간: 상권 마트 vs 공간 스냅샷 | 0 |  | 0.0 | 통과 |
+| C15 | 대조 | 월말 계약: 계약 월 마트 vs 계약 차원 | 0 | daily_venue_registry, monthly_contract | 0.0 | 통과 |
+
+### 층 보존: 층을 지나며 빠지거나 겹친 행이 없는가 (차단 13개)
+
+| ID | 종류 | 이름 | 통과 기준 | 대상 표 | 최근 관측 | 판정 |
+|---|---|---|---|---|---|---|
 | C3 | 대조 | 일 방문 사람: 마트 합 vs 중간 표 | 0 | daily_metrics | 0.0 | 통과 |
 | C4 | 대조 | 주간 코호트 크기: 0주차 vs 첫 방문 | 0 | weekly_cohort | 0.0 | 통과 |
 | C5 | 대조 | 채널 합: 세션 채널 마트 vs 세션 표 | 0 | daily_channel | 0.0 | 통과 |
 | C6 | 대조 | 오디언스 퍼널: 신규 + 재방문 vs WAU | 0 | weekly_audience_funnel | 0.0 | 통과 |
 | C7 | 대조 | 경로 1단계 세션 vs 주간 방문 세션 | 0 | weekly_path | 0.0 | 통과 |
 | C8 | 대조 | 사람 마트 방문 고유 vs 일 마트 방문 사람 | 0 | person_day | 0.0 | 통과 |
-| C9 | 대조 | 티켓 결제 금액: 매출 마트 vs 결제 원장 | 0 | fct_order, daily_revenue | 0.0 | 통과 |
-| C10 | 대조 | 일별 활성 구독자: 구독 마트 vs 구독 원장 | 0 | daily_subscription | 0.0 | 통과 |
-| C11 | 대조 | 등록 공간 누적: 상권 마트 vs 공간 원장 | 0 | daily_venue_registry | 0.0 | 통과 |
-| C14 | 대조 | 수수료 매출: 매출 마트 vs 주문 원장 | 0 | fct_order, daily_revenue | 0.0 | 통과 |
-| C15 | 대조 | 월말 계약: 계약 월 마트 vs 계약 차원 | 0 | daily_venue_registry, monthly_contract | 0.0 | 통과 |
+| C16 | 대조 | 검색 요청: 서버 로그 vs 중간 표 vs 일 마트 (+ 날짜별 불일치 일수) | 0 | int_search, daily_search | 0.0 | 통과 |
+| C17 | 대조 | 세션 대표 행: 대표 검색 행 수 vs 검색이 있었던 세션 수 | 0 | int_search | 0.0 | 통과 |
+| C21 | 대조 | 검색 클릭: 서버 클릭 로그 클릭 요청 vs 중간 표 클릭 (+ 요청 로그에 없는 클릭) | 0 | int_search | 0.0 | 통과 |
+| C18 | 대조 | 라벨 수: 원천 vs 평가 운영 주간 마트 | 0 | int_label, weekly_eval_ops | 0.0 | 통과 |
+| C19 | 대조 | 정답셋 성분: 원천 재집계 vs 주간 마트 (첫 제출 라벨 수 + 정답 수) | 0 | int_label, weekly_eval_ops | 0.0 | 통과 |
+| C22 | 대조 | 순위 모델 채점: 해석된 검색어의 학습 쌍 vs 채점 결과 (+ 키 불일치) | 0 | ml_ranker_pairs | 0.0 | 통과 |
+| C23 | 대조 | 순위 모델 평가 마트: 학습 쌍 vs ranker_eval (행 + 정답 등급 합) | 0 | ml_ranker_pairs, ranker_eval | 0.0 | 통과 |
+
+### 무결성: 규칙을 어긴 행이 0인가 (차단 12개)
+
+| ID | 종류 | 이름 | 통과 기준 | 대상 표 | 최근 관측 | 판정 |
+|---|---|---|---|---|---|---|
+| I1 | 무결성 | 기기당 회원 1명 | 0 | int_session | 0.0 | 통과 |
+| I2 | 무결성 | 채널 매핑 누락 세션 | 0 | int_session | 0.0 | 통과 |
+| I3 | 무결성 | event_date = KST 날짜 | 0 | events_clean | 0.0 | 통과 |
+| I4 | 무결성 | 행사 원장에 없는 신청 | 0 | fct_order | 0.0 | 통과 |
+| I5 | 무결성 | 클릭 판정: 결과 0건이거나 순위 1~10 밖인데 클릭 | 0 | int_search | 0.0 | 통과 |
+| I6 | 무결성 | 검색 요청 세그먼트 누락 | 0 | int_search | 0.0 | 통과 |
+| I7 | 무결성 | 과제당 평가자 초과·배치 완료 > 목표 | 0 | int_label, weekly_batch | 0.0 | 통과 |
+| I8 | 무결성 | 검색 지표 관계식: result = searches − zero, clicked ≤ result (일 마트 행마다) | 0 | daily_search | 0.0 | 통과 |
+| I9 | 무결성 | 랭킹 배정·기간 경계: 7/13 전 v2·7/27 이후 v1·A/B 기간 배정과 다른 버전 | 0 | int_search, exp_ranker_request | 0.0 | 통과 |
+| I10 | 무결성 | 순위 모델 산출 짝: 버전 둘 이상·중요도 합 ≠ 1·해석 표에 없는 검색 로그 검색어 | 0 | ranker_feature | 0.0 | 통과 |
+| I11 | 무결성 | 검색어 해석: 새 해석 의도 ≠ 검색 로그 의도 분류 + 해석 평가 마트 요청 ≠ 기준선 요청 | 0 | ranker_query_eval | 0.0 | 통과 |
+| C20 | 대조 | 실패 출처 편입 검색어가 직전 7일 실패 조건(20건 이상·0건 30% 이상)을 만족 | 0 |  | 0.0 | 통과 |
+
+### 지표 범위: 지표가 상식 범위 안인가 (경보 10개)
+
+| ID | 종류 | 이름 | 통과 기준 | 대상 표 | 최근 관측 | 판정 |
+|---|---|---|---|---|---|---|
 | R1 | 범위 | 신규 방문자 W1 리텐션 | 0.15 ~ 0.30 | weekly_cohort | 0.2274 | 통과 |
 | R2 | 범위 | W4 리텐션 | 0.08 ~ 0.18 | weekly_cohort | 0.09 | 통과 |
 | R3 | 범위 | 방문 → 가입 전환 (기간 누적 사람) | 0.06 ~ 0.12 | int_person_day | 0.1049 | 통과 |
@@ -432,38 +471,12 @@ flowchart LR
 | R6 | 범위 | 취소율 (신청 대비) | 0.05 ~ 0.12 | fct_order | 0.0778 | 통과 |
 | R7 | 범위 | 광고 세션 비중 (집행일, 자동 로드 제외) | 0.10 ~ 0.30 | int_session | 0.1583 | 통과 |
 | R8 | 범위 | 자동 로드 세션 비중 | 0.05 ~ 0.10 | int_session | 0.072 | 통과 |
-| R10 | 범위 | 실효 수수료율 (수수료 ÷ 거래액) | 0.05 ~ 0.07 | fct_order, daily_revenue | 0.06 | 통과 |
-| R11 | 범위 | 파트너 부담률 ((파트너 공간 수수료 + 플랜 매출) ÷ 파트너 거래액) | 0 ~ 0.15 | fct_order, daily_revenue | 0.1326 | 통과 |
-| I1 | 무결성 | 기기당 회원 1명 | 0 | int_session | 0.0 | 통과 |
-| I2 | 무결성 | 채널 매핑 누락 세션 | 0 | int_session | 0.0 | 통과 |
-| I3 | 무결성 | event_date = KST 날짜 | 0 | events_clean | 0.0 | 통과 |
-| I4 | 무결성 | 행사 원장에 없는 신청 | 0 | fct_order | 0.0 | 통과 |
-| C12a | 대조 | 신청 건수 전 기간: 일 마트(로그) vs 행사 마트(원장) | 0 |  | 0.0 | 통과 |
-| C12b | 대조 | 결제 금액 전 기간: 일 마트(로그) vs 행사 마트(원장) | 0 |  | 0.0 | 통과 |
-| C13 | 대조 | 기준일 파트너 공간: 상권 마트 vs 공간 스냅샷 | 0 |  | 0.0 | 통과 |
 | R9 | 범위 | 세션 시작일과 다른 날의 신청 (자정 넘긴 세션) | 0 ~ 0.02 |  | 0.0058 | 통과 |
-| C16 | 대조 | 검색 요청: 서버 로그 vs 중간 표 vs 일 마트 (+ 날짜별 불일치 일수) | 0 | int_search, daily_search | 0.0 | 통과 |
-| C17 | 대조 | 세션 대표 행: 대표 검색 행 수 vs 검색이 있었던 세션 수 | 0 | int_search | 0.0 | 통과 |
 | R12 | 범위 | GA search 이벤트 수집률 (서버 요청 중 같은 search_id 의 GA 이벤트가 있는 비중) | 0.97 ~ 0.995 | int_search | 0.9845 | 통과 |
-| I5 | 무결성 | 클릭 판정: 결과 0건이거나 순위 1~10 밖인데 클릭 | 0 | int_search | 0.0 | 통과 |
-| C21 | 대조 | 검색 클릭: 서버 클릭 로그 클릭 요청 vs 중간 표 클릭 (+ 요청 로그에 없는 클릭) | 0 | int_search | 0.0 | 통과 |
-| I8 | 무결성 | 검색 지표 관계식: result = searches − zero, clicked ≤ result (일 마트 행마다) | 0 | daily_search | 0.0 | 통과 |
-| I9 | 무결성 | 랭킹 배정·기간 경계: 7/13 전 v2·7/27 이후 v1·A/B 기간 배정과 다른 버전 | 0 | int_search, exp_ranker_request | 0.0 | 통과 |
-| R13 | 범위 | 구독 회차 해지율: 직전 회차 파트너 티켓 할인 결제 있음 ÷ 없음 | 0 ~ 0.7 | db_subscriptions | 0.5301 | 통과 |
-| R14 | 범위 | 계약 월 해지율: 직전 3개월 파트너 거래액 하위 1/3 ÷ 상위 1/3 | 1.5 ~ 100 | db_venue_contracts | 2.25 | 통과 |
-| I6 | 무결성 | 검색 요청 세그먼트 누락 | 0 | int_search | 0.0 | 통과 |
-| C18 | 대조 | 라벨 수: 원천 vs 평가 운영 주간 마트 | 0 | int_label, weekly_eval_ops | 0.0 | 통과 |
-| C19 | 대조 | 정답셋 성분: 원천 재집계 vs 주간 마트 (첫 제출 라벨 수 + 정답 수) | 0 | int_label, weekly_eval_ops | 0.0 | 통과 |
-| I7 | 무결성 | 과제당 평가자 초과·배치 완료 > 목표 | 0 | int_label, weekly_batch | 0.0 | 통과 |
-| C20 | 대조 | 실패 출처 편입 검색어가 직전 7일 실패 조건(20건 이상·0건 30% 이상)을 만족 | 0 |  | 0.0 | 통과 |
-| C22 | 대조 | 순위 모델 채점: 해석된 검색어의 학습 쌍 vs 채점 결과 (+ 키 불일치) | 0 | ml_ranker_pairs | 0.0 | 통과 |
-| C23 | 대조 | 순위 모델 평가 마트: 학습 쌍 vs ranker_eval (행 + 정답 등급 합) | 0 | ml_ranker_pairs, ranker_eval | 0.0 | 통과 |
-| I10 | 무결성 | 순위 모델 산출 짝: 버전 둘 이상·중요도 합 ≠ 1·해석 표에 없는 검색 로그 검색어 | 0 | ranker_feature | 0.0 | 통과 |
-| I11 | 무결성 | 검색어 해석: 새 해석 의도 ≠ 검색 로그 의도 분류 + 해석 평가 마트 요청 ≠ 기준선 요청 | 0 | ranker_query_eval | 0.0 | 통과 |
 
 ## 마지막 실행
 
-검사 run `20261023T070254Z` (2026-10-23 16:02 KST): 50/50 통과
+검사 run `20261025T080511Z` (2026-10-25 17:05 KST): 차단 36/36 통과, 경보 10개 중 범위 밖 0
 
 단계별 마지막 기록 (`ops.build_log`, 시각 KST):
 
@@ -517,6 +530,6 @@ flowchart LR
 | 7 | marts.ranker_eval | 20261023T042247Z | 2026-10-23 13:22 | 5 | 11,195 | 1,388,595 | ok |
 | 7 | marts.ranker_query_eval | 20261023T042247Z | 2026-10-23 13:23 | 4 | 505 | 174,925 | ok |
 | 7 | marts.ranker_feature | 20261023T042247Z | 2026-10-23 13:23 | 4 | 14 | 873 | ok |
-| 8 | ops.reconciliation | 20261023T070254Z | 2026-10-23 16:03 | 8 | 0 | 785,004,423 | ok |
-| 9 | ops.freshness | 20261023T070318Z | 2026-10-23 16:03 | 11 | 67 | 31,460,940 | ok |
+| 8 | ops.reconciliation | 20261025T080511Z | 2026-10-25 17:05 | 10 | 0 | 783,592,001 | ok |
+| 9 | ops.freshness | 20261025T080543Z | 2026-10-25 17:06 | 12 | 67 | 31,461,342 | ok |
 

@@ -2,6 +2,7 @@
 
 marts 데이터셋의 표 29개를 개인 GCP 래퍼(scripts/bq.sh)로 읽어 분할 파일로 쓴다.
 조회는 SELECT 뿐이며 표를 만들거나 바꾸지 않는다. 마트가 적재된 뒤에 실행한다.
+마지막 검사 실행(ops.reconciliation)에 차단 검사 실패가 있거나 그 뒤 마트가 다시 만들어졌으면 추출하지 않는다.
 
     uv run dashboard/scripts/extract.py
     uv run dashboard/scripts/extract.py --from-json /tmp/sample.json   # BigQuery 없이 합친 JSON 을 분할만
@@ -571,12 +572,40 @@ def person_day() -> dict:
     return {"base_date": base.isoformat(), "cols": ["pk", "d", "c", "p", "m", "f"], "codes": codes, "rows": packed}
 
 
+def check_gate() -> None:
+    """마지막 검사 실행이 화면에 올릴 마트를 보증하는지 확인한다.
+
+    대조·무결성(차단) 검사가 하나라도 실패했거나, 검사 기록이 없거나, 그 검사 뒤 load_all.sh 1~7단계가
+    다시 돌았으면 추출하지 않고 끝낸다. 범위(경보) 검사는 범위 밖 항목만 출력한다.
+    """
+    rows = query(
+        "WITH r AS (SELECT * FROM ops.reconciliation WHERE run_id = (SELECT MAX(run_id) FROM ops.reconciliation)) "
+        "SELECT ANY_VALUE(run_id) AS run_id, COUNTIF(category != 'range') AS blocking, "
+        "STRING_AGG(IF(category != 'range' AND NOT passed, check_id, NULL), ' ' ORDER BY check_id) AS failed, "
+        "STRING_AGG(IF(category = 'range' AND NOT passed, check_id, NULL), ' ' ORDER BY check_id) AS warned, "
+        "(SELECT COUNT(*) FROM ops.build_log WHERE SAFE_CAST(step AS INT64) BETWEEN 1 AND 7 "
+        "AND started_at > (SELECT MAX(checked_at) FROM r)) AS rebuilt "
+        "FROM r"
+    )
+    g = rows[0] if rows else {}
+    run_id, failed, warned = g.get("run_id"), g.get("failed") or "", g.get("warned") or ""
+    blocking, rebuilt = int(g.get("blocking") or 0), int(g.get("rebuilt") or 0)
+    if run_id is None or blocking == 0:
+        raise SystemExit("ops.reconciliation 에 검사 기록이 없다. load_all.sh 8단계를 먼저 실행")
+    if failed:
+        raise SystemExit(f"검사 run {run_id} 차단 검사 실패({failed}). 원인을 고쳐 다시 적재·검사한 뒤 추출")
+    if rebuilt:
+        raise SystemExit(f"검사 run {run_id} 뒤에 1~7단계가 {rebuilt}번 다시 돌았다. load_all.sh 8단계를 다시 실행")
+    print(f"검사 run {run_id}: 차단 {blocking}/{blocking} 통과, 경보 범위 밖 {warned or '없음'}")
+
+
 def fetch() -> dict:
-    """마트를 읽어 합친 사전(meta + 표 + person_day)을 만든다.
+    """검사 게이트를 확인한 뒤 마트를 읽어 합친 사전(meta + 표 + person_day)을 만든다.
 
     Returns:
         {"meta", <표>: 행 배열, "person_day": 열 배열 사전}.
     """
+    check_gate()
     out: dict[str, object] = {}
     for table, (cols, order) in TABLES.items():
         ints = INT_OVERRIDE.get(table, set())

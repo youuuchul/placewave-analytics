@@ -47,7 +47,9 @@ python3 bigquery/build_catalog.py --export dashboard/public/catalog.json   # + �
 | `[1]` 적재 오류 (스키마·형식) | 오류 메시지의 열 이름 | `bigquery/schema/*.json` 과 CSV 헤더 대조 |
 | `[n] … 실패: … bytesBilled` | `NP_MAX_BYTES` (기본 5GB) | 날짜 필터·열 선택을 먼저 줄인다. 상한을 올리는 건 마지막 |
 | `… Cannot replace a table with a different partitioning spec` 류 | 표의 파티션·클러스터 설정을 바꿨다 | `CREATE OR REPLACE` 는 설정 변경을 거부한다. `scripts/bq.sh rm -f -t <데이터셋>.<표>` 로 그 표만 지우고 해당 단계를 다시 돌린다 |
-| `[8] 검사 실패 k건` | 아래 첫 쿼리 | C(대조)는 SQL 버그, R(범위)은 생성기 보정, I(무결성)는 원천 문제일 가능성이 크다. C9 는 결제 원장에 신청이 없는 티켓 결제·부분 환불, C14 는 수수료 등급 누락(`fee_tier` NULL), C15 는 계약 기간 밖 요금제 변경·`from_fee` 가 직전 요금과 다른 변경, C10·C11 은 활성 규칙·날짜(KST) 변환 차이부터 본다. R10·R11 은 수수료율·플랜 요금·파트너 행사 비중(생성기 보정) |
+| `[8] 차단 검사 실패 k건` | 아래 첫 쿼리 | C(대조)는 SQL 버그, I(무결성)는 원천 문제일 가능성이 크다. C9 는 결제 원장에 신청이 없는 티켓 결제·부분 환불, C14 는 수수료 등급 누락(`fee_tier` NULL), C15 는 계약 기간 밖 요금제 변경·`from_fee` 가 직전 요금과 다른 변경, C10·C11 은 활성 규칙·날짜(KST) 변환 차이부터 본다 |
+| `[8] 경보 k건: 범위 밖 지표` | 아래 첫 쿼리 | R(범위)은 수집 누락(R12)·정의 오류·생성기 보정부터 본다. 경보라 파이프라인은 계속 돈다 |
+| `extract.py`: `차단 검사 실패` · `1~7단계가 n번 다시 돌았다` · `검사 기록이 없다` | 메시지의 run | 화면 데이터를 쓰지 않고 멈춘 상태다. 차단 실패는 위 조치 뒤 다시 적재·검사하고, 검사 뒤 마트를 다시 만들었으면 `load_all.sh --only 8` 을 돌린 뒤 추출한다 |
 
 ```sql
 -- 마지막 실행의 실패 항목
@@ -68,7 +70,7 @@ ORDER BY started_at;
 
 ## 검사 (8단계)
 
-검사 50개(대조 C · 범위 R · 무결성 I)의 ID·통과 기준·대상 표·최근 관측값은 [bigquery/README.md § 검사](../bigquery/README.md#검사). 하나라도 통과하지 못하면 `load_all.sh` 가 exit 1. 범위 검사(R)의 분자·분모 정의는 [metrics.md](metrics.md) 의 해당 지표와 같다.
+검사 46개의 ID·통과 기준·대상 표·최근 관측값은 [bigquery/README.md § 검사](../bigquery/README.md#검사)(목적별 묶음). 대조 C 25개 · 무결성 I 11개는 차단 검사다. 하나라도 통과하지 못하면 `load_all.sh` 가 exit 1 이고, `dashboard/scripts/extract.py` 는 마지막 검사 실행에 차단 실패가 있거나 그 뒤 1~7단계가 다시 돌았으면 추출을 거부한다. 범위 R 10개는 경보 검사로, 범위 밖 건수만 출력하고 계속한다. 범위 검사(R)의 분자·분모 정의는 [metrics.md](metrics.md) 의 해당 지표와 같다.
 
 ## 비용
 

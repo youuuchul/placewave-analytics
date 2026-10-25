@@ -2,20 +2,22 @@
 -- 1행: 실행 1회 × 검사 항목
 -- 키: (run_id, check_id)
 -- 파티션·클러스터: DATE(checked_at) / 없음
--- 원천: raw.db_payments·db_applications·db_subscriptions·db_venues·db_events·db_venue_contracts,
+-- 원천: raw.db_payments·db_applications·db_subscriptions·db_venues,
 --       staging.events_clean·int_session·int_person_day·fct_order·ad_spend·dim_contract,
 --       marts.daily_metrics·weekly_cohort·daily_channel·weekly_activity·weekly_audience_funnel·weekly_path·person_day,
 --       marts.daily_revenue·daily_subscription·daily_venue_registry·daily_event·venue_registry·monthly_contract,
 --       raw.search_log·search_click_log·eval_queries·eval_labels·eval_tasks·eval_batches, staging.int_search·int_label,
 --       marts.daily_search·exp_ranker_request·weekly_eval_ops·weekly_batch,
 --       staging.ml_ranker_pairs, raw.ml_query_parse·ml_ranker_scores·ml_ranker_features, marts.ranker_eval·ranker_query_eval·ranker_feature
--- 소비: load_all.sh 8단계. passed = FALSE 가 하나라도 있으면 파이프라인이 exit 1
+-- 소비: load_all.sh 8단계(차단 검사가 하나라도 실패하면 exit 1), dashboard/scripts/extract.py(마지막 실행에
+--       차단 실패가 있거나 그 뒤 1~7단계가 다시 돌았으면 추출 거부)
 --
 -- 표 정의는 sql/00_ops_tables.sql.
 -- 판정
---   reconcile (C)  observed = |왼쪽 - 오른쪽| + 날짜별 불일치 키 수. 0 이어야 통과
---   range     (R)  observed = 분자 / 분모. docs/architecture.md §6 범위 안이어야 통과
---   integrity (I)  observed = 위반 건수. 0 이어야 통과
+--   reconcile (C)  observed = |왼쪽 - 오른쪽| + 날짜별 불일치 키 수. 0 이어야 통과. 차단
+--   integrity (I)  observed = 위반 건수. 0 이어야 통과. 차단
+--   range     (R)  observed = 분자 / 분모. docs/architecture.md §6 범위 안이어야 통과. 경보(기록만 하고 멈추지 않는다)
+-- 사업 목표(수수료율·파트너 부담률)는 지표 가이드 북극성 가드레일, 생성 가정(해지 연결)은 generator/validate.py 에서 본다.
 -- 매개변수: @run_id STRING
 
 INSERT INTO ops.reconciliation
@@ -298,17 +300,6 @@ c15 AS (
   ) AS v ON v.kst_date = r.eom_day
   WHERE a.plan = 'all'
 ),
--- R10·R11 수수료·파트너 부담 (전 기간, 매출 마트)
-take AS (
-  SELECT
-    SUM(IF(kind = 'ticket', net_amount, 0)) AS fee,
-    SUM(IF(kind = 'ticket', gmv_amount, 0)) AS gmv,
-    SUM(IF(kind = 'ticket' AND fee_tier IN ('basic', 'pro'), net_amount, 0))
-      + SUM(IF(kind = 'partner_plan', net_amount, 0)) AS partner_cost,
-    SUM(IF(kind = 'ticket' AND fee_tier IN ('basic', 'pro'), gmv_amount, 0)) AS partner_gmv
-  FROM marts.daily_revenue
-  WHERE kst_date BETWEEN DATE '2000-01-01' AND DATE '2099-12-31'
-),
 cohort_ret AS (
   SELECT
     SUM(IF(week_offset = 1, retained, 0)) AS w1_num,
@@ -484,75 +475,6 @@ failed_src AS (
   ) AS w USING (batch_id, query_norm)
   WHERE q.source = 'failed'
 ),
--- R13 구독 회차 해지율: 직전 회차에 파트너 티켓을 멤버 할인으로 결제한 구독 ÷ 안 한 구독 (validate.py 와 같은 규칙)
---     회차 k(2 이상) = [시작 + k−1 개월, 시작 + k 개월), 직전 회차 = [시작 + k−2 개월, 시작 + k−1 개월). 관측 끝을 넘는 회차는 그 안에 해지했을 때만 센다
-sub_cyc AS (
-  SELECT
-    s.subscription_id, s.member_id,
-    DATE(s.ended_at, 'Asia/Seoul') AS ended,
-    DATE_ADD(DATE(s.started_at, 'Asia/Seoul'), INTERVAL k - 2 MONTH) AS p0,
-    DATE_ADD(DATE(s.started_at, 'Asia/Seoul'), INTERVAL k - 1 MONTH) AS w0,
-    DATE_ADD(DATE(s.started_at, 'Asia/Seoul'), INTERVAL k MONTH) AS w1,
-    s.snapshot_date AS end_date
-  FROM raw.db_subscriptions AS s, UNNEST(GENERATE_ARRAY(2, 14)) AS k
-),
-sub_risk AS (
-  SELECT
-    c.subscription_id, c.w0,
-    ANY_VALUE(c.ended IS NOT NULL AND c.ended >= c.w0 AND c.ended < c.w1) AS canceled,
-    COUNT(x.d) > 0 AS used
-  FROM sub_cyc AS c
-  LEFT JOIN (
-    SELECT member_id, DATE(paid_at, 'Asia/Seoul') AS d FROM raw.db_payments WHERE kind = 'ticket' AND discount_amount > 0
-  ) AS x
-    ON x.member_id = c.member_id AND x.d >= c.p0 AND x.d < c.w0
-  WHERE (c.ended IS NULL OR c.ended >= c.w0)
-    AND c.w0 <= c.end_date
-    AND (c.w1 <= DATE_ADD(c.end_date, INTERVAL 1 DAY) OR (c.ended IS NOT NULL AND c.ended < c.w1))
-  GROUP BY 1, 2
-),
-sub_churn AS (
-  SELECT
-    SAFE_DIVIDE(COUNTIF(used AND canceled), COUNTIF(used)) AS r_used,
-    SAFE_DIVIDE(COUNTIF(NOT used AND canceled), COUNTIF(NOT used)) AS r_none
-  FROM sub_risk
-),
--- R14 계약 월 해지율: 직전 3개월(계약 3개월 미만이면 있는 달) 월평균 파트너 거래액 하위 1/3 ÷ 상위 1/3 (validate.py 와 같은 규칙)
-pay_month AS (
-  SELECT e.venue_id, DATE_TRUNC(DATE(p.paid_at, 'Asia/Seoul'), MONTH) AS m, SUM(p.amount + p.discount_amount) AS gmv
-  FROM raw.db_payments AS p
-  JOIN raw.db_events AS e USING (event_id)
-  WHERE p.kind = 'ticket' AND p.status = 'paid'
-  GROUP BY 1, 2
-),
-con_month AS (
-  SELECT m, c.contract_id, c.venue_id, DATE(c.started_at, 'Asia/Seoul') AS st, DATE(c.ended_at, 'Asia/Seoul') AS en
-  FROM UNNEST(GENERATE_DATE_ARRAY(DATE '2025-10-01', DATE '2026-08-01', INTERVAL 1 MONTH)) AS m
-  JOIN raw.db_venue_contracts AS c
-    ON DATE(c.started_at, 'Asia/Seoul') < m AND (c.ended_at IS NULL OR DATE(c.ended_at, 'Asia/Seoul') >= m)
-),
-con_hist AS (
-  SELECT cm.m, cm.contract_id, ANY_VALUE(cm.en) AS en, AVG(COALESCE(pm.gmv, 0)) AS avg_gmv
-  FROM con_month AS cm
-  CROSS JOIN UNNEST([1, 2, 3]) AS k
-  LEFT JOIN pay_month AS pm
-    ON pm.venue_id = cm.venue_id AND pm.m = DATE_SUB(cm.m, INTERVAL k MONTH)
-  WHERE DATE_ADD(DATE_SUB(cm.m, INTERVAL k MONTH), INTERVAL 1 MONTH) > cm.st
-  GROUP BY 1, 2
-),
-con_rank AS (
-  SELECT
-    en IS NOT NULL AND en < DATE_ADD(m, INTERVAL 1 MONTH) AS churned,
-    ROW_NUMBER() OVER (PARTITION BY m ORDER BY avg_gmv, contract_id) AS rn,
-    COUNT(*) OVER (PARTITION BY m) AS n
-  FROM con_hist
-),
-con_churn AS (
-  SELECT
-    SAFE_DIVIDE(COUNTIF(rn <= DIV(n, 3) AND churned), COUNTIF(rn <= DIV(n, 3))) AS r_low,
-    SAFE_DIVIDE(COUNTIF(rn > n - DIV(n, 3) AND churned), COUNTIF(rn > n - DIV(n, 3))) AS r_high
-  FROM con_rank
-),
 -- C22 순위 모델 채점: 해석된 검색어의 학습 쌍 vs 채점 결과 (+ 양쪽 키 불일치)
 ml_score AS (
   SELECT
@@ -711,16 +633,6 @@ checks AS (
          SAFE_DIVIDE(auto_load, sessions), 0.05, 0.10, NULL
   FROM sess
   UNION ALL
-  SELECT 'R10', 'range', '실효 수수료율 (수수료 ÷ 거래액)',
-         '수수료 매출', fee, '거래액', gmv,
-         SAFE_DIVIDE(fee, gmv), 0.05, 0.07, NULL
-  FROM take
-  UNION ALL
-  SELECT 'R11', 'range', '파트너 부담률 ((파트너 공간 수수료 + 플랜 매출) ÷ 파트너 거래액)',
-         '파트너 수수료 + 플랜 매출', partner_cost, '파트너 공간 거래액', partner_gmv,
-         SAFE_DIVIDE(partner_cost, partner_gmv), 0, 0.15, NULL
-  FROM take
-  UNION ALL
   SELECT 'I1', 'integrity', '기기당 회원 1명', '회원 2명 이상 기기', multi_member_devices, NULL, NULL,
          multi_member_devices, 0, 0, NULL
   FROM integrity
@@ -788,16 +700,6 @@ checks AS (
   SELECT 'I9', 'integrity', '랭킹 배정·기간 경계: 7/13 전 v2·7/27 이후 v1·A/B 기간 배정과 다른 버전', '위반 요청', bad, NULL, NULL,
          bad, 0, 0, NULL
   FROM assign
-  UNION ALL
-  SELECT 'R13', 'range', '구독 회차 해지율: 직전 회차 파트너 티켓 할인 결제 있음 ÷ 없음',
-         '있음 해지율', r_used, '없음 해지율', r_none,
-         SAFE_DIVIDE(r_used, r_none), 0, 0.7, NULL
-  FROM sub_churn
-  UNION ALL
-  SELECT 'R14', 'range', '계약 월 해지율: 직전 3개월 파트너 거래액 하위 1/3 ÷ 상위 1/3',
-         '하위 1/3 해지율', r_low, '상위 1/3 해지율', r_high,
-         SAFE_DIVIDE(r_low, r_high), 1.5, 100, NULL
-  FROM con_churn
   UNION ALL
   SELECT 'I6', 'integrity', '검색 요청 세그먼트 누락', '세그먼트 NULL 요청', no_seg, NULL, NULL,
          no_seg, 0, 0, NULL
